@@ -9,6 +9,7 @@ edition = "2021"
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
 miniquad = "*"
 egui-miniquad = "*"
-egui = { version = "*", features = ["persistence"] }
+egui = "*"
 egui-notify = "*"
 native-dialog = "*"
+platform-dirs = "*"
