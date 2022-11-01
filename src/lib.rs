@@ -9,17 +9,20 @@ pub struct Stove {
     notifs: egui_notify::Toasts,
 }
 
-fn config_path()->std::path::PathBuf{
-    platform_dirs::AppDirs::new(None,true)
-        .expect("config directory not found")
-        .config_dir
-        .join("stove.config")
+fn config()->std::path::PathBuf{
+    dirs::config_dir().unwrap().join("stove")
 }
 
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
-        let version=std::fs::read_to_string(config_path()).unwrap_or("0".to_string()).parse().unwrap();
+        let config=config();
+        if !config.exists(){
+            if let Err(e)= std::fs::create_dir(&config){
+                notifs.error("failed to create config directory");
+            }
+        }
+        let version=std::fs::read_to_string(config.join("VERSION")).unwrap_or("0".to_string()).parse().unwrap();
         let map = std::env::args().skip(1).next();
         let map = match map {
             Some(path) => match asset_utils::open_asset(path, unreal_asset::ue4version::VER_UE4_25)
@@ -93,7 +96,7 @@ impl EventHandler for Stove {
                         .show_ui(ui, |ui| {
                             for version in VERSIONS {
                                 if ui.selectable_value(&mut self.version, version.1, version.0).clicked(){
-                                    if let Err(e)=std::fs::write(config_path(),version.1.to_string()) {
+                                    if let Err(e)=std::fs::write(config().join("VERSION"),version.1.to_string()) {
                                         self.notifs.error(e.to_string());
                                     }
                                 }
