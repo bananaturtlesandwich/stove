@@ -13,3 +13,9 @@ egui = "*"
 egui-notify = "*"
 native-dialog = "*"
 dirs = "*"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"

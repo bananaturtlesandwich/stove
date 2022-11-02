@@ -1,6 +1,7 @@
 use miniquad::*;
 mod asset_utils;
 mod map_utils;
+mod actor;
 
 pub struct Stove {
     map: Option<unreal_asset::Asset>,
@@ -18,7 +19,7 @@ impl Stove {
         let mut notifs = egui_notify::Toasts::new();
         let config=config();
         if !config.exists(){
-            if let Err(e)= std::fs::create_dir(&config){
+            if let Err(_)= std::fs::create_dir(&config){
                 notifs.error("failed to create config directory");
             }
         }
@@ -50,7 +51,7 @@ impl EventHandler for Stove {
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
-            color: Some((0.8, 1.0, 0.8, 1.0)),
+            color: Some((0.9, 1.0, 0.9, 1.0)),
             depth: Some(1.0),
             stencil: None,
         });
@@ -149,7 +150,19 @@ impl EventHandler for Stove {
         self.egui.key_up_event(keycode, keymods);
     }
 
-    fn files_dropped_event(&mut self, _ctx: &mut Context) {}
+    // is this even supported?
+    fn files_dropped_event(&mut self, ctx: &mut Context) {
+        if let Some(path)=ctx.dropped_file_path(0){
+            match asset_utils::open_asset(path, self.version) {
+                Ok(asset) => {
+                    self.map = Some(asset);
+                }
+                Err(e) => {
+                    self.notifs.error(e.to_string());
+                }
+            }
+        }
+    }
 }
 
 use unreal_asset::{ue4version::*, exports::ExportBaseTrait};
