@@ -1,16 +1,45 @@
 use unreal_asset::{
+    error::Error,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::{Property, PropertyDataTrait},
-    reader::asset_trait::AssetTrait,
-    unreal_types::PackageIndex,
+    properties::Property,
+    unreal_types::{PackageIndex, ToFName},
     Asset,
 };
 
+fn get_export_unchecked(asset: &Asset, index: PackageIndex) -> &Export {
+    &asset.exports[index.index as usize - 1]
+}
 pub struct Actor {
     export: PackageIndex,
+    transform: PackageIndex,
 }
 
+// may change to a list of class types because some objects will have all 3 values defaulted
+const tags: [&str; 3] = ["RelativeLocation", "RelativeRotation", "RelativeScale3D"];
+
 impl Actor {
+    pub fn new(asset: &Asset, export: PackageIndex) -> Result<Self, Error> {
+        match get_export_unchecked(asset, export)
+            .get_base_export()
+            .create_before_serialization_dependencies
+            .iter()
+            .find(
+                |&&index| match get_export_unchecked(asset, index).get_normal_export() {
+                    Some(norm) => norm
+                        .properties
+                        .iter()
+                        .find(|prop| tags.contains(&prop.to_fname().content.as_str()))
+                        .is_some(),
+                    None => false,
+                },
+            ) {
+            Some(&transform) => Ok(Self { export, transform }),
+            None => Err(Error::invalid_package_index(
+                "failed to find a scene component for an actor".to_string(),
+            )),
+        }
+    }
+
     pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
         let mut children = Vec::new();
         if let Some(export) = asset.get_export_mut(self.export) {
@@ -38,219 +67,175 @@ fn show_export(export: &mut Export, ui: &mut egui::Ui) {
 
 fn show_property(property: &mut Property, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        ui.label(&property.get_name().content);
         match property {
             Property::BoolProperty(bool) => {
+                ui.label(&bool.name.content);
                 ui.checkbox(&mut bool.value, &bool.name.content);
             }
+            Property::UInt16Property(uint) => {
+                ui.label(&uint.name.content);
+                slider(ui, &mut uint.value);
+            }
             Property::UInt32Property(uint) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut uint.value,
-                    u32::MIN..=u32::MAX,
-                ));
+                ui.label(&uint.name.content);
+                slider(ui, &mut uint.value);
             }
             Property::UInt64Property(uint) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut uint.value,
-                    u64::MIN..=u64::MAX,
-                ));
+                ui.label(&uint.name.content);
+                slider(ui, &mut uint.value);
             }
             Property::FloatProperty(float) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut float.value.into_inner(),
-                    f32::MIN..=f32::MAX,
-                ));
+                ui.label(&float.name.content);
+                slider(ui, &mut float.value.into_inner());
             }
             Property::Int16Property(int) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut int.value,
-                    i16::MIN..=i16::MAX,
-                ));
+                ui.label(&int.name.content);
+                slider(ui, &mut int.value);
             }
             Property::Int64Property(int) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut int.value,
-                    i64::MIN..=i64::MAX,
-                ));
+                ui.label(&int.name.content);
+                slider(ui, &mut int.value);
             }
             Property::Int8Property(int) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut int.value,
-                    i8::MIN..=i8::MAX,
-                ));
+                ui.label(&int.name.content);
+                slider(ui, &mut int.value);
             }
             Property::IntProperty(int) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut int.value,
-                    i32::MIN..=i32::MAX,
-                ));
+                ui.label(&int.name.content);
+                slider(ui, &mut int.value);
             }
             Property::ByteProperty(byte) => {
                 use unreal_asset::properties::int_property::ByteType;
+                ui.label(&byte.name.content);
                 match byte.byte_type {
-                    ByteType::Byte => ui.add(egui::widgets::Slider::new(
-                        &mut byte.value,
-                        i64::MIN..=i64::MAX,
-                    )),
+                    ByteType::Byte =>{slider(ui, &mut byte.value);}
+,
                     // byte.enum_type references the index of the fname in the name map so i need asset
                     // but the variable i'm editing is already a mutable reference to asset :/
-                    ByteType::Long => ui.label("ah rust makes this complicated"),
+                    ByteType::Long => {ui.label("ah rust makes this complicated");},
                 };
             }
             Property::DoubleProperty(double) => {
-                ui.add(egui::widgets::Slider::new(
-                    &mut double.value.into_inner(),
-                    f64::MIN..=f64::MAX,
-                ));
+                ui.label(&double.name.content);
+                slider(ui, &mut double.value.into_inner());
             }
-            Property::NameProperty(_) => {
+            Property::NameProperty(name) => {
+                ui.label(&name.name.content);
                 // the trouble with this is that i could change references elsewhere
                 ui.label("fname shenanigans");
             }
             Property::StrProperty(str) => {
-                let mut buf = str.value.clone().unwrap_or_default();
-                ui.text_edit_singleline(&mut buf);
-                str.value = Some(buf);
+                ui.label(&str.name.content);
+                text_edit(ui, &mut str.value);
             }
             Property::TextProperty(text) => {
-                let mut buf = text.culture_invariant_string.clone().unwrap_or_default();
-                ui.text_edit_singleline(&mut buf);
-                text.culture_invariant_string = Some(buf);
+                ui.label(&text.name.content);
+                text_edit(ui, &mut text.culture_invariant_string);
             }
             // we do nothing here to abstract away references and allow simplicity in the editor
             Property::ObjectProperty(_) => {}
             Property::AssetObjectProperty(obj) => {
-                let mut buf = obj.value.clone().unwrap_or_default();
-                ui.text_edit_singleline(&mut buf);
-                obj.value = Some(buf);
+                ui.label(&obj.name.content);
+                text_edit(ui, &mut obj.value);
             }
-            Property::SoftObjectProperty(_) => {
+            Property::SoftObjectProperty(obj) => {
+                ui.label(&obj.name.content);
                 ui.label("fname shenanigans");
             }
             Property::IntPointProperty(int_point) => {
-                ui.horizontal(|ui| {
-                    ui.add(egui::widgets::Slider::new(
-                        &mut int_point.x,
-                        i32::MIN..=i32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut int_point.y,
-                        i32::MIN..=i32::MAX,
-                    ));
-                });
+                ui.label(&int_point.name.content);
+                slider(ui, &mut int_point.x);
+                slider(ui, &mut int_point.y);
             }
             Property::VectorProperty(vec) => {
-                ui.horizontal(|ui| {
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.x.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.y.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.z.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
+                ui.label(&vec.name.content);
+                slider(ui, &mut vec.value.x.into_inner());
+                slider(ui, &mut vec.value.y.into_inner());
+                slider(ui, &mut vec.value.z.into_inner());
+            }
+            Property::ColorProperty(colour) => {
+                ui.label(&colour.name.content);
+                let mut val = [
+                    colour.color.r,
+                    colour.color.g,
+                    colour.color.b,
+                    colour.color.a,
+                ];
+                ui.color_edit_button_srgba_unmultiplied(&mut val);
+                colour.color.r = val[0];
+                colour.color.g = val[1];
+                colour.color.b = val[2];
+                colour.color.a = val[3];
+            }
+            Property::TimeSpanProperty(time) => {
+                ui.label(&time.name.content);
+                slider(ui, &mut time.ticks);
+            }
+            Property::DateTimeProperty(date) => {
+                ui.label(&date.name.content);
+                slider(ui, &mut date.ticks);
+            }
+            Property::SetProperty(set) => {
+                // show_property(&mut Property::ArrayProperty(set.value), ui);
+            }
+            Property::ArrayProperty(arr) => {
+                ui.collapsing(&arr.name.content, |ui| {
+                    for prop in arr.value.iter_mut() {
+                        show_property(prop, ui);
+                    }
                 });
             }
-            Property::Vector4Property(vec) => {
-                ui.horizontal(|ui| {
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.w.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.x.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.y.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.value.z.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
+            Property::MapProperty(map) => {
+                ui.collapsing(&map.name.content, |ui| {
+                    for set in map.value.iter_mut() {
+                        ui.horizontal(|ui| {
+                            ui.label(&set.0.to_fname().content);
+                            show_property(set.1, ui);
+                        });
+                    }
                 });
             }
-            Property::Vector2DProperty(vec) => {
-                ui.horizontal(|ui| {
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.x.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut vec.y.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
+            Property::PerPlatformBoolProperty(bools) => {
+                ui.collapsing(&bools.name.content, |ui| {
+                    for bool in bools.value.iter_mut() {
+                        ui.checkbox(bool, "");
+                    }
                 });
             }
-            Property::BoxProperty(prop) => {
-                ui.horizontal(|ui| {
-                    ui.add(egui::widgets::Slider::new(
-                        &mut prop.v1.value.x.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut prop.v1.value.y.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut prop.v1.value.z.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                });
-                ui.horizontal(|ui| {
-                    ui.add(egui::widgets::Slider::new(
-                        &mut prop.v2.value.x.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut prop.v2.value.y.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut prop.v2.value.z.into_inner(),
-                        f32::MIN..=f32::MAX,
-                    ));
+            Property::PerPlatformIntProperty(ints) => {
+                ui.collapsing(&ints.name.content, |ui| {
+                    for int in ints.value.iter_mut() {
+                        slider(ui, int);
+                    }
                 });
             }
-            Property::QuatProperty(_) => todo!(),
-            Property::RotatorProperty(_) => todo!(),
-            Property::LinearColorProperty(_) => todo!(),
-            Property::ColorProperty(_) => todo!(),
-            Property::TimeSpanProperty(_) => todo!(),
-            Property::DateTimeProperty(_) => todo!(),
-            Property::GuidProperty(_) => todo!(),
-            Property::SetProperty(_) => todo!(),
-            Property::ArrayProperty(_) => todo!(),
-            Property::MapProperty(_) => todo!(),
-            Property::PerPlatformBoolProperty(_) => todo!(),
-            Property::PerPlatformIntProperty(_) => todo!(),
-            Property::PerPlatformFloatProperty(_) => todo!(),
-            Property::MaterialAttributesInputProperty(_) => todo!(),
-            Property::ExpressionInputProperty(_) => todo!(),
-            Property::ColorMaterialInputProperty(_) => todo!(),
-            Property::ScalarMaterialInputProperty(_) => todo!(),
-            Property::ShadingModelMaterialInputProperty(_) => todo!(),
-            Property::VectorMaterialInputProperty(_) => todo!(),
-            Property::Vector2MaterialInputProperty(_) => todo!(),
-            Property::WeightedRandomSamplerProperty(_) => todo!(),
-            Property::SkeletalMeshSamplingLODBuiltDataProperty(_) => todo!(),
-            Property::SkeletalMeshAreaWeightedTriangleSampler(_) => todo!(),
-            Property::SoftAssetPathProperty(_) => todo!(),
-            Property::SoftObjectPathProperty(_) => todo!(),
-            Property::SoftClassPathProperty(_) => todo!(),
-            Property::MulticastDelegateProperty(_) => todo!(),
-            Property::RichCurveKeyProperty(_) => todo!(),
-            Property::ViewTargetBlendParamsProperty(_) => todo!(),
-            Property::GameplayTagContainerProperty(_) => todo!(),
-            Property::SmartNameProperty(_) => todo!(),
-            Property::StructProperty(_) => todo!(),
-            Property::EnumProperty(_) => todo!(),
-            Property::UnknownProperty(_) => todo!(),
+            Property::PerPlatformFloatProperty(floats) => {
+                ui.collapsing(&floats.name.content, |ui| {
+                    for float in floats.value.iter_mut() {
+                        slider(ui, &mut float.into_inner());
+                    }
+                });
+            }
+            Property::StructProperty(struc) => {
+                ui.collapsing(&struc.name.content, |ui| {
+                    for prop in struc.value.iter_mut() {
+                        show_property(prop, ui);
+                    }
+                });
+            }
+            // everything else is yet to be implemented because i'm lazy
+            _ => {}
         }
     });
+}
+
+/// a wrapper for adding sliders with the range already specified to reduce code duplication
+fn slider<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) {
+    ui.add(egui::widgets::Slider::new(val, Num::MIN..=Num::MAX));
+}
+
+fn text_edit(ui: &mut egui::Ui, val: &mut Option<String>) {
+    let mut buf = val.clone().unwrap_or_default();
+    ui.text_edit_singleline(&mut buf);
+    *val = Some(buf);
 }

@@ -1,29 +1,33 @@
 use miniquad::*;
+mod actor;
 mod asset_utils;
 mod map_utils;
-mod actor;
 
 pub struct Stove {
     map: Option<unreal_asset::Asset>,
     version: i32,
     egui: egui_miniquad::EguiMq,
     notifs: egui_notify::Toasts,
+    actors: Vec<actor::Actor>,
 }
 
-fn config()->std::path::PathBuf{
+fn config() -> std::path::PathBuf {
     dirs::config_dir().unwrap().join("stove")
 }
 
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
-        let config=config();
-        if !config.exists(){
-            if let Err(_)= std::fs::create_dir(&config){
+        let config = config();
+        if !config.exists() {
+            if let Err(_) = std::fs::create_dir(&config) {
                 notifs.error("failed to create config directory");
             }
         }
-        let version=std::fs::read_to_string(config.join("VERSION")).unwrap_or("0".to_string()).parse().unwrap();
+        let version = std::fs::read_to_string(config.join("VERSION"))
+            .unwrap_or("0".to_string())
+            .parse()
+            .unwrap();
         let map = std::env::args().skip(1).next();
         let map = match map {
             Some(path) => match asset_utils::open_asset(path, unreal_asset::ue4version::VER_UE4_25)
@@ -37,11 +41,25 @@ impl Stove {
             None => None,
         };
         let egui = egui_miniquad::EguiMq::new(ctx);
+        let mut actors = Vec::new();
+        if let Some(map) = &map {
+            for index in map_utils::get_actors(map) {
+                match actor::Actor::new(map, index) {
+                    Ok(actor) => {
+                        actors.push(actor);
+                    }
+                    Err(e) => {
+                        notifs.error(e.to_string());
+                    }
+                }
+            }
+        }
         Self {
             map,
             version,
             egui,
             notifs,
+            actors,
         }
     }
 }
@@ -104,14 +122,11 @@ impl EventHandler for Stove {
                             }
                         });
                 });
-                if let Some(map)=&self.map{
-                    let actors=map_utils::get_actors(&map);                    
-                    egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),actors.len(),|ui,range|{
-                       for i in  range{
-                            if let Some(ex)=map.get_export(actors[i]){
-                                ui.label(&ex.get_base_export().object_name.content);
-                            };
-                        }
+                if let Some(map)=&mut self.map{
+                    egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
+                       for i in range{
+                            self.actors[i].show(map,ui);
+                       }
                     });
                 }
             });
@@ -152,7 +167,7 @@ impl EventHandler for Stove {
 
     // is this even supported?
     fn files_dropped_event(&mut self, ctx: &mut Context) {
-        if let Some(path)=ctx.dropped_file_path(0){
+        if let Some(path) = ctx.dropped_file_path(0) {
             match asset_utils::open_asset(path, self.version) {
                 Ok(asset) => {
                     self.map = Some(asset);
@@ -165,7 +180,7 @@ impl EventHandler for Stove {
     }
 }
 
-use unreal_asset::{ue4version::*, exports::ExportBaseTrait};
+use unreal_asset::{exports::ExportBaseTrait, ue4version::*};
 const VERSIONS: &[(&str, i32)] = &[
     ("UNKNOWN", UNKNOWN),
     ("OLDEST_LOADABLE_PACKAGE", VER_UE4_OLDEST_LOADABLE_PACKAGE),
