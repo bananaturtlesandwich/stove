@@ -4,11 +4,12 @@ mod asset_utils;
 mod map_utils;
 
 pub struct Stove {
+    notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset>,
     version: i32,
     egui: egui_miniquad::EguiMq,
-    notifs: egui_notify::Toasts,
     actors: Vec<actor::Actor>,
+    selected: Option<usize>,
 }
 
 fn config() -> std::path::PathBuf {
@@ -28,8 +29,7 @@ impl Stove {
             .unwrap_or("0".to_string())
             .parse()
             .unwrap();
-        let map = std::env::args().skip(1).next();
-        let map = match map {
+        let map = match std::env::args().skip(1).next() {
             Some(path) => match asset_utils::open_asset(path, unreal_asset::ue4version::VER_UE4_25)
             {
                 Ok(asset) => Some(asset),
@@ -40,32 +40,38 @@ impl Stove {
             },
             None => None,
         };
-        let egui = egui_miniquad::EguiMq::new(ctx);
-        let mut actors = Vec::new();
-        if let Some(map) = &map {
+        let mut temp = Self {
+            notifs,
+            map,
+            version,
+            egui: egui_miniquad::EguiMq::new(ctx),
+            actors: Vec::new(),
+            selected: None,
+        };
+        temp.update_actors();
+        temp
+    }
+    fn update_actors(&mut self) {
+        self.actors.clear();
+        self.selected=None;
+        if let Some(map) = &self.map {
             for index in map_utils::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
-                        actors.push(actor);
+                        self.actors.push(actor);
                     }
                     Err(e) => {
-                        notifs.error(e.to_string());
+                        self.notifs.error(e.to_string());
                     }
                 }
             }
-        }
-        Self {
-            map,
-            version,
-            egui,
-            notifs,
-            actors,
         }
     }
 }
 
 impl EventHandler for Stove {
-    fn update(&mut self, _: &mut Context) {}
+    fn update(&mut self, _: &mut Context) {
+    }
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
@@ -74,7 +80,7 @@ impl EventHandler for Stove {
             stencil: None,
         });
         ctx.end_render_pass();
-        self.egui.run(ctx, |_, ctx| {
+        self.egui.run(ctx, |mqctx, ctx| {
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -86,6 +92,21 @@ impl EventHandler for Stove {
                                 match asset_utils::open_asset(path, self.version) {
                                     Ok(asset) => {
                                         self.map = Some(asset);
+                                        // why this compile but calling update_actors to do the same doesn't?
+                                        self.actors.clear();
+                                        self.selected=None;
+                                        if let Some(map) = &self.map {
+                                            for index in map_utils::get_actors(map) {
+                                                match actor::Actor::new(map, index) {
+                                                    Ok(actor) => {
+                                                        self.actors.push(actor);
+                                                    }
+                                                    Err(e) => {
+                                                        self.notifs.error(e.to_string());
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                     Err(e) => {
                                         self.notifs.error(e.to_string());
@@ -103,6 +124,9 @@ impl EventHandler for Stove {
                             ui.label("stove is an unreal engine map editor running on my spaghetti code - feel free to help untangle it over at "); 
                             ui.hyperlink("https://github.com/bananaturtlesandwich/stove");
                         });
+                        if ui.button("exit").clicked(){
+                            mqctx.request_quit();
+                        }
                     });
                     egui::ComboBox::from_id_source("version")
                         .selected_text(
@@ -123,11 +147,20 @@ impl EventHandler for Stove {
                         });
                 });
                 if let Some(map)=&mut self.map{
-                    egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
-                       for i in range{
-                            self.actors[i].show(map,ui);
-                       }
-                    });
+                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).max_height(250.0).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
+                        for i in range{
+                            let is_selected=Some(i)==self.selected;
+                            if ui.selectable_label(is_selected,self.actors[i].name(&map)).clicked(){
+                                self.selected=(!is_selected).then_some(i);
+                            }
+                        };
+                    }));
+                    ui.add_space(50.0);
+                    if let Some(selected)=self.selected{
+                        ui.push_id("properties",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
+                           self.actors[selected].show(map,ui); 
+                        }));
+                    }
                 }
             });
             self.notifs.show(ctx);
@@ -164,26 +197,13 @@ impl EventHandler for Stove {
     fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
         self.egui.key_up_event(keycode, keymods);
     }
-
-    // is this even supported?
-    fn files_dropped_event(&mut self, ctx: &mut Context) {
-        if let Some(path) = ctx.dropped_file_path(0) {
-            match asset_utils::open_asset(path, self.version) {
-                Ok(asset) => {
-                    self.map = Some(asset);
-                }
-                Err(e) => {
-                    self.notifs.error(e.to_string());
-                }
-            }
-        }
-    }
+    // unfortunately i don't believe file drop is implemented for miniquad at the current time
 }
 
-use unreal_asset::{exports::ExportBaseTrait, ue4version::*};
+use unreal_asset::ue4version::*;
 const VERSIONS: &[(&str, i32)] = &[
-    ("UNKNOWN", UNKNOWN),
-    ("OLDEST_LOADABLE_PACKAGE", VER_UE4_OLDEST_LOADABLE_PACKAGE),
+    ("unknown", UNKNOWN),
+    ("oldest", VER_UE4_OLDEST_LOADABLE_PACKAGE),
     ("4.0", VER_UE4_0),
     ("4.1", VER_UE4_1),
     ("4.2", VER_UE4_2),

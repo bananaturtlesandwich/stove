@@ -6,6 +6,7 @@ fn main() {
         miniquad::conf::Conf {
             window_title: "stove".to_string(),
             sample_count: 32,
+            fullscreen: true,
             // remind me to add a cool icon
             ..Default::default()
         },

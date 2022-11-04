@@ -17,7 +17,10 @@ pub fn get_actors(asset: &Asset) -> Vec<PackageIndex> {
         Some(ex) => ex
             .get_base_export()
             .create_before_serialization_dependencies
-            .clone(),
+            .clone()
+            .into_iter()
+            .filter(|i| i.is_export())
+            .collect(),
         None => Vec::new(),
     }
 }
