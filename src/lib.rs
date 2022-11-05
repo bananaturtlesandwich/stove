@@ -20,16 +20,14 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         let config = config();
-        if !config.exists() {
-            if let Err(_) = std::fs::create_dir(&config) {
-                notifs.error("failed to create config directory");
-            }
+        if !config.exists() && std::fs::create_dir(&config).is_err() {
+            notifs.error("failed to create config directory");
         }
         let version = std::fs::read_to_string(config.join("VERSION"))
-            .unwrap_or("0".to_string())
+            .unwrap_or_else(|_| "0".to_string())
             .parse()
             .unwrap();
-        let map = match std::env::args().skip(1).next() {
+        let map = match std::env::args().nth(1) {
             Some(path) => match asset_utils::open_asset(path, unreal_asset::ue4version::VER_UE4_25)
             {
                 Ok(asset) => Some(asset),

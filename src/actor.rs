@@ -16,7 +16,7 @@ const TAGS: [&str; 3] = ["RelativeLocation", "RelativeRotation", "RelativeScale3
 
 impl Actor {
     pub fn new(asset: &Asset, export: PackageIndex) -> Result<Self, Error> {
-        let Some(ex) = asset.get_export(export) else{
+        let Some(ex) = asset.get_export(export) else {
             return Err(Error::invalid_package_index(format!("failed to find actor at index {}",export.index-1)));
         };
 
@@ -25,12 +25,12 @@ impl Actor {
             .create_before_serialization_dependencies
             .iter()
             .find(|&&index| {
-                let Some(norm)=asset.get_export(index)else{return false};
-                let Some(norm)=norm.get_normal_export()else{return false};
+                let Some(Some(norm))=asset.get_export(index).map(|ex|ex.get_normal_export()) else {
+                    return false
+                };
                 norm.properties
                     .iter()
-                    .find(|prop| TAGS.contains(&prop.get_name().content.as_str()))
-                    .is_some()
+                    .any(|prop| TAGS.contains(&prop.get_name().content.as_str()))
             }) {
             Some(&transform) => Ok(Self { export, transform }),
             None => Err(Error::invalid_package_index(
@@ -40,6 +40,7 @@ impl Actor {
     }
 
     pub fn name<'a>(&self, asset: &'a Asset) -> &'a str {
+        // this is safe because invalid exports were already dealt with in the constructor
         &asset.exports[self.export.index as usize - 1]
             .get_base_export()
             .object_name
@@ -179,7 +180,7 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
             ui.label(&date.name.content);
             slider(ui, &mut date.ticks);
         }
-        Property::SetProperty(set) => {
+        Property::SetProperty(_) => {
             // show_property(&mut Property::ArrayProperty(set.value), ui);
         }
         Property::ArrayProperty(arr) => {
