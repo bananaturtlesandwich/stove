@@ -1,5 +1,5 @@
 # stove
-mule is a work-in-progress level editor for cooked unreal engine 4 map files
+stove is a work-in-progress level editor for cooked unreal engine 4 map files
 
 It was named as such because I didn't just want to call it something generic:
 I intend for the tool to be reliable, capable of doing some of the hard work for you, allowing you to take something already cooked and likely make it better
