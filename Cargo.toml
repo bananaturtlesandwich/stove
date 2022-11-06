@@ -17,6 +17,9 @@ egui-notify = "*"
 native-dialog = "*"
 dirs = "*"
 
+[target.'cfg(windows)'.build-dependencies]
+winres = "*"
+
 [profile.release]
 strip = true
 lto = true

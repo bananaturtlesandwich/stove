@@ -290,6 +290,7 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
         }
         _ => return,
     }
+    // this displays the property type
     .on_hover_text(&property.to_fname().content);
 }
 
