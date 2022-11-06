@@ -64,34 +64,28 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
     }
     match property {
         Property::BoolProperty(bool) => ui.checkbox(&mut bool.value, &bool.name.content),
-        Property::UInt16Property(uint) => {
-            ui.label(&uint.name.content) | slider(ui, &mut uint.value)
-        }
-        Property::UInt32Property(uint) => {
-            ui.label(&uint.name.content) | slider(ui, &mut uint.value)
-        }
-        Property::UInt64Property(uint) => {
-            ui.label(&uint.name.content) | slider(ui, &mut uint.value)
-        }
+        Property::UInt16Property(uint) => ui.label(&uint.name.content) | drag(ui, &mut uint.value),
+        Property::UInt32Property(uint) => ui.label(&uint.name.content) | drag(ui, &mut uint.value),
+        Property::UInt64Property(uint) => ui.label(&uint.name.content) | drag(ui, &mut uint.value),
         Property::FloatProperty(float) => {
-            ui.label(&float.name.content) | slider(ui, &mut float.value.0)
+            ui.label(&float.name.content) | drag(ui, &mut float.value.0)
         }
-        Property::Int16Property(int) => ui.label(&int.name.content) | slider(ui, &mut int.value),
-        Property::Int64Property(int) => ui.label(&int.name.content) | slider(ui, &mut int.value),
-        Property::Int8Property(int) => ui.label(&int.name.content) | slider(ui, &mut int.value),
-        Property::IntProperty(int) => ui.label(&int.name.content) | slider(ui, &mut int.value),
+        Property::Int16Property(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
+        Property::Int64Property(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
+        Property::Int8Property(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
+        Property::IntProperty(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
         Property::ByteProperty(byte) => {
             use unreal_asset::properties::int_property::ByteType;
             ui.label(&byte.name.content)
                 | match byte.byte_type {
-                    ByteType::Byte => slider(ui, &mut byte.value),
+                    ByteType::Byte => drag(ui, &mut byte.value),
                     // byte.enum_type references the index of the fname in the name map so i need asset
                     // but the variable i'm editing is already a mutable reference to asset :/
-                    ByteType::Long => ui.label("enum here"),
+                    ByteType::Long => return,
                 }
         }
         Property::DoubleProperty(double) => {
-            ui.label(&double.name.content) | slider(ui, &mut double.value.0)
+            ui.label(&double.name.content) | drag(ui, &mut double.value.0)
         }
         Property::NameProperty(name) => {
             ui.label(&name.name.content)|
@@ -144,10 +138,10 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
             }
         }
         Property::TimeSpanProperty(time) => {
-            ui.label(&time.name.content) | slider(ui, &mut time.ticks)
+            ui.label(&time.name.content) | drag(ui, &mut time.ticks)
         }
         Property::DateTimeProperty(date) => {
-            ui.label(&date.name.content) | slider(ui, &mut date.ticks)
+            ui.label(&date.name.content) | drag(ui, &mut date.ticks)
         }
         Property::ArrayProperty(arr) => {
             if let Some(arr_type) = &arr.array_type {
@@ -191,7 +185,7 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
             ui.push_id(ints.clone(), |ui| {
                 ui.collapsing(&ints.name.content, |ui| {
                     for int in ints.value.iter_mut() {
-                        slider(ui, int);
+                        drag(ui, int);
                     }
                 })
             })
@@ -201,7 +195,7 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
             ui.push_id(floats.clone(), |ui| {
                 ui.collapsing(&floats.name.content, |ui| {
                     for float in floats.value.iter_mut() {
-                        slider(ui, &mut float.0);
+                        drag(ui, &mut float.0);
                     }
                 })
             })
@@ -299,10 +293,7 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
     .on_hover_text(&property.to_fname().content);
 }
 
-/// a wrapper for adding sliders with the range already specified to reduce code duplication
-fn slider<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Response {
-    ui.add(egui::widgets::Slider::new(val, Num::MIN..=Num::MAX))
-}
+/// a wrapper for adding drag values with the range already specified to reduce code duplication
 fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Response {
     ui.add(egui::widgets::DragValue::new(val).clamp_range(Num::MIN..=Num::MAX))
 }

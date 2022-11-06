@@ -1,7 +1,8 @@
 [package]
 name = "stove"
 authors = ["spuds"]
-repository = "https://github.com/bananaturtlesandwich/mule"
+repository = "https://github.com/bananaturtlesandwich/stove"
+readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 
