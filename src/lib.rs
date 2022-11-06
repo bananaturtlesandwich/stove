@@ -51,7 +51,7 @@ impl Stove {
     }
     fn update_actors(&mut self) {
         self.actors.clear();
-        self.selected=None;
+        self.selected = None;
         if let Some(map) = &self.map {
             for index in map_utils::get_actors(map) {
                 match actor::Actor::new(map, index) {
@@ -68,8 +68,7 @@ impl Stove {
 }
 
 impl EventHandler for Stove {
-    fn update(&mut self, _: &mut Context) {
-    }
+    fn update(&mut self, _: &mut Context) {}
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
@@ -112,6 +111,20 @@ impl EventHandler for Stove {
                                 }
                             }
                         }
+                        if ui.button("save as").clicked(){
+                            match &self.map{
+                                Some(map) => 
+                                if let Ok(Some(path)) = native_dialog::FileDialog::new()
+                                    .add_filter("unreal map file", &["umap"])
+                                    .show_save_single_file(){
+                                        match asset_utils::save_asset(map, path){
+                                            Ok(_) => self.notifs.success("saved map"),
+                                            Err(e) => self.notifs.error(e.to_string()),
+                                        };
+                                    },
+                                None => {self.notifs.error("no map to save");},
+                            }
+                        }
                     });
                     ui.menu_button("options", |ui| {
                         ui.horizontal(|ui| {
@@ -144,20 +157,22 @@ impl EventHandler for Stove {
                             }
                         });
                 });
+                ui.add_space(10.0);
                 if let Some(map)=&mut self.map{
-                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).max_height(250.0).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
+                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
                         for i in range{
                             let is_selected=Some(i)==self.selected;
-                            if ui.selectable_label(is_selected,self.actors[i].name(&map)).clicked(){
+                            if ui.selectable_label(is_selected,self.actors[i].name(map)).clicked(){
                                 self.selected=(!is_selected).then_some(i);
                             }
                         };
                     }));
-                    ui.add_space(50.0);
                     if let Some(selected)=self.selected{
-                        ui.push_id("properties",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
-                           self.actors[selected].show(map,ui); 
-                        }));
+                        egui::SidePanel::right("properties").show(ctx, |ui|{
+                            egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
+                                self.actors[selected].show(map,ui); 
+                             });
+                        });
                     }
                 }
             });
