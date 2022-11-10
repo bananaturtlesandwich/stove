@@ -132,8 +132,10 @@ impl EventHandler for Stove {
                             egui::global_dark_light_mode_buttons(ui);
                         });
                         ui.menu_button("about",|ui|{
-                            ui.label("stove is an unreal engine map editor running on my spaghetti code - feel free to help untangle it over at "); 
-                            ui.hyperlink("https://github.com/bananaturtlesandwich/stove");
+                            ui.horizontal_wrapped(|ui|{
+                                ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
+                                ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                            });
                         });
                         if ui.button("exit").clicked(){
                             mqctx.request_quit();
@@ -166,6 +168,7 @@ impl EventHandler for Stove {
                                 self.selected=(!is_selected).then_some(i);
                             }
                         };
+                        ui.add_space(1.0);
                     }));
                     if let Some(selected)=self.selected{
                         egui::SidePanel::right("properties").show(ctx, |ui|{

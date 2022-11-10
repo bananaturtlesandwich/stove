@@ -149,67 +149,55 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
                     return;
                 }
             }
-            ui.push_id(arr.clone(), |ui| {
-                ui.collapsing(&arr.name.content, |ui| {
-                    for prop in arr.value.iter_mut() {
-                        show_property(prop, ui);
-                    }
-                })
+            ui.collapsing(&arr.name.content, |ui| {
+                for prop in arr.value.iter_mut() {
+                    show_property(prop, ui);
+                }
             })
-            .response
+            .header_response
         }
         Property::MapProperty(map) => {
-            ui.push_id(map.clone(), |ui| {
-                ui.collapsing(&map.name.content, |ui| {
-                    for set in map.value.iter_mut() {
-                        ui.horizontal(|ui| {
-                            ui.label(&set.0.to_fname().content);
-                            show_property(set.1, ui);
-                        });
-                    }
-                })
+            ui.collapsing(&map.name.content, |ui| {
+                for set in map.value.iter_mut() {
+                    ui.horizontal(|ui| {
+                        ui.label(&set.0.to_fname().content);
+                        show_property(set.1, ui);
+                    });
+                }
             })
-            .response
+            .header_response
         }
         Property::PerPlatformBoolProperty(bools) => {
-            ui.push_id(bools.clone(), |ui| {
-                ui.collapsing(&bools.name.content, |ui| {
-                    for bool in bools.value.iter_mut() {
-                        ui.checkbox(bool, "");
-                    }
-                })
+            ui.collapsing(&bools.name.content, |ui| {
+                for bool in bools.value.iter_mut() {
+                    ui.checkbox(bool, "");
+                }
             })
-            .response
+            .header_response
         }
         Property::PerPlatformIntProperty(ints) => {
-            ui.push_id(ints.clone(), |ui| {
-                ui.collapsing(&ints.name.content, |ui| {
-                    for int in ints.value.iter_mut() {
-                        drag(ui, int);
-                    }
-                })
+            ui.collapsing(&ints.name.content, |ui| {
+                for int in ints.value.iter_mut() {
+                    drag(ui, int);
+                }
             })
-            .response
+            .header_response
         }
         Property::PerPlatformFloatProperty(floats) => {
-            ui.push_id(floats.clone(), |ui| {
-                ui.collapsing(&floats.name.content, |ui| {
-                    for float in floats.value.iter_mut() {
-                        drag(ui, &mut float.0);
-                    }
-                })
+            ui.collapsing(&floats.name.content, |ui| {
+                for float in floats.value.iter_mut() {
+                    drag(ui, &mut float.0);
+                }
             })
-            .response
+            .header_response
         }
         Property::StructProperty(struc) => {
-            ui.push_id(struc.clone(), |ui| {
-                ui.collapsing(&struc.name.content, |ui| {
-                    for prop in struc.value.iter_mut() {
-                        show_property(prop, ui);
-                    }
-                })
+            ui.collapsing(&struc.name.content, |ui| {
+                for prop in struc.value.iter_mut() {
+                    show_property(prop, ui);
+                }
             })
-            .response
+            .header_response
         }
         Property::Vector4Property(vec) => {
             ui.label(&vec.name.content)
@@ -288,7 +276,10 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
                 })
                 .response
         }
-        _ => return,
+        _ => ui.hyperlink_to(
+            "currently unimplemented",
+            "https://github.com/bananaturtlesandwich/stove/issues/new",
+        ),
     }
     // this displays the property type
     .on_hover_text(&property.to_fname().content);
