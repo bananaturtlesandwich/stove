@@ -24,7 +24,7 @@ impl Stove {
             notifs.error("failed to create config directory");
         }
         let version = std::fs::read_to_string(config.join("VERSION"))
-            .unwrap_or_else(|_| "0".to_string())
+            .unwrap_or("0".to_string())
             .parse()
             .unwrap();
         let map = match std::env::args().nth(1) {
@@ -91,7 +91,7 @@ impl EventHandler for Stove {
                                         self.map = Some(asset);
                                         // why this compile but calling update_actors to do the same doesn't?
                                         self.actors.clear();
-                                        self.selected=None;
+                                        self.selected = None;
                                         if let Some(map) = &self.map {
                                             for index in map_utils::get_actors(map) {
                                                 match actor::Actor::new(map, index) {

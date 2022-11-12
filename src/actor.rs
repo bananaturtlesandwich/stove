@@ -1,19 +1,22 @@
 use unreal_asset::{
+    cast,
     error::Error,
     exports::{ExportBaseTrait, ExportNormalTrait},
-    properties::{Property, PropertyDataTrait},
+    properties::Property,
     unreal_types::{PackageIndex, ToFName},
     Asset,
 };
 
 pub struct Actor {
-    export: PackageIndex,
+    export: usize,
 }
 
 impl Actor {
     pub fn new(asset: &Asset, export: PackageIndex) -> Result<Self, Error> {
         match asset.get_export(export) {
-            Some(_) => Ok(Self { export }),
+            Some(_) => Ok(Self {
+                export: export.index as usize - 1,
+            }),
             None => Err(Error::invalid_package_index(format!(
                 "failed to find actor at index {}",
                 export.index - 1
@@ -23,45 +26,117 @@ impl Actor {
 
     pub fn name<'a>(&self, asset: &'a Asset) -> &'a str {
         // this is safe because invalid exports were already dealt with in the constructor
-        &asset.exports[self.export.index as usize - 1]
+        &asset.exports[self.export]
             .get_base_export()
             .object_name
             .content
     }
 
     pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
-        let mut children = Vec::new();
-        if let Some(Some(export)) = asset
-            .get_export_mut(self.export)
-            .map(|ex| ex.get_normal_export_mut())
+        for (i, prop) in asset.exports[self.export]
+            .get_normal_export()
+            .unwrap()
+            .properties
+            // clone so that i can check type for those special cases where i need access to the asset first
+            .clone()
+            .iter()
+            .enumerate()
         {
-            ui.heading(&export.base_export.object_name.content);
-            for prop in export.properties.iter_mut() {
-                show_property(prop, ui);
-            }
-            // because i can't have a non-mutable reference as well
-            children = export
-                .get_base_export()
-                .create_before_serialization_dependencies
-                .clone()
+            self.show_property(prop, i, asset, ui);
         }
-        for child in children {
-            if let Some(Some(export)) = asset
-                .get_export_mut(child)
-                .map(|ex| ex.get_normal_export_mut())
-            {
-                for prop in export.properties.iter_mut() {
-                    show_property(prop, ui);
+    }
+
+    /// this was the best way to compromise imo
+    fn show_property(
+        &self,
+        prop_ref: &Property,
+        prop_index: usize,
+        asset: &mut Asset,
+        ui: &mut egui::Ui,
+    ) {
+        match prop_ref {
+            Property::NameProperty(name) => {
+                let mut buf = name.value.content.clone();
+                let response = ui.text_edit_singleline(&mut buf);
+                if response.changed() {
+                    let fname = asset.add_fname(&buf);
+                    cast!(
+                        Property,
+                        NameProperty,
+                        &mut asset.exports[self.export]
+                            .get_normal_export_mut()
+                            .unwrap()
+                            .properties[prop_index]
+                    )
+                    .unwrap()
+                    .value = fname;
                 }
+                response
             }
+            // leave the normal byte properties to the other function
+            Property::ByteProperty(byte) if byte.enum_type.is_some() => {
+                let mut buf = asset.get_name_reference(byte.enum_type.unwrap() as i32);
+                let response = ui.text_edit_singleline(&mut buf);
+                // since it's an index i think i have to add an fname on every change
+                if response.changed() {
+                    let fname = asset.add_fname(&buf);
+                    cast!(
+                        Property,
+                        ByteProperty,
+                        &mut asset.exports[self.export]
+                            .get_normal_export_mut()
+                            .unwrap()
+                            .properties[prop_index]
+                    )
+                    .unwrap()
+                    .value = fname.index as i64;
+                }
+                response
+            }
+            Property::EnumProperty(e) => {
+                let mut buf = e.value.content.clone();
+                let response = ui.text_edit_singleline(&mut buf);
+                if response.changed() {
+                    let fname = asset.add_fname(&buf);
+                    cast!(
+                        Property,
+                        EnumProperty,
+                        &mut asset.exports[self.export]
+                            .get_normal_export_mut()
+                            .unwrap()
+                            .properties[prop_index]
+                    )
+                    .unwrap()
+                    .value = fname;
+                }
+                response
+            }
+            _ => show_simple_properties(
+                &mut asset.exports[self.export]
+                    .get_normal_export_mut()
+                    .unwrap()
+                    .properties[prop_index],
+                ui,
+            ),
         }
+        // this displays the property type
+        .on_hover_text(&prop_ref.to_fname().content);
     }
 }
 
-fn show_property(property: &mut Property, ui: &mut egui::Ui) {
-    if property.get_name().content.starts_with("UCS") {
-        return;
-    }
+/// a wrapper for adding drag values with the range already specified to reduce code duplication
+fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Response {
+    ui.add(egui::widgets::DragValue::new(val).clamp_range(Num::MIN..=Num::MAX))
+}
+
+fn text_edit(ui: &mut egui::Ui, val: &mut Option<String>) -> egui::Response {
+    let mut buf = val.clone().unwrap_or_default();
+    let response = ui.text_edit_singleline(&mut buf);
+    *val = Some(buf);
+    response
+}
+
+fn show_simple_properties(property: &mut Property, ui: &mut egui::Ui) -> egui::Response {
     match property {
         Property::BoolProperty(bool) => ui.checkbox(&mut bool.value, &bool.name.content),
         Property::UInt16Property(uint) => ui.label(&uint.name.content) | drag(ui, &mut uint.value),
@@ -74,30 +149,13 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
         Property::Int64Property(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
         Property::Int8Property(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
         Property::IntProperty(int) => ui.label(&int.name.content) | drag(ui, &mut int.value),
-        Property::ByteProperty(byte) => {
-            use unreal_asset::properties::int_property::ByteType;
-            ui.label(&byte.name.content)
-                | match byte.byte_type {
-                    ByteType::Byte => drag(ui, &mut byte.value),
-                    // byte.enum_type references the index of the fname in the name map so i need asset
-                    // but the variable i'm editing is already a mutable reference to asset :/
-                    ByteType::Long => return,
-                }
-        }
         Property::DoubleProperty(double) => {
             ui.label(&double.name.content) | drag(ui, &mut double.value.0)
-        }
-        Property::NameProperty(name) => {
-            ui.label(&name.name.content)|
-            // the trouble with this is that i could change references elsewhere
-            ui.text_edit_singleline(&mut name.value.content)
         }
         Property::StrProperty(str) => ui.label(&str.name.content) | text_edit(ui, &mut str.value),
         Property::TextProperty(text) => {
             ui.label(&text.name.content) | text_edit(ui, &mut text.culture_invariant_string)
         }
-        // we do nothing here to allow simplicity in the editor
-        Property::ObjectProperty(_) => return,
         Property::AssetObjectProperty(obj) => {
             ui.label(&obj.name.content) | text_edit(ui, &mut obj.value)
         }
@@ -143,30 +201,6 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
         Property::DateTimeProperty(date) => {
             ui.label(&date.name.content) | drag(ui, &mut date.ticks)
         }
-        Property::ArrayProperty(arr) => {
-            if let Some(arr_type) = &arr.array_type {
-                if arr_type.content == "ObjectProperty" {
-                    return;
-                }
-            }
-            ui.collapsing(&arr.name.content, |ui| {
-                for prop in arr.value.iter_mut() {
-                    show_property(prop, ui);
-                }
-            })
-            .header_response
-        }
-        Property::MapProperty(map) => {
-            ui.collapsing(&map.name.content, |ui| {
-                for set in map.value.iter_mut() {
-                    ui.horizontal(|ui| {
-                        ui.label(&set.0.to_fname().content);
-                        show_property(set.1, ui);
-                    });
-                }
-            })
-            .header_response
-        }
         Property::PerPlatformBoolProperty(bools) => {
             ui.collapsing(&bools.name.content, |ui| {
                 for bool in bools.value.iter_mut() {
@@ -187,14 +221,6 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
             ui.collapsing(&floats.name.content, |ui| {
                 for float in floats.value.iter_mut() {
                     drag(ui, &mut float.0);
-                }
-            })
-            .header_response
-        }
-        Property::StructProperty(struc) => {
-            ui.collapsing(&struc.name.content, |ui| {
-                for prop in struc.value.iter_mut() {
-                    show_property(prop, ui);
                 }
             })
             .header_response
@@ -281,18 +307,4 @@ fn show_property(property: &mut Property, ui: &mut egui::Ui) {
             "https://github.com/bananaturtlesandwich/stove/issues/new",
         ),
     }
-    // this displays the property type
-    .on_hover_text(&property.to_fname().content);
-}
-
-/// a wrapper for adding drag values with the range already specified to reduce code duplication
-fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Response {
-    ui.add(egui::widgets::DragValue::new(val).clamp_range(Num::MIN..=Num::MAX))
-}
-
-fn text_edit(ui: &mut egui::Ui, val: &mut Option<String>) -> egui::Response {
-    let mut buf = val.clone().unwrap_or_default();
-    let response = ui.text_edit_singleline(&mut buf);
-    *val = Some(buf);
-    response
 }

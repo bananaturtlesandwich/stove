@@ -1,7 +1,5 @@
 # <img src="assets/pot.ico" width="50" /> `stove` - an editor for cooked unreal engine 4 maps
----
-**still a heavy work in progress**
----
+# **still an extremely heavy work in progress**
 # Credits
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
 - [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates which allowed me to build the tool how I wanted
