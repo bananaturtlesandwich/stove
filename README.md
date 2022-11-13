@@ -1,5 +1,5 @@
 # <img src="assets/pot.ico" width="50" /> `stove` - an editor for cooked unreal engine 4 maps
-# **still an extremely heavy work in progress**
+*<h1 align="center">still an extremely heavy work in progress</h1>*
 # Credits
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
 - [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates which allowed me to build the tool how I wanted
@@ -8,7 +8,8 @@
 # Roadmap (AKA unrealistic ambitions)
 - [x] save and load unreal map files of any version
 - [x] display a selectable list of actors
-- [x] allow editing of each actor's properties
+- [x] allow editing of transforms
+- [ ] allow editing of each actor's properties
 - [ ] exclude properties not in the unreal editor
 - [ ] render each actor as an cube/sprite in a 3d scene
 - [ ] walk around scene with an unreal-editor-style camera

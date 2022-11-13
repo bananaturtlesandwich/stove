@@ -11,6 +11,7 @@ An editor for cooked unreal engine 4 map files
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
+glam = { version = "*", features = ["scalar-math", "fast-math"] }
 miniquad = "*"
 egui-miniquad = "*"
 egui = "*"

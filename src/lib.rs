@@ -1,9 +1,11 @@
 use miniquad::*;
+mod camera;
 mod actor;
 mod asset_utils;
 mod map_utils;
 
 pub struct Stove {
+    camera: camera::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset>,
     version: i32,
@@ -14,6 +16,26 @@ pub struct Stove {
 
 fn config() -> std::path::PathBuf {
     dirs::config_dir().unwrap().join("stove")
+}
+
+// the only way i could get it to compile and look nice :p
+macro_rules! update_actors{
+    ($self: expr)=>{
+        $self.actors.clear();
+        $self.selected = None;
+        if let Some(map) = &$self.map {
+            for index in map_utils::get_actors(map) {
+                match actor::Actor::new(map, index) {
+                    Ok(actor) => {
+                        $self.actors.push(actor);
+                    }
+                    Err(e) => {
+                        $self.notifs.warning(e.to_string());
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Stove {
@@ -38,7 +60,8 @@ impl Stove {
             },
             None => None,
         };
-        let mut temp = Self {
+        let mut stove = Self {
+            camera: camera::Camera::default(),
             notifs,
             map,
             version,
@@ -46,29 +69,16 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
         };
-        temp.update_actors();
-        temp
-    }
-    fn update_actors(&mut self) {
-        self.actors.clear();
-        self.selected = None;
-        if let Some(map) = &self.map {
-            for index in map_utils::get_actors(map) {
-                match actor::Actor::new(map, index) {
-                    Ok(actor) => {
-                        self.actors.push(actor);
-                    }
-                    Err(e) => {
-                        self.notifs.error(e.to_string());
-                    }
-                }
-            }
-        }
+        update_actors!(stove);
+        stove
     }
 }
 
 impl EventHandler for Stove {
-    fn update(&mut self, _: &mut Context) {}
+    fn update(&mut self, _: &mut Context) {
+        self.camera.update_times();
+        self.camera.move_cam()
+    }
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
@@ -89,21 +99,7 @@ impl EventHandler for Stove {
                                 match asset_utils::open_asset(path, self.version) {
                                     Ok(asset) => {
                                         self.map = Some(asset);
-                                        // why this compile but calling update_actors to do the same doesn't?
-                                        self.actors.clear();
-                                        self.selected = None;
-                                        if let Some(map) = &self.map {
-                                            for index in map_utils::get_actors(map) {
-                                                match actor::Actor::new(map, index) {
-                                                    Ok(actor) => {
-                                                        self.actors.push(actor);
-                                                    }
-                                                    Err(e) => {
-                                                        self.notifs.error(e.to_string());
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        update_actors!(self);
                                     }
                                     Err(e) => {
                                         self.notifs.error(e.to_string());
@@ -122,7 +118,9 @@ impl EventHandler for Stove {
                                             Err(e) => self.notifs.error(e.to_string()),
                                         };
                                     },
-                                None => {self.notifs.error("no map to save");},
+                                None => {
+                                    self.notifs.error("no map to save");
+                                },
                             }
                         }
                     });
@@ -181,13 +179,13 @@ impl EventHandler for Stove {
             });
             self.notifs.show(ctx);
         });
-
         self.egui.draw(ctx);
         ctx.commit_frame();
     }
     // boilerplate >n<
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
+        self.camera.handle_mouse_motion(x,y);
     }
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
@@ -196,10 +194,12 @@ impl EventHandler for Stove {
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
+        self.camera.handle_mouse_down(mb);
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
+        self.camera.handle_mouse_up(mb);
     }
 
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
@@ -208,12 +208,13 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
+        self.camera.handle_key_down(keycode);
     }
 
     fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
         self.egui.key_up_event(keycode, keymods);
+        self.camera.handle_key_up(keycode);
     }
-    // unfortunately i don't believe file drop is implemented for miniquad at the current time
 }
 
 use unreal_asset::ue4version::*;
