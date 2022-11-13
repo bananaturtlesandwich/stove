@@ -18,7 +18,7 @@ impl Default for Camera {
         Self {
             delta_time: 0.0,
             last_time: date::now(),
-            position: glam::Vec3::default(),
+            position: glam::Vec3::ZERO,
             view: false,
             up: glam::Vec3::Y,
             front: glam::vec3(0.0, 0.0, -1.0),

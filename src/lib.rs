@@ -1,17 +1,18 @@
 use miniquad::*;
-mod camera;
+mod rendering;
 mod actor;
 mod asset_utils;
 mod map_utils;
 
 pub struct Stove {
-    camera: camera::Camera,
+    camera: rendering::camera::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset>,
     version: i32,
     egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
+    cube: rendering::cube::Cube
 }
 
 fn config() -> std::path::PathBuf {
@@ -61,13 +62,14 @@ impl Stove {
             None => None,
         };
         let mut stove = Self {
-            camera: camera::Camera::default(),
+            camera: rendering::camera::Camera::default(),
             notifs,
             map,
             version,
             egui: egui_miniquad::EguiMq::new(ctx),
             actors: Vec::new(),
             selected: None,
+            cube: rendering::cube::Cube::new(ctx)
         };
         update_actors!(stove);
         stove
@@ -82,10 +84,18 @@ impl EventHandler for Stove {
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
-            color: Some((0.9, 1.0, 0.9, 1.0)),
+            color: Some((0.1, 0.2, 0.1, 1.0)),
             depth: Some(1.0),
             stencil: None,
         });
+        // self.cube.draw(ctx,glam::Mat4::from_translation(glam::Vec3::ZERO),self.camera.view_matrix());
+        if let Some(map)=&mut self.map{
+            for actor in self.actors.iter(){
+                if let Some(trans) = actor.get_translation(map){
+                    self.cube.draw(ctx,glam::Mat4::from_translation(glam::vec3(trans.value.x.0,trans.value.y.0,trans.value.z.0)),self.camera.view_matrix());
+                }
+            }
+        }
         ctx.end_render_pass();
         self.egui.run(ctx, |mqctx, ctx| {
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
