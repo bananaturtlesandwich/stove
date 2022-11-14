@@ -4,18 +4,19 @@
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
 - [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates which allowed me to build the tool how I wanted
 - [LongerWarrior](https://github.com/LongerWarrior) for pointing out everything I was missing in the actor duplication code
-
-# Roadmap (AKA unrealistic ambitions)
-- [x] save and load unreal map files of any version
+# Roadmap (from basic functionality to unrealistic ambitions)
+- [x] save and open unreal map files of any version
 - [x] display a selectable list of actors
-- [x] allow editing of transforms
+- [x] allow editing of actor transforms
+- [x] render each actor as an cube/sprite in a 3d scene
+- [x] walk around the scene with an unreal-editor-style camera
+- [ ] organise actor components in a satisfying way
 - [ ] allow editing of each actor's properties
-- [ ] exclude properties not in the unreal editor
-- [ ] render each actor as an cube/sprite in a 3d scene
-- [ ] walk around scene with an unreal-editor-style camera
-- [ ] insert default values (if a value is left the same as in the blueprint then it isn't actually in the map file)
+- [ ] duplicate actors in the same map
+- [ ] transplant actors from a different map
 - [ ] undo and redo certain actions
-- [ ] clone actors in the same map
-- [ ] transfer actors from a different map
-- [ ] display the mesh of an actor rather than a cube
-- [ ] search functionality
+- [ ] insert default values (many properties left as default are cut from the map file)
+- [ ] searching functionality
+- [ ] discord RPC (show your internet friends what you're doing)
+- [ ] display the mesh/sprite of an actor rather than a cube (would require loading pak/folder of assets)
+- [ ] move actors with a gizmo/keybinds rather than directly editing the transform property

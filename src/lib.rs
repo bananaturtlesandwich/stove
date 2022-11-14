@@ -84,11 +84,11 @@ impl EventHandler for Stove {
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
-            color: Some((0.1, 0.2, 0.1, 1.0)),
-            depth: Some(1.0),
+            color: Some((0.15, 0.15, 0.15, 1.0)),
+            // no point to clear depth at the moment because everything is solid colours
+            depth: None,
             stencil: None,
         });
-        // self.cube.draw(ctx,glam::Mat4::from_translation(glam::Vec3::ZERO),self.camera.view_matrix());
         if let Some(map)=&mut self.map{
             for actor in self.actors.iter(){
                 if let Some(trans) = actor.get_translation(map){
@@ -141,8 +141,11 @@ impl EventHandler for Stove {
                         });
                         ui.menu_button("about",|ui|{
                             ui.horizontal_wrapped(|ui|{
+                                let size=ui.fonts().glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' ');
+                                ui.spacing_mut().item_spacing.x=size;
                                 ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
                                 ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                                ui.label(egui::special_emojis::GITHUB.to_string());
                             });
                         });
                         if ui.button("exit").clicked(){

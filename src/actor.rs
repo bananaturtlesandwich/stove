@@ -52,11 +52,16 @@ impl Actor {
             match prop.get_name().content.as_str() {
                 "BlueprintCreatedComponents" => {
                     if let Property::ArrayProperty(arr) = prop {
-                        if let Some(Property::ObjectProperty(obj)) = &arr.value.first() {
-                            return Ok(Self {
-                                export,
-                                transform: obj.value.index as usize - 1,
-                            });
+                        // for some reason some blueprintcreatedcomponents are padded with null references
+                        for entry in arr.value.iter() {
+                            if let Property::ObjectProperty(obj) = entry {
+                                if asset.get_export(obj.value).is_some() {
+                                    return Ok(Self {
+                                        export,
+                                        transform: obj.value.index as usize - 1,
+                                    });
+                                }
+                            }
                         }
                     }
                 }
@@ -84,7 +89,7 @@ impl Actor {
     }
 
     pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
-        ui.heading(self.name(&asset));
+        ui.heading(self.name(asset));
         if let Some(trans) = self.get_translation(asset) {
             ui.horizontal(|ui| {
                 drag(ui, &mut trans.value.x.0);

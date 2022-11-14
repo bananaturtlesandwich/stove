@@ -62,9 +62,9 @@ impl Camera {
         }
     }
     pub fn handle_key_up(&mut self, key: KeyCode) {
-        // held must contain the position because a key must be put down first
-        self.held
-            .remove(self.held.iter().position(|k| k == &key).unwrap());
+        if let Some(pos) = self.held.iter().position(|k| k == &key) {
+            self.held.remove(pos);
+        }
     }
     pub fn handle_mouse_motion(&mut self, x: f32, y: f32) {
         if self.view {
@@ -87,6 +87,8 @@ impl Camera {
         self.view = button == MouseButton::Right;
     }
     pub fn handle_mouse_up(&mut self, button: MouseButton) {
-        self.view = !(button == MouseButton::Right);
+        if button == MouseButton::Right {
+            self.view = false;
+        }
     }
 }
