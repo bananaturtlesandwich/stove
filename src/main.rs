@@ -5,8 +5,8 @@ fn main() {
     miniquad::start(
         miniquad::conf::Conf {
             window_title: "stove".to_string(),
-            sample_count: 32,
-            fullscreen: true,
+            sample_count: 8,
+            high_dpi: true,
             icon: Some(miniquad::conf::Icon {
                 small: *include_bytes!("../assets/pot_16.rgba"),
                 medium: *include_bytes!("../assets/pot_32.rgba"),

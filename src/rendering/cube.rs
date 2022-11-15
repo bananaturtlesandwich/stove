@@ -15,6 +15,7 @@ impl Cube {
                     uniforms: vec![
                         UniformDesc::new("model", UniformType::Mat4),
                         UniformDesc::new("view", UniformType::Mat4),
+                        UniformDesc::new("tint", UniformType::Float3),
                     ],
                 },
                 images: vec![],
@@ -34,10 +35,10 @@ impl Cube {
             },
         }
     }
-    pub fn draw(&self, ctx: &mut Context, model: glam::Mat4, view: glam::Mat4) {
+    pub fn draw(&self, ctx: &mut Context, model: glam::Mat4, view: glam::Mat4, tint: glam::Vec3) {
         ctx.apply_pipeline(&self.block);
         ctx.apply_bindings(&self.bindings);
-        ctx.apply_uniforms(&(Uniforms { model, view }));
+        ctx.apply_uniforms(&Uniforms { model, view, tint });
         ctx.draw(0, 36, 1);
     }
 }
@@ -46,4 +47,5 @@ impl Cube {
 struct Uniforms {
     model: glam::Mat4,
     view: glam::Mat4,
+    tint: glam::Vec3,
 }

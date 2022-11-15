@@ -22,10 +22,11 @@ impl Actor {
             .rev()
             .find_map(|prop| {
                 if let Property::StructProperty(struc) = prop {
-                    cast!(Property, VectorProperty, &mut struc.value[0])
-                } else {
-                    None
+                    if &struc.name.content == "RelativeLocation" {
+                        return cast!(Property, VectorProperty, &mut struc.value[0]);
+                    }
                 }
+                None
             })
     }
 
@@ -48,23 +49,10 @@ impl Actor {
         let Some(norm) = ex.get_normal_export() else {
             return Err(Error::no_data(format!("actor at index {} failed to parse", package.index)))
         };
+        // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
             match prop.get_name().content.as_str() {
-                "BlueprintCreatedComponents" => {
-                    if let Property::ArrayProperty(arr) = prop {
-                        // for some reason some blueprintcreatedcomponents are padded with null references
-                        for entry in arr.value.iter() {
-                            if let Property::ObjectProperty(obj) = entry {
-                                if asset.get_export(obj.value).is_some() {
-                                    return Ok(Self {
-                                        export,
-                                        transform: obj.value.index as usize - 1,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
+                // of course this wouldn't be able to be detected if all transforms were left default
                 "RelativeLocation" | "RelativeRotation" | "RelativeScale3D" => {
                     return Ok(Self {
                         export,

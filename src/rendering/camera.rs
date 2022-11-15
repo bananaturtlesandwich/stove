@@ -56,6 +56,9 @@ impl Camera {
             }
         }
     }
+    pub fn set_pos(&mut self, pos: glam::Vec3) {
+        self.position = pos - self.front * glam::Vec3::splat(4.0);
+    }
     pub fn handle_key_down(&mut self, key: KeyCode) {
         if !self.held.contains(&key) {
             self.held.push(key)
