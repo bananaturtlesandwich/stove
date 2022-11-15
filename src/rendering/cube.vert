@@ -7,8 +7,8 @@ uniform mat4 view;
 const mat4 projection = mat4(
     1, 0, 0, 0,
     0, 1.8, 0, 0,
-    0, 0, -1, -1,
-    0, 0, -0.2, 0
+    0, 0, 1, 1,
+    0, 0, -1, 0
 );
 
 const vec3 verts[36] = vec3[](

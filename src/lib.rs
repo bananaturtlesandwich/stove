@@ -90,17 +90,15 @@ impl EventHandler for Stove {
         });
         if let Some(map)=&mut self.map{
             for (i,actor) in self.actors.iter().enumerate(){
-                if let Some(trans) = actor.get_translation(map){
-                    self.cube.draw(
-                        ctx,
-                        glam::Mat4::from_translation(trans),
-                        self.camera.view_matrix(),
-                        match self.selected==Some(i){
-                            true=>glam::vec3(0.0,1.0,0.5),
-                            false=>glam::Vec3::ONE
-                        }
-                    );
-                }
+                self.cube.draw(
+                    ctx,
+                    glam::Mat4::from_translation(actor.get_translation(map)),
+                    self.camera.view_matrix(),
+                    match self.selected == Some(i){
+                        true => glam::vec3(1.0,1.0,0.5),
+                        false => glam::vec3(0.0,1.0,0.5)
+                    }
+                );
             }
         }
         ctx.end_render_pass();
@@ -185,9 +183,7 @@ impl EventHandler for Stove {
                             if ui.selectable_label(is_selected,self.actors[i].name(map)).on_hover_text(self.actors[i].class(map)).clicked(){
                                 self.selected=(!is_selected).then_some(i);
                                 if let Some(i)=self.selected{
-                                    if let Some(pos)=self.actors[i].get_translation(map){
-                                        self.camera.set_focus(pos);
-                                    }
+                                    self.camera.set_focus(self.actors[i].get_translation(map));
                                 }
                             }
                         };
@@ -199,6 +195,11 @@ impl EventHandler for Stove {
                                 self.actors[selected].show(map,ui); 
                              });
                         });
+                        egui_gizmo::Gizmo::new("gizmo")
+                            .view_matrix(self.camera.view_matrix().to_cols_array_2d())
+                            .model_matrix(glam::Mat4::from_translation(self.actors[selected].get_translation(map)).to_cols_array_2d())
+                            .projection_matrix(glam::Mat4::perspective_infinite_lh(45.0, 1920.0/1080.0, 10.0).to_cols_array_2d())
+                            .interact(ui);
                     }
                 }
             });

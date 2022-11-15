@@ -14,8 +14,8 @@ pub struct Actor {
 }
 
 impl Actor {
-    pub fn get_translation(&self, asset: &Asset) -> Option<glam::Vec3> {
-        let Some(trans)=asset.exports[self.transform]
+    pub fn get_translation(&self, asset: &Asset) -> glam::Vec3 {
+        asset.exports[self.transform]
             .get_normal_export()
             .unwrap()
             .properties
@@ -28,12 +28,12 @@ impl Actor {
                     }
                 }
                 None
-            }) else{
-                return None
-            };
-        Some(
-            glam::vec3(trans.value.x.0, trans.value.y.0, trans.value.z.0) * glam::Vec3::splat(0.01),
-        )
+            })
+            .map(|trans| {
+                glam::vec3(trans.value.x.0, trans.value.y.0, trans.value.z.0)
+                    * glam::Vec3::splat(0.01)
+            })
+            .unwrap_or_default()
     }
 
     pub fn name<'a>(&self, asset: &'a Asset) -> &'a str {

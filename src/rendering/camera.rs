@@ -37,7 +37,7 @@ impl Camera {
         self.last_time = time;
     }
     pub fn view_matrix(&self) -> glam::Mat4 {
-        glam::Mat4::look_at_rh(self.position, self.position + self.front, self.up)
+        glam::Mat4::look_at_lh(self.position, self.position + self.front, self.up)
     }
     pub fn move_cam(&mut self) {
         if !self.view {
@@ -47,9 +47,9 @@ impl Camera {
         for keycode in self.held.iter() {
             match keycode {
                 KeyCode::W => self.position += self.front * velocity,
-                KeyCode::A => self.position -= self.front.cross(self.up).normalize() * velocity,
+                KeyCode::A => self.position += self.front.cross(self.up).normalize() * velocity,
                 KeyCode::S => self.position -= self.front * velocity,
-                KeyCode::D => self.position += self.front.cross(self.up).normalize() * velocity,
+                KeyCode::D => self.position -= self.front.cross(self.up).normalize() * velocity,
                 KeyCode::E => self.position += glam::vec3(0.0, velocity, 0.0),
                 KeyCode::Q => self.position -= glam::vec3(0.0, velocity, 0.0),
                 _ => (),
@@ -73,8 +73,9 @@ impl Camera {
         if self.view {
             let delta = glam::vec2(x - self.last_pos.x, y - self.last_pos.y);
             let scale = (10.0 * self.delta_time) as f32;
-            self.yaw += (delta.x * scale).clamp(-89.0, 89.0);
+            self.yaw -= delta.x * scale;
             self.pitch -= delta.y * scale;
+            self.pitch = self.pitch.clamp(-89.0, 89.0);
             let front_pitch = self.pitch.to_radians().sin_cos();
             let front_yaw = self.yaw.to_radians().sin_cos();
             self.front = glam::vec3(
