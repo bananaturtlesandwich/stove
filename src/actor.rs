@@ -2,7 +2,8 @@ use unreal_asset::{
     cast,
     error::Error,
     exports::{ExportBaseTrait, ExportNormalTrait},
-    properties::{vector_property::VectorProperty, Property, PropertyDataTrait},
+    properties::{Property, PropertyDataTrait},
+    reader::asset_trait::AssetTrait,
     unreal_types::PackageIndex,
     Asset,
 };
@@ -13,21 +14,26 @@ pub struct Actor {
 }
 
 impl Actor {
-    pub fn get_translation<'a>(&self, asset: &'a mut Asset) -> Option<&'a mut VectorProperty> {
-        asset.exports[self.transform]
-            .get_normal_export_mut()
+    pub fn get_translation(&self, asset: &Asset) -> Option<glam::Vec3> {
+        let Some(trans)=asset.exports[self.transform]
+            .get_normal_export()
             .unwrap()
             .properties
-            .iter_mut()
+            .iter()
             .rev()
             .find_map(|prop| {
                 if let Property::StructProperty(struc) = prop {
                     if &struc.name.content == "RelativeLocation" {
-                        return cast!(Property, VectorProperty, &mut struc.value[0]);
+                        return cast!(Property, VectorProperty, &struc.value[0]);
                     }
                 }
                 None
-            })
+            }) else{
+                return None
+            };
+        Some(
+            glam::vec3(trans.value.x.0, trans.value.y.0, trans.value.z.0) * glam::Vec3::splat(0.01),
+        )
     }
 
     pub fn name<'a>(&self, asset: &'a Asset) -> &'a str {
@@ -36,6 +42,14 @@ impl Actor {
             .get_base_export()
             .object_name
             .content
+    }
+
+    pub fn class<'a>(&self, asset: &'a Asset) -> &'a str {
+        // this is safe because invalid exports were already dealt with in the constructor
+        asset
+            .get_import(asset.exports[self.export].get_base_export().class_index)
+            .map(|import| import.object_name.content.as_str())
+            .unwrap_or_default()
     }
 
     pub fn new(asset: &Asset, package: PackageIndex) -> Result<Self, Error> {
@@ -61,10 +75,12 @@ impl Actor {
                 }
                 "RootComponent" => {
                     if let Property::ObjectProperty(obj) = prop {
-                        return Ok(Self {
-                            export,
-                            transform: obj.value.index as usize - 1,
-                        });
+                        if obj.value.is_export() {
+                            return Ok(Self {
+                                export,
+                                transform: obj.value.index as usize - 1,
+                            });
+                        }
                     }
                 }
                 _ => continue,
@@ -78,12 +94,22 @@ impl Actor {
 
     pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
         ui.heading(self.name(asset));
-        if let Some(trans) = self.get_translation(asset) {
-            ui.horizontal(|ui| {
-                drag(ui, &mut trans.value.x.0);
-                drag(ui, &mut trans.value.y.0);
-                drag(ui, &mut trans.value.z.0);
-            });
+        for prop in asset.exports[self.transform]
+            .get_normal_export_mut()
+            .unwrap()
+            .properties
+            .iter_mut()
+        {
+            if let Property::StructProperty(struc) = prop {
+                if let Some(Property::VectorProperty(vec)) = struc.value.first_mut() {
+                    ui.horizontal(|ui| {
+                        ui.label(&vec.name.content);
+                        drag(ui, &mut vec.value.x.0);
+                        drag(ui, &mut vec.value.y.0);
+                        drag(ui, &mut vec.value.z.0);
+                    });
+                }
+            }
         }
     }
 }

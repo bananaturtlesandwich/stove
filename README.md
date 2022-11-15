@@ -2,7 +2,7 @@
 *<h1 align="center">still an extremely heavy work in progress</h1>*
 # Credits
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
-- [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates which allowed me to build the tool how I wanted
+- [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their minimal yet easy-to-use [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates
 - [LongerWarrior](https://github.com/LongerWarrior) for pointing out everything I was missing in the actor duplication code
 # Roadmap (from basic functionality to unrealistic ambitions)
 - [x] save and open unreal map files of any version

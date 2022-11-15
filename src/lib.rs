@@ -85,8 +85,7 @@ impl EventHandler for Stove {
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(PassAction::Clear {
             color: Some((0.15, 0.15, 0.15, 1.0)),
-            // no point to clear depth at the moment because everything is solid colours
-            depth: None,
+            depth: Some(1.0),
             stencil: None,
         });
         if let Some(map)=&mut self.map{
@@ -94,7 +93,7 @@ impl EventHandler for Stove {
                 if let Some(trans) = actor.get_translation(map){
                     self.cube.draw(
                         ctx,
-                        glam::Mat4::from_translation(glam::vec3(trans.value.x.0,trans.value.y.0,trans.value.z.0)),
+                        glam::Mat4::from_translation(trans),
                         self.camera.view_matrix(),
                         match self.selected==Some(i){
                             true=>glam::vec3(0.0,1.0,0.5),
@@ -183,17 +182,17 @@ impl EventHandler for Stove {
                     ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
                         for i in range{
                             let is_selected=Some(i)==self.selected;
-                            if ui.selectable_label(is_selected,self.actors[i].name(map)).clicked(){
+                            if ui.selectable_label(is_selected,self.actors[i].name(map)).on_hover_text(self.actors[i].class(map)).clicked(){
                                 self.selected=(!is_selected).then_some(i);
                                 if let Some(i)=self.selected{
                                     if let Some(pos)=self.actors[i].get_translation(map){
-                                        self.camera.set_pos(glam::vec3(pos.value.x.0,pos.value.y.0,pos.value.z.0));
+                                        self.camera.set_focus(pos);
                                     }
                                 }
                             }
                         };
-                        ui.add_space(1.0);
                     }));
+                    ui.add_space(1.0);
                     if let Some(selected)=self.selected{
                         egui::SidePanel::right("properties").show(ctx, |ui|{
                             egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
