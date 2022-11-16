@@ -173,15 +173,16 @@ impl EventHandler for Stove {
                     ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
                         for i in range{
                             let is_selected=Some(i)==self.selected;
-                            if ui.selectable_label(is_selected,self.actors[i].name(map)).on_hover_text(self.actors[i].class(map)).clicked(){
+                            if ui.selectable_label(is_selected,&self.actors[i].name).on_hover_text(&self.actors[i].class).clicked(){
                                 self.selected=(!is_selected).then_some(i);
                                 if let Some(i)=self.selected{
                                     self.camera.set_focus(self.actors[i].get_translation(map));
                                 }
                             }
                         };
+                        // otherwise the scroll area bugs out at the bottom
+                        ui.add_space(1.0);
                     }));
-                    ui.add_space(1.0);
                     if let Some(selected)=self.selected{
                         egui::SidePanel::right("properties").show(ctx, |ui|{
                             egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{

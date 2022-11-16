@@ -1,7 +1,7 @@
 use unreal_asset::{
     cast,
     error::Error,
-    exports::{ExportBaseTrait, ExportNormalTrait},
+    exports::ExportNormalTrait,
     properties::{Property, PropertyDataTrait},
     reader::asset_trait::AssetTrait,
     unreal_types::PackageIndex,
@@ -11,6 +11,8 @@ use unreal_asset::{
 pub struct Actor {
     export: usize,
     transform: usize,
+    pub name: String,
+    pub class: String,
 }
 
 impl Actor {
@@ -36,22 +38,6 @@ impl Actor {
             .unwrap_or_default()
     }
 
-    pub fn name<'a>(&self, asset: &'a Asset) -> &'a str {
-        // this is safe because invalid exports were already dealt with in the constructor
-        &asset.exports[self.export]
-            .get_base_export()
-            .object_name
-            .content
-    }
-
-    pub fn class<'a>(&self, asset: &'a Asset) -> &'a str {
-        // this is safe because invalid exports were already dealt with in the constructor
-        asset
-            .get_import(asset.exports[self.export].get_base_export().class_index)
-            .map(|import| import.object_name.content.as_str())
-            .unwrap_or_default()
-    }
-
     pub fn new(asset: &Asset, package: PackageIndex) -> Result<Self, Error> {
         let export = package.index as usize - 1;
         let Some(ex) = asset.get_export(package) else{
@@ -63,6 +49,11 @@ impl Actor {
         let Some(norm) = ex.get_normal_export() else {
             return Err(Error::no_data(format!("actor at index {} failed to parse", package.index)))
         };
+        let name = norm.base_export.object_name.content.clone();
+        let class = asset
+            .get_import(norm.base_export.class_index)
+            .map(|import| import.object_name.content.clone())
+            .unwrap_or_default();
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
             match prop.get_name().content.as_str() {
@@ -71,6 +62,8 @@ impl Actor {
                     return Ok(Self {
                         export,
                         transform: export,
+                        name,
+                        class,
                     })
                 }
                 "RootComponent" => {
@@ -79,6 +72,8 @@ impl Actor {
                             return Ok(Self {
                                 export,
                                 transform: obj.value.index as usize - 1,
+                                name,
+                                class,
                             });
                         }
                     }
@@ -93,7 +88,7 @@ impl Actor {
     }
 
     pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
-        ui.heading(self.name(asset));
+        ui.heading(&self.name);
         for prop in asset.exports[self.transform]
             .get_normal_export_mut()
             .unwrap()
