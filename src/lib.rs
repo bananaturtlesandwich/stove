@@ -198,11 +198,13 @@ impl EventHandler for Stove {
                     ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
                         for i in range{
                             let is_selected=Some(i)==self.selected;
-                            if ui.selectable_label(is_selected,&self.actors[i].name).on_hover_text(&self.actors[i].class).clicked(){
+                            if ui.selectable_label(
+                                is_selected,
+                                &self.actors[i].name
+                            )
+                            .on_hover_text(&self.actors[i].class)
+                            .clicked(){
                                 self.selected=(!is_selected).then_some(i);
-                                if let Some(i)=self.selected{
-                                    self.camera.set_focus(self.actors[i].get_translation(map));
-                                }
                             }
                         };
                         // otherwise the scroll area bugs out at the bottom
@@ -226,9 +228,16 @@ impl EventHandler for Stove {
         });
         if let Some(map)=&mut self.map{
             for (i,actor) in self.actors.iter().enumerate(){
+                let rot=actor.get_rotation(map);
                 self.cube.draw(
                     ctx,
-                    glam::Mat4::from_translation(actor.get_translation(map)),
+                    glam::Mat4::from_translation(actor.get_translation(map))
+                    * glam::Mat4::from_euler(
+                        glam::EulerRot::XZY,
+                        rot.x.to_radians(),
+                        rot.y.to_radians(),
+                        rot.z.to_radians()
+                    ),
                     self.camera.view_matrix(),
                     match self.selected == Some(i){
                         true => glam::vec3(1.0,1.0,0.5),
@@ -273,6 +282,11 @@ impl EventHandler for Stove {
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
         self.camera.handle_key_down(keycode);
+        if let KeyCode::F = keycode {
+            if let Some(selected)=self.selected{
+                self.camera.set_focus(self.actors[selected].get_translation(self.map.as_ref().unwrap()))
+            }
+        }
     }
 
     fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {

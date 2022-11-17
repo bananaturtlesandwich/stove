@@ -23,7 +23,17 @@ impl Cube {
         )
         .unwrap();
         Self {
-            block: Pipeline::new(ctx, &[BufferLayout::default()], &[], shader),
+            block: Pipeline::with_params(
+                ctx,
+                &[BufferLayout::default()],
+                &[],
+                shader,
+                PipelineParams {
+                    depth_test: Comparison::LessOrEqual,
+                    depth_write: true,
+                    ..Default::default()
+                },
+            ),
             bindings: Bindings {
                 vertex_buffers: vec![],
                 index_buffer: Buffer::immutable(

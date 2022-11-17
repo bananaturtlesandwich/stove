@@ -3,11 +3,13 @@ use unreal_asset::{
     error::Error,
     exports::ExportNormalTrait,
     properties::{
-        struct_property::StructProperty, vector_property::VectorProperty, Property,
-        PropertyDataTrait,
+        struct_property::StructProperty,
+        vector_property::{RotatorProperty, VectorProperty},
+        Property, PropertyDataTrait,
     },
     reader::asset_trait::AssetTrait,
-    unreal_types::PackageIndex,
+    types::Vector,
+    unreal_types::{FName, PackageIndex},
     Asset,
 };
 
@@ -34,11 +36,30 @@ impl Actor {
                 }
                 None
             })
-            .map(|trans| glam::vec3(trans.value.x.0, trans.value.y.0, trans.value.z.0) * 0.01)
+            .map(|pos| glam::vec3(pos.value.x.0, pos.value.y.0, pos.value.z.0) * 0.01)
             .unwrap_or_default()
     }
 
-    pub fn set_translation(&self, asset: &mut Asset, pos: [f32; 3]) {
+    pub fn get_rotation(&self, asset: &Asset) -> glam::Vec3 {
+        asset.exports[self.transform]
+            .get_normal_export()
+            .unwrap()
+            .properties
+            .iter()
+            .rev()
+            .find_map(|prop| {
+                if let Property::StructProperty(struc) = prop {
+                    if &struc.name.content == "RelativeRotation" {
+                        return cast!(Property, RotatorProperty, &struc.value[0]);
+                    }
+                }
+                None
+            })
+            .map(|rot| glam::vec3(rot.value.x.0, rot.value.y.0, rot.value.z.0))
+            .unwrap_or_default()
+    }
+
+    pub fn set_translation(&self, asset: &mut Asset, new: [f32; 3]) {
         match asset.exports[self.transform]
             .get_normal_export_mut()
             .unwrap()
@@ -53,25 +74,79 @@ impl Actor {
                 }
                 None
             }) {
-            Some(trans) => {
-                trans.value.x.0 = pos[0] * 100.0;
-                trans.value.y.0 = pos[1] * 100.0;
-                trans.value.z.0 = pos[2] * 100.0;
+            Some(pos) => {
+                pos.value.x.0 = new[0] * 100.0;
+                pos.value.y.0 = new[1] * 100.0;
+                pos.value.z.0 = new[2] * 100.0;
             }
             // create if does not exist
             None => {
                 let name = asset.add_fname("RelativeTransform");
-                let mut trans =
-                    StructProperty::new(asset, name.clone(), false, 0, 0, asset.engine_version)
-                        .unwrap();
-                trans.value.push(Property::VectorProperty(
-                    VectorProperty::new(asset, name, false, 0).unwrap(),
-                ));
                 asset.exports[self.transform]
                     .get_normal_export_mut()
                     .unwrap()
                     .properties
-                    .push(Property::StructProperty(trans));
+                    .push(Property::StructProperty(StructProperty {
+                        name: name.clone(),
+                        // from research this seems to be the field values
+                        struct_type: Some(FName::from_slice("Vector")),
+                        struct_guid: Some([0; 16]),
+                        property_guid: None,
+                        duplication_index: 0,
+                        serialize_none: true,
+                        value: vec![Property::VectorProperty(VectorProperty {
+                            name,
+                            property_guid: None,
+                            duplication_index: 0,
+                            value: Vector::new(0.0.into(), 0.0.into(), 0.0.into()),
+                        })],
+                    }));
+            }
+        }
+    }
+
+    pub fn set_rotation(&self, asset: &mut Asset, new: [f32; 3]) {
+        match asset.exports[self.transform]
+            .get_normal_export_mut()
+            .unwrap()
+            .properties
+            .iter_mut()
+            .rev()
+            .find_map(|prop| {
+                if let Property::StructProperty(struc) = prop {
+                    if &struc.name.content == "RelativeRotation" {
+                        return cast!(Property, RotatorProperty, &mut struc.value[0]);
+                    }
+                }
+                None
+            }) {
+            Some(rot) => {
+                rot.value.x.0 = new[0];
+                rot.value.y.0 = new[1];
+                rot.value.z.0 = new[2];
+            }
+            // create if does not exist
+            None => {
+                let name = asset.add_fname("RelativeRotation");
+                asset.exports[self.transform]
+                    .get_normal_export_mut()
+                    .unwrap()
+                    .properties
+                    .push(Property::StructProperty(StructProperty {
+                        name: name.clone(),
+                        // from research this seems to be the field values
+                        struct_type: Some(FName::from_slice("Rotator")),
+                        struct_guid: Some([0; 16]),
+                        property_guid: None,
+                        duplication_index: 0,
+                        serialize_none: true,
+                        value: vec![Property::RotatorProperty(RotatorProperty {
+                            name,
+                            property_guid: None,
+                            duplication_index: 0,
+                            value: Vector::new(0.0.into(), 0.0.into(), 0.0.into()),
+                        })],
+                    }));
             }
         }
     }
@@ -134,14 +209,25 @@ impl Actor {
             .iter_mut()
         {
             if let Property::StructProperty(struc) = prop {
-                if let Some(Property::VectorProperty(vec)) = struc.value.first_mut() {
-                    ui.horizontal(|ui| {
-                        ui.label(&vec.name.content);
-                        drag(ui, &mut vec.value.x.0);
-                        drag(ui, &mut vec.value.y.0);
-                        drag(ui, &mut vec.value.z.0);
-                    });
-                }
+                ui.horizontal(|ui| match struc.name.content.as_str() {
+                    "RelativeLocation" | "RelativeScale3D" => {
+                        if let Some(Property::VectorProperty(vec)) = struc.value.first_mut() {
+                            ui.label(&vec.name.content);
+                            drag(ui, &mut vec.value.x.0);
+                            drag(ui, &mut vec.value.y.0);
+                            drag(ui, &mut vec.value.z.0);
+                        }
+                    }
+                    "RelativeRotation" => {
+                        if let Some(Property::RotatorProperty(rot)) = struc.value.first_mut() {
+                            ui.label(&rot.name.content);
+                            drag_angle(ui, &mut rot.value.x.0);
+                            drag_angle(ui, &mut rot.value.y.0);
+                            drag_angle(ui, &mut rot.value.z.0);
+                        }
+                    }
+                    _ => (),
+                });
             }
         }
     }
@@ -149,4 +235,10 @@ impl Actor {
 
 fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Response {
     ui.add(egui::widgets::DragValue::new(val).clamp_range(Num::MIN..=Num::MAX))
+}
+
+fn drag_angle(ui: &mut egui::Ui, val: &mut f32) {
+    let mut buf = *val;
+    ui.add(egui::widgets::DragValue::new(&mut buf).suffix("°"));
+    *val = buf % 360.0;
 }
