@@ -13,7 +13,8 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cube: rendering::cube::Cube,
-    mode: egui_gizmo::GizmoMode
+    mode: egui_gizmo::GizmoMode,
+    orig: Option<[f32;3]>
 }
 
 fn config() -> std::path::PathBuf {
@@ -71,12 +72,20 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cube: rendering::cube::Cube::new(ctx),
-            mode: egui_gizmo::GizmoMode::Translate
+            mode: egui_gizmo::GizmoMode::Translate,
+            orig: None
         };
         update_actors!(stove);
         stove
     }
 }
+
+const PERSPECTIVE: [[f32;4];4]=[
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 1.8, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 1.0],
+    [0.0, 0.0, -1.0, 0.0],
+];
 
 impl EventHandler for Stove {
     fn update(&mut self, _: &mut Context) {
@@ -88,12 +97,28 @@ impl EventHandler for Stove {
         self.egui.run(ctx, |mqctx, ctx| {
             egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui|{
                 if let Some(selected)=self.selected{
-                    egui_gizmo::Gizmo::new("gizmo")
+                    match egui_gizmo::Gizmo::new("gizmo")
                     .view_matrix(self.camera.view_matrix().to_cols_array_2d())
                     .model_matrix(glam::Mat4::from_translation(self.actors[selected].get_translation(self.map.as_ref().unwrap())).to_cols_array_2d())
-                    .projection_matrix(glam::Mat4::perspective_infinite_lh(45.0, 1920.0/1080.0, 10.0).to_cols_array_2d())
+                    .projection_matrix(PERSPECTIVE)
                     .mode(self.mode)
-                    .interact(ui);
+                    .interact(ui){
+                        Some(response) => {
+                            match response.mode{
+                                egui_gizmo::GizmoMode::Translate => {
+                                    let orig=self.orig.get_or_insert(self.actors[selected].get_translation(self.map.as_ref().unwrap()).to_array());
+                                    self.actors[selected].set_translation(self.map.as_mut().unwrap(),[
+                                        orig[0] + response.value[0],
+                                        orig[1] + response.value[1],
+                                        orig[2] + response.value[2],
+                                    ]);
+                                },
+                                egui_gizmo::GizmoMode::Rotate => {},
+                                egui_gizmo::GizmoMode::Scale => {},
+                            }
+                        },
+                        None => self.orig = None,
+                    }
                 }
             });
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {

@@ -2,7 +2,10 @@ use unreal_asset::{
     cast,
     error::Error,
     exports::ExportNormalTrait,
-    properties::{Property, PropertyDataTrait},
+    properties::{
+        struct_property::StructProperty, vector_property::VectorProperty, Property,
+        PropertyDataTrait,
+    },
     reader::asset_trait::AssetTrait,
     unreal_types::PackageIndex,
     Asset,
@@ -31,11 +34,46 @@ impl Actor {
                 }
                 None
             })
-            .map(|trans| {
-                glam::vec3(trans.value.x.0, trans.value.y.0, trans.value.z.0)
-                    * glam::Vec3::splat(0.01)
-            })
+            .map(|trans| glam::vec3(trans.value.x.0, trans.value.y.0, trans.value.z.0) * 0.01)
             .unwrap_or_default()
+    }
+
+    pub fn set_translation(&self, asset: &mut Asset, pos: [f32; 3]) {
+        match asset.exports[self.transform]
+            .get_normal_export_mut()
+            .unwrap()
+            .properties
+            .iter_mut()
+            .rev()
+            .find_map(|prop| {
+                if let Property::StructProperty(struc) = prop {
+                    if &struc.name.content == "RelativeLocation" {
+                        return cast!(Property, VectorProperty, &mut struc.value[0]);
+                    }
+                }
+                None
+            }) {
+            Some(trans) => {
+                trans.value.x.0 = pos[0] * 100.0;
+                trans.value.y.0 = pos[1] * 100.0;
+                trans.value.z.0 = pos[2] * 100.0;
+            }
+            // create if does not exist
+            None => {
+                let name = asset.add_fname("RelativeTransform");
+                let mut trans =
+                    StructProperty::new(asset, name.clone(), false, 0, 0, asset.engine_version)
+                        .unwrap();
+                trans.value.push(Property::VectorProperty(
+                    VectorProperty::new(asset, name, false, 0).unwrap(),
+                ));
+                asset.exports[self.transform]
+                    .get_normal_export_mut()
+                    .unwrap()
+                    .properties
+                    .push(Property::StructProperty(trans));
+            }
+        }
     }
 
     pub fn new(asset: &Asset, package: PackageIndex) -> Result<Self, Error> {

@@ -7,7 +7,7 @@
 # Roadmap (from basic functionality to unrealistic ambitions)
 - [x] save and open unreal map files of any version
 - [x] display a selectable list of actors
-- [x] allow editing of actor transforms
+- [ ] allow editing all of an actor's transforms
 - [x] render each actor as an cube/sprite in a 3d scene
 - [x] walk around the scene with an unreal-editor-style camera
 - [ ] organise actor components in a satisfying way
