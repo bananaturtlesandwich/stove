@@ -13,6 +13,7 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cube: rendering::cube::Cube,
+    sprite: rendering::sprite::Sprite
 }
 
 fn config() -> std::path::PathBuf {
@@ -70,6 +71,7 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cube: rendering::cube::Cube::new(ctx),
+            sprite: rendering::sprite::Sprite::new(ctx)
         };
         update_actors!(stove);
         stove
@@ -83,8 +85,9 @@ impl EventHandler for Stove {
     }
 
     fn draw(&mut self, ctx: &mut Context) {
+        let mut scissor = 0;
         self.egui.run(ctx, |mqctx, ctx| {
-            egui::SidePanel::left("sidepanel").show(ctx, |ui| {
+            egui::SidePanel::left("sidepanel").resizable(false).show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
                         if ui.button("open").clicked() {
@@ -156,9 +159,9 @@ impl EventHandler for Stove {
                             }
                         });
                 });
-                ui.add_space(10.0);
-                if let Some(map)=&mut self.map{
-                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false,true]).max_height(ui.available_height()*0.5).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
+                if let Some(map)=&mut self.map {
+                    ui.add_space(10.0);
+                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).max_height(ui.available_height()*0.5).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
                         for i in range{
                             let is_selected=Some(i)==self.selected;
                             if ui.selectable_label(
@@ -172,6 +175,7 @@ impl EventHandler for Stove {
                         };
                     }));
                     if let Some(selected)=self.selected{
+                        ui.add_space(10.0);
                         egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
                             self.actors[selected].show(map,ui);
                             // otherwise the scroll area bugs out at the bottom
@@ -179,6 +183,7 @@ impl EventHandler for Stove {
                         });
                     }
                 }
+                scissor=(ui.available_width() * 0.5) as i32;
             });
             self.notifs.show(ctx);
         });
@@ -187,6 +192,9 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
+        let (width,height) = ctx.display().screen_size();
+        ctx.apply_viewport(scissor,0,width as i32,height as i32);
+        ctx.apply_scissor_rect(scissor,0,width as i32,height as i32);
         if let Some(map)=&mut self.map{
             for (i,actor) in self.actors.iter().enumerate(){
                 let rot=actor.get_rotation(map);

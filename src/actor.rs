@@ -142,7 +142,7 @@ fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Re
     ui.add(
         egui::widgets::DragValue::new(val)
             .clamp_range(Num::MIN..=Num::MAX)
-            .fixed_decimals(0),
+            .fixed_decimals(1),
     )
 }
 

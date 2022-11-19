@@ -43,7 +43,7 @@ impl Camera {
         if !self.view {
             return;
         }
-        let velocity = (5.0 * self.delta_time) as f32;
+        let velocity = (25.0 * self.delta_time) as f32;
         for keycode in self.held.iter() {
             match keycode {
                 KeyCode::W => self.position += self.front * velocity,
