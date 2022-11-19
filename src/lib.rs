@@ -158,7 +158,7 @@ impl EventHandler for Stove {
                 });
                 ui.add_space(10.0);
                 if let Some(map)=&mut self.map{
-                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
+                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false,true]).max_height(ui.available_height()*0.5).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
                         for i in range{
                             let is_selected=Some(i)==self.selected;
                             if ui.selectable_label(
@@ -170,14 +170,12 @@ impl EventHandler for Stove {
                                 self.selected=(!is_selected).then_some(i);
                             }
                         };
-                        // otherwise the scroll area bugs out at the bottom
-                        ui.add_space(1.0);
                     }));
                     if let Some(selected)=self.selected{
-                        egui::SidePanel::right("properties").show(ctx, |ui|{
-                            egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
-                                self.actors[selected].show(map,ui); 
-                             });
+                        egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
+                            self.actors[selected].show(map,ui);
+                            // otherwise the scroll area bugs out at the bottom
+                            ui.add_space(1.0);
                         });
                     }
                 }
