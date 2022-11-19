@@ -2,14 +2,9 @@ use unreal_asset::{
     cast,
     error::Error,
     exports::ExportNormalTrait,
-    properties::{
-        struct_property::StructProperty,
-        vector_property::{RotatorProperty, VectorProperty},
-        Property, PropertyDataTrait,
-    },
+    properties::{Property, PropertyDataTrait},
     reader::asset_trait::AssetTrait,
-    types::Vector,
-    unreal_types::{FName, PackageIndex},
+    unreal_types::PackageIndex,
     Asset,
 };
 
@@ -36,7 +31,7 @@ impl Actor {
                 }
                 None
             })
-            .map(|pos| glam::vec3(pos.value.x.0, pos.value.y.0, pos.value.z.0) * 0.01)
+            .map(|pos| glam::vec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0) * 0.01)
             .unwrap_or_default()
     }
 
@@ -57,98 +52,6 @@ impl Actor {
             })
             .map(|rot| glam::vec3(rot.value.x.0, rot.value.y.0, rot.value.z.0))
             .unwrap_or_default()
-    }
-
-    pub fn set_translation(&self, asset: &mut Asset, new: [f32; 3]) {
-        match asset.exports[self.transform]
-            .get_normal_export_mut()
-            .unwrap()
-            .properties
-            .iter_mut()
-            .rev()
-            .find_map(|prop| {
-                if let Property::StructProperty(struc) = prop {
-                    if &struc.name.content == "RelativeLocation" {
-                        return cast!(Property, VectorProperty, &mut struc.value[0]);
-                    }
-                }
-                None
-            }) {
-            Some(pos) => {
-                pos.value.x.0 = new[0] * 100.0;
-                pos.value.y.0 = new[1] * 100.0;
-                pos.value.z.0 = new[2] * 100.0;
-            }
-            // create if does not exist
-            None => {
-                let name = asset.add_fname("RelativeTransform");
-                asset.exports[self.transform]
-                    .get_normal_export_mut()
-                    .unwrap()
-                    .properties
-                    .push(Property::StructProperty(StructProperty {
-                        name: name.clone(),
-                        // from research this seems to be the field values
-                        struct_type: Some(FName::from_slice("Vector")),
-                        struct_guid: Some([0; 16]),
-                        property_guid: None,
-                        duplication_index: 0,
-                        serialize_none: true,
-                        value: vec![Property::VectorProperty(VectorProperty {
-                            name,
-                            property_guid: None,
-                            duplication_index: 0,
-                            value: Vector::new(0.0.into(), 0.0.into(), 0.0.into()),
-                        })],
-                    }));
-            }
-        }
-    }
-
-    pub fn set_rotation(&self, asset: &mut Asset, new: [f32; 3]) {
-        match asset.exports[self.transform]
-            .get_normal_export_mut()
-            .unwrap()
-            .properties
-            .iter_mut()
-            .rev()
-            .find_map(|prop| {
-                if let Property::StructProperty(struc) = prop {
-                    if &struc.name.content == "RelativeRotation" {
-                        return cast!(Property, RotatorProperty, &mut struc.value[0]);
-                    }
-                }
-                None
-            }) {
-            Some(rot) => {
-                rot.value.x.0 = new[0];
-                rot.value.y.0 = new[1];
-                rot.value.z.0 = new[2];
-            }
-            // create if does not exist
-            None => {
-                let name = asset.add_fname("RelativeRotation");
-                asset.exports[self.transform]
-                    .get_normal_export_mut()
-                    .unwrap()
-                    .properties
-                    .push(Property::StructProperty(StructProperty {
-                        name: name.clone(),
-                        // from research this seems to be the field values
-                        struct_type: Some(FName::from_slice("Rotator")),
-                        struct_guid: Some([0; 16]),
-                        property_guid: None,
-                        duplication_index: 0,
-                        serialize_none: true,
-                        value: vec![Property::RotatorProperty(RotatorProperty {
-                            name,
-                            property_guid: None,
-                            duplication_index: 0,
-                            value: Vector::new(0.0.into(), 0.0.into(), 0.0.into()),
-                        })],
-                    }));
-            }
-        }
     }
 
     pub fn new(asset: &Asset, package: PackageIndex) -> Result<Self, Error> {

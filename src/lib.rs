@@ -13,8 +13,6 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cube: rendering::cube::Cube,
-    mode: egui_gizmo::GizmoMode,
-    orig: Option<[f32;3]>
 }
 
 fn config() -> std::path::PathBuf {
@@ -49,7 +47,7 @@ impl Stove {
             notifs.error("failed to create config directory");
         }
         let version = std::fs::read_to_string(config.join("VERSION"))
-            .unwrap_or("0".to_string())
+            .unwrap_or_else(|_| "0".to_string())
             .parse()
             .unwrap();
         let map = match std::env::args().nth(1) {
@@ -72,20 +70,11 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cube: rendering::cube::Cube::new(ctx),
-            mode: egui_gizmo::GizmoMode::Translate,
-            orig: None
         };
         update_actors!(stove);
         stove
     }
 }
-
-const PERSPECTIVE: [[f32;4];4]=[
-    [1.0, 0.0, 0.0, 0.0],
-    [0.0, 1.8, 0.0, 0.0],
-    [0.0, 0.0, 1.0, 1.0],
-    [0.0, 0.0, -1.0, 0.0],
-];
 
 impl EventHandler for Stove {
     fn update(&mut self, _: &mut Context) {
@@ -95,32 +84,6 @@ impl EventHandler for Stove {
 
     fn draw(&mut self, ctx: &mut Context) {
         self.egui.run(ctx, |mqctx, ctx| {
-            egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui|{
-                if let Some(selected)=self.selected{
-                    match egui_gizmo::Gizmo::new("gizmo")
-                    .view_matrix(self.camera.view_matrix().to_cols_array_2d())
-                    .model_matrix(glam::Mat4::from_translation(self.actors[selected].get_translation(self.map.as_ref().unwrap())).to_cols_array_2d())
-                    .projection_matrix(PERSPECTIVE)
-                    .mode(self.mode)
-                    .interact(ui){
-                        Some(response) => {
-                            match response.mode{
-                                egui_gizmo::GizmoMode::Translate => {
-                                    let orig=self.orig.get_or_insert(self.actors[selected].get_translation(self.map.as_ref().unwrap()).to_array());
-                                    self.actors[selected].set_translation(self.map.as_mut().unwrap(),[
-                                        orig[0] + response.value[0],
-                                        orig[1] + response.value[1],
-                                        orig[2] + response.value[2],
-                                    ]);
-                                },
-                                egui_gizmo::GizmoMode::Rotate => {},
-                                egui_gizmo::GizmoMode::Scale => {},
-                            }
-                        },
-                        None => self.orig = None,
-                    }
-                }
-            });
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -258,11 +221,6 @@ impl EventHandler for Stove {
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
-        self.mode = match self.mode{
-            egui_gizmo::GizmoMode::Rotate => egui_gizmo::GizmoMode::Translate,
-            egui_gizmo::GizmoMode::Translate => egui_gizmo::GizmoMode::Scale,
-            egui_gizmo::GizmoMode::Scale => egui_gizmo::GizmoMode::Rotate,
-        };
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {

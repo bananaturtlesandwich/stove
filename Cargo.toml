@@ -16,7 +16,6 @@ miniquad = "*"
 egui-miniquad = "*"
 egui = "*"
 egui-notify = "*"
-egui-gizmo = "*"
 native-dialog = "*"
 dirs = "*"
 
