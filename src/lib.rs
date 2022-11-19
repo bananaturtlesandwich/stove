@@ -1,8 +1,8 @@
 use miniquad::*;
-mod rendering;
 mod actor;
 mod asset_utils;
 mod map_utils;
+mod rendering;
 
 pub struct Stove {
     camera: rendering::camera::Camera,
@@ -13,7 +13,6 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cube: rendering::cube::Cube,
-    sprite: rendering::sprite::Sprite
 }
 
 fn config() -> std::path::PathBuf {
@@ -21,8 +20,8 @@ fn config() -> std::path::PathBuf {
 }
 
 // the only way i could get it to compile and look nice :p
-macro_rules! update_actors{
-    ($self: expr)=>{
+macro_rules! update_actors {
+    ($self: expr) => {
         $self.actors.clear();
         $self.selected = None;
         if let Some(map) = &$self.map {
@@ -37,7 +36,7 @@ macro_rules! update_actors{
                 }
             }
         }
-    }
+    };
 }
 
 impl Stove {
@@ -52,8 +51,7 @@ impl Stove {
             .parse()
             .unwrap();
         let map = match std::env::args().nth(1) {
-            Some(path) => match asset_utils::open_asset(path, version)
-            {
+            Some(path) => match asset_utils::open_asset(path, version) {
                 Ok(asset) => Some(asset),
                 Err(e) => {
                     notifs.error(e.to_string());
@@ -71,7 +69,6 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cube: rendering::cube::Cube::new(ctx),
-            sprite: rendering::sprite::Sprite::new(ctx)
         };
         update_actors!(stove);
         stove
@@ -108,8 +105,7 @@ impl EventHandler for Stove {
                         }
                         if ui.button("save as").clicked(){
                             match &self.map{
-                                Some(map) => 
-                                if let Ok(Some(path)) = native_dialog::FileDialog::new()
+                                Some(map) => if let Ok(Some(path)) = native_dialog::FileDialog::new()
                                     .add_filter("unreal map file", &["umap"])
                                     .show_save_single_file(){
                                         match asset_utils::save_asset(map, path){
@@ -192,26 +188,26 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
-        let (width,height) = ctx.display().screen_size();
-        ctx.apply_viewport(scissor,0,width as i32,height as i32);
-        ctx.apply_scissor_rect(scissor,0,width as i32,height as i32);
-        if let Some(map)=&mut self.map{
-            for (i,actor) in self.actors.iter().enumerate(){
-                let rot=actor.get_rotation(map);
+        let (width, height) = ctx.display().screen_size();
+        ctx.apply_viewport(scissor, 0, width as i32, height as i32);
+        ctx.apply_scissor_rect(scissor, 0, width as i32, height as i32);
+        if let Some(map) = &mut self.map {
+            for (i, actor) in self.actors.iter().enumerate() {
+                let rot = actor.get_rotation(map);
                 self.cube.draw(
                     ctx,
                     glam::Mat4::from_translation(actor.get_translation(map))
-                    * glam::Mat4::from_euler(
-                        glam::EulerRot::XZY,
-                        rot.x.to_radians(),
-                        rot.y.to_radians(),
-                        rot.z.to_radians()
-                    ),
+                        * glam::Mat4::from_euler(
+                            glam::EulerRot::XZY,
+                            rot.x.to_radians(),
+                            rot.y.to_radians(),
+                            rot.z.to_radians(),
+                        ),
                     self.camera.view_matrix(),
-                    match self.selected == Some(i){
-                        true => glam::vec3(1.0,1.0,0.5),
-                        false => glam::vec3(0.0,1.0,0.5)
-                    }
+                    match self.selected == Some(i) {
+                        true => glam::vec3(1.0, 1.0, 0.5),
+                        false => glam::vec3(0.0, 1.0, 0.5),
+                    },
                 );
             }
         }
@@ -222,7 +218,7 @@ impl EventHandler for Stove {
     // boilerplate >n<
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
-        self.camera.handle_mouse_motion(x,y);
+        self.camera.handle_mouse_motion(x, y);
     }
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
@@ -247,8 +243,9 @@ impl EventHandler for Stove {
         self.egui.key_down_event(ctx, keycode, keymods);
         self.camera.handle_key_down(keycode);
         if let KeyCode::F = keycode {
-            if let Some(selected)=self.selected{
-                self.camera.set_focus(self.actors[selected].get_translation(self.map.as_ref().unwrap()))
+            if let Some(selected) = self.selected {
+                self.camera
+                    .set_focus(self.actors[selected].get_translation(self.map.as_ref().unwrap()))
             }
         }
     }

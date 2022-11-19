@@ -4,7 +4,7 @@ uniform mat4 model;
 uniform mat4 view;
 
 // this isn't going to change so might as well just make it a constant
-const mat4 projection = mat4(
+const mat4 PROJECTION = mat4(
     1, 0, 0, 0,
     0, 1.8, 0, 0,
     0, 0, 1, 1,
@@ -56,5 +56,5 @@ const vec3 verts[36] = vec3[](
 );
 
 void main() {
-    gl_Position = projection * view * model * vec4(verts[gl_VertexID], 1.0);
+    gl_Position = PROJECTION * view * model * vec4(verts[gl_VertexID], 1.0);
 }
