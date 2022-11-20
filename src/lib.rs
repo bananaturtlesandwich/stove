@@ -189,7 +189,6 @@ impl EventHandler for Stove {
             stencil: None,
         });
         let (width, height) = ctx.display().screen_size();
-        ctx.apply_viewport(scissor, 0, width as i32, height as i32);
         ctx.apply_scissor_rect(scissor, 0, width as i32, height as i32);
         if let Some(map) = &mut self.map {
             for (i, actor) in self.actors.iter().enumerate() {
@@ -233,6 +232,32 @@ impl EventHandler for Stove {
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
         self.camera.handle_mouse_up(mb);
+        // i think this picking code must be some of the hackiest shit i've ever written
+        // funnily enough it's probably more performant than raycasting tho
+        if mb == MouseButton::Left {
+            if let Some(map) = self.map.as_ref() {
+                // convert the mouse coordinates to uv
+                let (width, height) = ctx.screen_size();
+                let coords = (x / width, 1.0 - y / height);
+                for (i, actor) in self.actors.iter().enumerate() {
+                    let proj = self.camera.projection()
+                        * self.camera.view_matrix()
+                        * actor.get_translation(map).extend(1.0);
+                    // get the uv coordinates of the actor's position
+                    let uv = (
+                        0.5 * (proj.x / proj.w.abs() + 1.0),
+                        0.5 * (proj.y / proj.w.abs() + 1.0),
+                    );
+                    if uv.0 < 0.0 || uv.0 > 1.0 || uv.1 < 0.0 || uv.1 > 1.0 {
+                        continue;
+                    }
+                    if (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01 {
+                        self.selected = Some(i);
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
@@ -242,7 +267,7 @@ impl EventHandler for Stove {
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
         self.camera.handle_key_down(keycode);
-        if let KeyCode::F = keycode {
+        if keycode == KeyCode::F {
             if let Some(selected) = self.selected {
                 self.camera
                     .set_focus(self.actors[selected].get_translation(self.map.as_ref().unwrap()))

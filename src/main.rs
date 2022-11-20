@@ -2,7 +2,6 @@
 use stove::Stove;
 
 fn main() {
-    // println!("{:#?}",glam::Mat4::perspective_infinite_lh(45.0, 1920.0/1080.0, 1.0));
     miniquad::start(
         miniquad::conf::Conf {
             window_title: "stove".to_string(),
