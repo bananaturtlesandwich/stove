@@ -13,6 +13,7 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cube: rendering::cube::Cube,
+    ui: bool,
 }
 
 fn config() -> std::path::PathBuf {
@@ -69,6 +70,7 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cube: rendering::cube::Cube::new(ctx),
+            ui: true,
         };
         update_actors!(stove);
         stove
@@ -83,7 +85,8 @@ impl EventHandler for Stove {
 
     fn draw(&mut self, ctx: &mut Context) {
         let mut scissor = 0;
-        self.egui.run(ctx, |mqctx, ctx| {
+        if self.ui {
+            self.egui.run(ctx, |mqctx, ctx| {
             egui::SidePanel::left("sidepanel").resizable(false).show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -182,7 +185,8 @@ impl EventHandler for Stove {
                 scissor=(ui.available_width() * 0.5) as i32;
             });
             self.notifs.show(ctx);
-        });
+        })
+        }
         ctx.begin_default_pass(PassAction::Clear {
             color: Some((0.15, 0.15, 0.15, 1.0)),
             depth: Some(1.0),
@@ -263,11 +267,16 @@ impl EventHandler for Stove {
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
         self.camera.handle_key_down(keycode);
-        if keycode == KeyCode::F {
-            if let Some(selected) = self.selected {
-                self.camera
-                    .set_focus(self.actors[selected].get_translation(self.map.as_ref().unwrap()))
+        match keycode {
+            KeyCode::F => {
+                if let Some(selected) = self.selected {
+                    self.camera.set_focus(
+                        self.actors[selected].get_translation(self.map.as_ref().unwrap()),
+                    )
+                }
             }
+            KeyCode::H => self.ui = !self.ui,
+            _ => (),
         }
     }
 
