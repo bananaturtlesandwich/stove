@@ -31,6 +31,7 @@ impl Cube {
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
                     depth_write: true,
+                    primitive_type: PrimitiveType::Lines,
                     ..Default::default()
                 },
             ),
@@ -39,7 +40,14 @@ impl Cube {
                 index_buffer: Buffer::immutable(
                     ctx,
                     BufferType::IndexBuffer,
-                    &(0..36).collect::<Vec<_>>(),
+                    &[
+                        1, 2, 0, 1, 2, 3, // front face
+                        5, 6, 4, 5, 6, 7, // back face
+                        3, 5, 1, 3, 5, 7, // top face
+                        2, 4, 0, 2, 4, 6, // bottom face
+                        0, 5, 4, 0, 5, 1, // left face
+                        2, 7, 6, 2, 7, 3, // right face
+                    ],
                 ),
                 images: vec![],
             },

@@ -195,13 +195,16 @@ impl EventHandler for Stove {
                 let rot = actor.get_rotation(map);
                 self.cube.draw(
                     ctx,
-                    glam::Mat4::from_translation(actor.get_translation(map))
-                        * glam::Mat4::from_euler(
+                    glam::Mat4::from_scale_rotation_translation(
+                        actor.get_scale(map),
+                        glam::Quat::from_euler(
                             glam::EulerRot::XZY,
                             rot.x.to_radians(),
                             rot.y.to_radians(),
                             rot.z.to_radians(),
                         ),
+                        actor.get_translation(map),
+                    ),
                     self.camera.view_matrix(),
                     match self.selected == Some(i) {
                         true => glam::vec3(1.0, 1.0, 0.5),
@@ -242,7 +245,7 @@ impl EventHandler for Stove {
                 let proj = self.camera.projection() * self.camera.view_matrix();
                 self.selected = self.actors.iter().position(|actor| {
                     let proj = proj * actor.get_translation(map).extend(1.0);
-                    // get the uv coordinates of the actor's position
+                    // convert the actor position to uv
                     let uv = (
                         0.5 * (proj.x / proj.w.abs() + 1.0),
                         0.5 * (proj.y / proj.w.abs() + 1.0),

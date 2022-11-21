@@ -24,27 +24,6 @@ const vec3 VERTICES[] = vec3[](
     vec3( 0.5,  0.5,  0.5)
 );
 
-const int INDICES[] = int[](
-    // front face
-    1, 2, 0,
-    1, 2, 3,
-    // back face
-    5, 6, 4,
-    5, 6, 7,
-    // top face
-    3, 5, 1,
-    3, 5, 7,
-    // bottom face
-    2, 4, 0,
-    2, 4, 6,
-    // left face
-    0, 5, 4,
-    0, 5, 1,
-    // right face
-    2, 7, 6,
-    2, 7, 3
-);
-
 void main() {
-    gl_Position = PROJECTION * view * model * vec4(VERTICES[INDICES[gl_VertexID]], 1.0);
+    gl_Position = PROJECTION * view * model * vec4(VERTICES[gl_VertexID], 1.0);
 }
