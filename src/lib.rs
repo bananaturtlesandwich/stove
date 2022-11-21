@@ -182,7 +182,7 @@ impl EventHandler for Stove {
                         });
                     }
                 }
-                scissor=(ui.available_width() * 0.5) as i32;
+                scissor=ui.available_width() as i32;
             });
             self.notifs.show(ctx);
         })
@@ -218,7 +218,9 @@ impl EventHandler for Stove {
             }
         }
         ctx.end_render_pass();
-        self.egui.draw(ctx);
+        if self.ui {
+            self.egui.draw(ctx);
+        }
         ctx.commit_frame();
     }
     // boilerplate >n<
@@ -233,14 +235,20 @@ impl EventHandler for Stove {
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
+        if self.egui.egui_ctx().wants_pointer_input() {
+            return;
+        }
         self.camera.handle_mouse_down(mb);
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
+        if self.egui.egui_ctx().wants_pointer_input() {
+            return;
+        }
         self.camera.handle_mouse_up(mb);
         // i think this picking code must be some of the hackiest shit i've ever written
-        // funnily enough it's probably more performant than raycasting tho
+        // funnily enough it's probably more performant than raycasting
         if mb == MouseButton::Left {
             if let Some(map) = self.map.as_ref() {
                 // convert the mouse coordinates to uv

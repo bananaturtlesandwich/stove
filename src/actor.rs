@@ -171,5 +171,4 @@ fn drag_angle(ui: &mut egui::Ui, val: &mut f32) {
             .suffix("°")
             .fixed_decimals(1),
     );
-    *val = *val % 360.0;
 }
