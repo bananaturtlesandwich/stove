@@ -239,23 +239,16 @@ impl EventHandler for Stove {
                 // convert the mouse coordinates to uv
                 let (width, height) = ctx.screen_size();
                 let coords = (x / width, 1.0 - y / height);
-                for (i, actor) in self.actors.iter().enumerate() {
-                    let proj = self.camera.projection()
-                        * self.camera.view_matrix()
-                        * actor.get_translation(map).extend(1.0);
+                let proj = self.camera.projection() * self.camera.view_matrix();
+                self.selected = self.actors.iter().position(|actor| {
+                    let proj = proj * actor.get_translation(map).extend(1.0);
                     // get the uv coordinates of the actor's position
                     let uv = (
                         0.5 * (proj.x / proj.w.abs() + 1.0),
                         0.5 * (proj.y / proj.w.abs() + 1.0),
                     );
-                    if uv.0 < 0.0 || uv.0 > 1.0 || uv.1 < 0.0 || uv.1 > 1.0 {
-                        continue;
-                    }
-                    if (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01 {
-                        self.selected = Some(i);
-                        return;
-                    }
-                }
+                    (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01
+                });
             }
         }
     }

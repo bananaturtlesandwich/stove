@@ -98,8 +98,8 @@ impl Actor {
             }
         }
         Err(Error::no_data(format!(
-            "couldn't find transform component for actor at index {}",
-            package.index
+            "couldn't find transform component for {}",
+            &norm.base_export.object_name.content
         )))
     }
 
@@ -150,7 +150,7 @@ fn drag_angle(ui: &mut egui::Ui, val: &mut f32) {
     ui.add(
         egui::widgets::DragValue::new(val)
             .suffix("°")
-            .clamp_range(0..=360)
             .fixed_decimals(1),
     );
+    *val = *val % 360.0;
 }
