@@ -87,105 +87,120 @@ impl EventHandler for Stove {
         let mut scissor = 0;
         if self.ui {
             self.egui.run(ctx, |mqctx, ctx| {
-            egui::SidePanel::left("sidepanel").resizable(false).show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.menu_button("file", |ui| {
-                        if ui.button("open").clicked() {
-                            if let Ok(Some(path)) = native_dialog::FileDialog::new()
-                                .add_filter("unreal map file", &["umap"])
-                                .show_open_single_file()
-                            {
-                                match asset_utils::open_asset(path, self.version) {
-                                    Ok(asset) => {
-                                        self.map = Some(asset);
-                                        update_actors!(self);
-                                    }
-                                    Err(e) => {
-                                        self.notifs.error(e.to_string());
-                                    }
-                                }
-                            }
-                        }
-                        if ui.button("save as").clicked(){
-                            match &self.map{
-                                Some(map) => if let Ok(Some(path)) = native_dialog::FileDialog::new()
+                egui::SidePanel::left("sidepanel").resizable(false).show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.menu_button("file", |ui| {
+                            if ui.button("open").clicked() {
+                                if let Ok(Some(path)) = native_dialog::FileDialog::new()
                                     .add_filter("unreal map file", &["umap"])
-                                    .show_save_single_file(){
-                                        match asset_utils::save_asset(map, path){
-                                            Ok(_) => self.notifs.success("saved map"),
-                                            Err(e) => self.notifs.error(e.to_string()),
-                                        };
-                                    },
-                                None => {
-                                    self.notifs.error("no map to save");
-                                },
-                            }
-                        }
-                    });
-                    ui.menu_button("options", |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("theme:");
-                            egui::global_dark_light_mode_buttons(ui);
-                        });
-                        ui.menu_button("about",|ui|{
-                            ui.horizontal_wrapped(|ui|{
-                                let size=ui.fonts().glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' ');
-                                ui.spacing_mut().item_spacing.x=size;
-                                ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
-                                ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
-                                ui.label(egui::special_emojis::GITHUB.to_string());
-                            });
-                        });
-                        if ui.button("exit").clicked(){
-                            mqctx.request_quit();
-                        }
-                    });
-                    egui::ComboBox::from_id_source("version")
-                        .selected_text(
-                            VERSIONS
-                                .iter()
-                                .find(|version| version.1 == self.version)
-                                .unwrap()
-                                .0,
-                        )
-                        .show_ui(ui, |ui| {
-                            for version in VERSIONS {
-                                if ui.selectable_value(&mut self.version, version.1, version.0).clicked(){
-                                    if let Err(e)=std::fs::write(config().join("VERSION"),version.1.to_string()) {
-                                        self.notifs.error(e.to_string());
+                                    .show_open_single_file()
+                                {
+                                    match asset_utils::open_asset(path, self.version) {
+                                        Ok(asset) => {
+                                            self.map = Some(asset);
+                                            update_actors!(self);
+                                        }
+                                        Err(e) => {
+                                            self.notifs.error(e.to_string());
+                                        }
                                     }
                                 }
                             }
-                        });
-                });
-                if let Some(map)=&mut self.map {
-                    ui.add_space(10.0);
-                    ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).max_height(ui.available_height()*0.5).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
-                        for i in range{
-                            let is_selected=Some(i)==self.selected;
-                            if ui.selectable_label(
-                                is_selected,
-                                &self.actors[i].name
-                            )
-                            .on_hover_text(&self.actors[i].class)
-                            .clicked(){
-                                self.selected=(!is_selected).then_some(i);
+                            if ui.button("save as").clicked(){
+                                match &self.map{
+                                    Some(map) => if let Ok(Some(path)) = native_dialog::FileDialog::new()
+                                        .add_filter("unreal map file", &["umap"])
+                                        .show_save_single_file(){
+                                            match asset_utils::save_asset(map, path){
+                                                Ok(_) => self.notifs.success("saved map"),
+                                                Err(e) => self.notifs.error(e.to_string()),
+                                            };
+                                        },
+                                    None => {
+                                        self.notifs.error("no map to save");
+                                    },
+                                }
                             }
-                        };
-                    }));
-                    if let Some(selected)=self.selected{
-                        ui.add_space(10.0);
-                        egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
-                            self.actors[selected].show(map,ui);
-                            // otherwise the scroll area bugs out at the bottom
-                            ui.add_space(1.0);
                         });
+                        ui.menu_button("options", |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("theme:");
+                                egui::global_dark_light_mode_buttons(ui);
+                            });
+                            ui.menu_button("keymap", |ui|{
+                                egui::Grid::new("keymap").striped(true).show(ui,|ui|{
+                                    ui.label("camera");
+                                    ui.label("right-click + wasd + drag");
+                                    ui.end_row();
+                                    ui.label("focus");
+                                    ui.label("F");
+                                    ui.end_row();
+                                    ui.label("hide ui");
+                                    ui.label("H");
+                                    ui.end_row();
+                                    ui.label("duplicate");
+                                    ui.label("ctrl + D")
+                                });
+                            });
+                            ui.menu_button("about",|ui|{
+                                ui.horizontal_wrapped(|ui|{
+                                    let size=ui.fonts().glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' ');
+                                    ui.spacing_mut().item_spacing.x=size;
+                                    ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
+                                    ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                                    ui.label(egui::special_emojis::GITHUB.to_string());
+                                });
+                            });
+                            if ui.button("exit").clicked(){
+                                mqctx.request_quit();
+                            }
+                        });
+                        egui::ComboBox::from_id_source("version")
+                            .selected_text(
+                                VERSIONS
+                                    .iter()
+                                    .find(|version| version.1 == self.version)
+                                    .unwrap()
+                                    .0,
+                            )
+                            .show_ui(ui, |ui| {
+                                for version in VERSIONS {
+                                    if ui.selectable_value(&mut self.version, version.1, version.0).clicked(){
+                                        if let Err(e)=std::fs::write(config().join("VERSION"),version.1.to_string()) {
+                                            self.notifs.error(e.to_string());
+                                        }
+                                    }
+                                }
+                            });
+                    });
+                    if let Some(map)=&mut self.map {
+                        ui.add_space(10.0);
+                        ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).max_height(ui.available_height()*0.5).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
+                            for i in range{
+                                let is_selected=Some(i)==self.selected;
+                                if ui.selectable_label(
+                                    is_selected,
+                                    &self.actors[i].name
+                                )
+                                .on_hover_text(&self.actors[i].class)
+                                .clicked(){
+                                    self.selected=(!is_selected).then_some(i);
+                                }
+                            };
+                        }));
+                        if let Some(selected)=self.selected{
+                            ui.add_space(10.0);
+                            egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
+                                self.actors[selected].show(map,ui);
+                                // otherwise the scroll area bugs out at the bottom
+                                ui.add_space(1.0);
+                            });
+                        }
                     }
-                }
-                scissor=ui.available_width() as i32;
-            });
-            self.notifs.show(ctx);
-        })
+                    scissor=ui.available_width() as i32;
+                });
+                self.notifs.show(ctx);
+            })
         }
         ctx.begin_default_pass(PassAction::Clear {
             color: Some((0.15, 0.15, 0.15, 1.0)),

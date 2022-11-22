@@ -41,12 +41,7 @@ impl Cube {
                     ctx,
                     BufferType::IndexBuffer,
                     &[
-                        1, 2, 0, 1, 2, 3, // front face
-                        5, 6, 4, 5, 6, 7, // back face
-                        3, 5, 1, 3, 5, 7, // top face
-                        2, 4, 0, 2, 4, 6, // bottom face
-                        0, 5, 4, 0, 5, 1, // left face
-                        2, 7, 6, 2, 7, 3, // right face
+                        0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
                     ],
                 ),
                 images: vec![],
@@ -57,7 +52,7 @@ impl Cube {
         ctx.apply_pipeline(&self.block);
         ctx.apply_bindings(&self.bindings);
         ctx.apply_uniforms(&Uniforms { model, view, tint });
-        ctx.draw(0, 36, 1);
+        ctx.draw(0, 24, 1);
     }
 }
 
