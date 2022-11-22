@@ -16,6 +16,9 @@ pub struct Actor {
 }
 
 impl Actor {
+    pub fn index(&self) -> PackageIndex {
+        PackageIndex::new(self.export as i32 + 1)
+    }
     pub fn get_translation(&self, asset: &Asset) -> glam::Vec3 {
         asset.exports[self.transform]
             .get_normal_export()

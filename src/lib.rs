@@ -5,14 +5,14 @@ mod map_utils;
 mod rendering;
 
 pub struct Stove {
-    camera: rendering::camera::Camera,
+    camera: rendering::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset>,
     version: i32,
     egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
-    cube: rendering::cube::Cube,
+    cube: rendering::Cube,
     ui: bool,
 }
 
@@ -62,14 +62,14 @@ impl Stove {
             None => None,
         };
         let mut stove = Self {
-            camera: rendering::camera::Camera::default(),
+            camera: rendering::Camera::default(),
             notifs,
             map,
             version,
             egui: egui_miniquad::EguiMq::new(ctx),
             actors: Vec::new(),
             selected: None,
-            cube: rendering::cube::Cube::new(ctx),
+            cube: rendering::Cube::new(ctx),
             ui: true,
         };
         update_actors!(stove);
@@ -275,6 +275,11 @@ impl EventHandler for Stove {
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
         self.camera.handle_key_down(keycode);
+    }
+
+    fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
+        self.egui.key_up_event(keycode, keymods);
+        self.camera.handle_key_up(keycode);
         match keycode {
             KeyCode::F => {
                 if let Some(selected) = self.selected {
@@ -284,13 +289,19 @@ impl EventHandler for Stove {
                 }
             }
             KeyCode::H => self.ui = !self.ui,
+            KeyCode::D if keymods.ctrl => match self.selected {
+                Some(index) => {
+                    map_utils::clone_actor(self.map.as_mut().unwrap(), self.actors[index].index());
+                    update_actors!(self);
+                    self.notifs
+                        .success(format!("cloned {}", &self.actors[index].name));
+                }
+                None => {
+                    self.notifs.error("nothing selected to clone");
+                }
+            },
             _ => (),
         }
-    }
-
-    fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
-        self.egui.key_up_event(keycode, keymods);
-        self.camera.handle_key_up(keycode);
     }
 }
 
