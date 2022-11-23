@@ -221,7 +221,7 @@ impl EventHandler for Stove {
                     glam::Mat4::from_scale_rotation_translation(
                         actor.get_scale(map),
                         glam::Quat::from_euler(
-                            glam::EulerRot::ZYX,
+                            glam::EulerRot::XYZ,
                             rot.x.to_radians(),
                             rot.y.to_radians(),
                             rot.z.to_radians(),

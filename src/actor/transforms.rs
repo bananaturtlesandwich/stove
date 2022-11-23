@@ -35,7 +35,7 @@ impl super::Actor {
                 }
                 None
             })
-            .map(|rot| glam::vec3(rot.value.x.0, rot.value.y.0, rot.value.z.0))
+            .map(|rot| glam::vec3(rot.value.z.0, rot.value.y.0, rot.value.x.0))
             .unwrap_or_default()
     }
 

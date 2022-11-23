@@ -1,7 +1,7 @@
 use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::{object_property::ObjectProperty, Property},
+    properties::Property,
     unreal_types::PackageIndex,
     Asset,
 };
@@ -74,7 +74,6 @@ impl super::Actor {
     }
 }
 
-// look at me using idiomatic closures (-3-)
 /// performs the provided closure on all of an export's possible references to other exports
 fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
@@ -83,23 +82,26 @@ fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
         }
     }
     let export = export.get_base_export_mut();
-    // calls the function on every entry in a list of PackageIndexes
-    let mut foreach = |vec: &mut Vec<PackageIndex>| {
-        for reference in vec.iter_mut() {
-            func(reference);
-        }
-    };
-    foreach(&mut export.create_before_create_dependencies);
-    foreach(&mut export.create_before_serialization_dependencies);
-    foreach(&mut export.serialization_before_create_dependencies);
+    export
+        .create_before_create_dependencies
+        .iter_mut()
+        .for_each(&mut func);
+    export
+        .create_before_serialization_dependencies
+        .iter_mut()
+        .for_each(&mut func);
+    export
+        .serialization_before_create_dependencies
+        .iter_mut()
+        .for_each(&mut func);
     func(&mut export.outer_index);
 }
 
 /// performs the provided closure on any possible references stashed away in properties
 fn update_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
     match prop {
-        Property::ObjectProperty(ObjectProperty { value, .. }) => {
-            func(value);
+        Property::ObjectProperty(obj) => {
+            func(&mut obj.value);
         }
         Property::ArrayProperty(arr) => {
             for entry in arr.value.iter_mut() {
