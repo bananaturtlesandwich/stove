@@ -217,7 +217,7 @@ impl EventHandler for Stove {
                     glam::Mat4::from_scale_rotation_translation(
                         actor.get_scale(map),
                         glam::Quat::from_euler(
-                            glam::EulerRot::XZY,
+                            glam::EulerRot::ZYX,
                             rot.x.to_radians(),
                             rot.y.to_radians(),
                             rot.z.to_radians(),
@@ -306,8 +306,17 @@ impl EventHandler for Stove {
             KeyCode::H => self.ui = !self.ui,
             KeyCode::D if keymods.ctrl => match self.selected {
                 Some(index) => {
-                    map_utils::clone_actor(self.map.as_mut().unwrap(), self.actors[index].index());
-                    update_actors!(self);
+                    let map = self.map.as_mut().unwrap();
+                    let insert = map.exports.len() as i32 + 1;
+                    self.selected = Some(self.actors.len());
+                    self.actors[index].duplicate(map);
+                    self.actors.push(
+                        actor::Actor::new(
+                            map,
+                            unreal_asset::unreal_types::PackageIndex::new(insert),
+                        )
+                        .unwrap(),
+                    );
                     self.notifs
                         .success(format!("cloned {}", &self.actors[index].name));
                 }
