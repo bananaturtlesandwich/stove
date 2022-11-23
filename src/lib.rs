@@ -127,8 +127,12 @@ impl EventHandler for Stove {
                                 ui.label("theme:");
                                 egui::global_dark_light_mode_buttons(ui);
                             });
-                            ui.menu_button("keymap", |ui|{
-                                egui::Grid::new("keymap").striped(true).show(ui,|ui|{
+                            ui.horizontal(|ui|{
+                                ui.label("camera speed");
+                                ui.add(egui::DragValue::new(&mut self.camera.speed).clamp_range(0..=250));
+                            });
+                            ui.menu_button("shortcuts", |ui|{
+                                egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
                                     ui.label("camera");
                                     ui.label("right-click + wasd + drag");
                                     ui.end_row();

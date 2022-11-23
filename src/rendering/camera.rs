@@ -19,6 +19,7 @@ pub struct Camera {
     last_time: f64,
     last_mouse_pos: glam::Vec2,
     held_keys: Vec<KeyCode>,
+    pub speed: u8,
 }
 
 impl Default for Camera {
@@ -34,6 +35,7 @@ impl Default for Camera {
             yaw: -90.0,
             last_mouse_pos: glam::vec2(0.0, 0.0),
             held_keys: Vec::new(),
+            speed: 25,
         }
     }
 }
@@ -54,7 +56,7 @@ impl Camera {
         if !self.can_move {
             return;
         }
-        let velocity = (25.0 * self.delta_time) as f32;
+        let velocity = (self.speed as f64 * self.delta_time) as f32;
         for keycode in self.held_keys.iter() {
             match keycode {
                 KeyCode::W => self.position += self.front * velocity,
