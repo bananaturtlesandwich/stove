@@ -7,8 +7,9 @@ use unreal_asset::{
     Asset,
 };
 
-mod duplication;
-mod transforms;
+mod duplicate;
+mod transform;
+mod transplant;
 mod ui;
 
 pub struct Actor {

@@ -127,14 +127,10 @@ impl EventHandler for Stove {
                                 ui.label("theme:");
                                 egui::global_dark_light_mode_buttons(ui);
                             });
-                            ui.horizontal(|ui|{
-                                ui.label("camera speed");
-                                ui.add(egui::DragValue::new(&mut self.camera.speed).clamp_range(0..=250));
-                            });
                             ui.menu_button("shortcuts", |ui|{
                                 egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
                                     ui.label("camera");
-                                    ui.label("right-click + wasd + drag");
+                                    ui.label("right-click + wasd + drag + wheel");
                                     ui.end_row();
                                     ui.label("focus");
                                     ui.label("F");
@@ -250,14 +246,16 @@ impl EventHandler for Stove {
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
+        if !self.egui.egui_ctx().wants_pointer_input() {
+            self.camera.speed = (self.camera.speed as f32 - dy / 200.0).clamp(5.0, 250.0) as u8;
+        }
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
-        if self.egui.egui_ctx().wants_pointer_input() {
-            return;
+        if !self.egui.egui_ctx().wants_pointer_input() {
+            self.camera.handle_mouse_down(mb);
         }
-        self.camera.handle_mouse_down(mb);
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {

@@ -129,6 +129,3 @@ fn update_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
         _ => (),
     }
 }
-
-// transferring is being developed over at:
-// https://github.com/bananaturtlesandwich/blue-fire-rando/blob/master/src/map_utils.rs
