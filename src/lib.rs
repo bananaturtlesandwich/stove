@@ -61,16 +61,12 @@ impl Stove {
             },
             None => None,
         };
-        let egui = egui_miniquad::EguiMq::new(ctx);
-        // to counteract the high dpi
-        #[cfg(windows)]
-        egui.egui_ctx().set_pixels_per_point(1.5);
         let mut stove = Self {
             camera: rendering::Camera::default(),
             notifs,
             map,
             version,
-            egui,
+            egui: egui_miniquad::EguiMq::new(ctx),
             actors: Vec::new(),
             selected: None,
             cube: rendering::Cube::new(ctx),
@@ -134,9 +130,6 @@ impl EventHandler for Stove {
                             ui.horizontal(|ui|{
                                 ui.label("camera speed");
                                 ui.add(egui::DragValue::new(&mut self.camera.speed).clamp_range(0..=250));
-                                if ui.button("⟲").clicked(){
-                                    self.camera.speed = 25;
-                                }
                             });
                             ui.menu_button("shortcuts", |ui|{
                                 egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
