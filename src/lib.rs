@@ -1,4 +1,5 @@
 use miniquad::*;
+
 mod actor;
 mod asset_utils;
 mod map_utils;
@@ -14,6 +15,7 @@ pub struct Stove {
     selected: Option<usize>,
     cube: rendering::Cube,
     ui: bool,
+    donor: Option<(unreal_asset::Asset, Vec<actor::Actor>)>,
 }
 
 fn config() -> std::path::PathBuf {
@@ -71,6 +73,7 @@ impl Stove {
             selected: None,
             cube: rendering::Cube::new(ctx),
             ui: true,
+            donor: None,
         };
         update_actors!(stove);
         stove
@@ -143,6 +146,7 @@ impl EventHandler for Stove {
                                     ui.end_row();
                                     binding(ui,"hide ui","H");
                                     binding(ui,"select","click");
+                                    binding(ui, "transplant", "ctrl + T");
                                     ui.heading("actor");
                                     ui.end_row();
                                     binding(ui,"focus","F");
@@ -182,26 +186,76 @@ impl EventHandler for Stove {
                     });
                     if let Some(map)=&mut self.map {
                         ui.add_space(10.0);
-                        ui.push_id("actors",|ui|egui::ScrollArea::vertical().auto_shrink([false;2]).max_height(ui.available_height()*0.5).show_rows(ui,ui.text_style_height(&egui::TextStyle::Body),self.actors.len(),|ui,range|{
-                            for i in range{
-                                let is_selected=Some(i)==self.selected;
-                                if ui.selectable_label(
-                                    is_selected,
-                                    &self.actors[i].name
-                                )
-                                .on_hover_text(&self.actors[i].class)
-                                .clicked(){
-                                    self.selected=(!is_selected).then_some(i);
-                                }
-                            };
-                        }));
+                        ui.push_id("actors", |ui| egui::ScrollArea::vertical()
+                            .auto_shrink([false;2])
+                            .max_height(ui.available_height()*0.5)
+                            .show_rows(
+                                ui,
+                                ui.text_style_height(&egui::TextStyle::Body),
+                                self.actors.len(),
+                                |ui,range|{
+                                for i in range{
+                                    let is_selected=Some(i)==self.selected;
+                                    if ui.selectable_label(
+                                        is_selected,
+                                        &self.actors[i].name
+                                    )
+                                    .on_hover_text(&self.actors[i].class)
+                                    .clicked(){
+                                        self.selected=(!is_selected).then_some(i);
+                                    }
+                                };
+                            })
+                        );
                         if let Some(selected)=self.selected{
                             ui.add_space(10.0);
-                            egui::ScrollArea::vertical().auto_shrink([false;2]).show(ui,|ui|{
-                                self.actors[selected].show(map,ui);
-                                // otherwise the scroll area bugs out at the bottom
-                                ui.add_space(1.0);
-                            });
+                            ui.push_id("properties", |ui|egui::ScrollArea::vertical()
+                                .auto_shrink([false;2])
+                                .show(ui,|ui|{
+                                    self.actors[selected].show(map,ui);
+                                    // otherwise the scroll area bugs out at the bottom
+                                    ui.add_space(1.0);
+                                })
+                            );
+                        }
+                        let mut open = true;
+                        let mut transplanted = false;
+                        if let Some((donor, actors))=&self.donor{
+                            egui::Window::new("transplant actor")
+                                .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
+                                .resizable(false)
+                                .collapsible(false)
+                                .open(&mut open)
+                                .show(ctx, |ui|{
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false;2])
+                                    .show_rows(
+                                        ui,
+                                        ui.text_style_height(&egui::TextStyle::Body),
+                                        actors.len(),
+                                        |ui,range|{
+                                            for i in range{
+                                                if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
+                                                    let insert = map.exports.len() as i32 + 1;
+                                                    actors[i].transplant(map, donor);
+                                                    self.actors.push(
+                                                        actor::Actor::new(
+                                                            map,
+                                                            unreal_asset::unreal_types::PackageIndex::new(insert),
+                                                        )
+                                                        .unwrap(),
+                                                    );
+                                                    self.notifs.success(format!("transplanted {}", actors[i].name));
+                                                    transplanted = true;
+                                                }
+                                            }
+                                        }
+                                    );
+                                }
+                            );
+                        }
+                        if transplanted || !open {
+                            self.donor=None;
                         }
                     }
                     scissor=ui.available_width() as i32;
@@ -331,6 +385,31 @@ impl EventHandler for Stove {
                 }
                 None => {
                     self.notifs.error("nothing selected to clone");
+                }
+            },
+            KeyCode::T if keymods.ctrl => match &self.map {
+                Some(_) => {
+                    if let Ok(Some(path)) = native_dialog::FileDialog::new()
+                        .add_filter("unreal map file", &["umap"])
+                        .show_open_single_file()
+                    {
+                        match asset_utils::open_asset(path, self.version) {
+                            Ok(donor) => {
+                                // no need for verbose warnings here
+                                let actors = map_utils::get_actors(&donor)
+                                    .into_iter()
+                                    .filter_map(|index| actor::Actor::new(&donor, index).ok())
+                                    .collect();
+                                self.donor = Some((donor, actors));
+                            }
+                            Err(e) => {
+                                self.notifs.error(e.to_string());
+                            }
+                        }
+                    }
+                }
+                None => {
+                    self.notifs.error("no map to transplant to");
                 }
             },
             _ => (),
