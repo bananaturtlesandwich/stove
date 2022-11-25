@@ -15,10 +15,21 @@ impl super::Actor {
 
         // make sure the actor has a unique object name
         let mut name = children[0].get_base_export().object_name.content.clone();
-        while asset.search_name_reference(&name).is_some() {
-            name.push('0');
+        let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
+            Some(index) if index != name.len() => name
+                .drain(index + 1..)
+                .collect::<String>()
+                .parse()
+                .unwrap_or_default(),
+            _ => 0,
+        };
+        while asset
+            .search_name_reference(&format!("{}{}", &name, id))
+            .is_some()
+        {
+            id += 1;
         }
-        children[0].get_base_export_mut().object_name = asset.add_fname(&name);
+        children[0].get_base_export_mut().object_name = asset.add_fname(&(name + &id.to_string()));
 
         // add the actor to persistent level
         if let Some(level) = asset

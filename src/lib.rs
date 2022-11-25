@@ -127,19 +127,26 @@ impl EventHandler for Stove {
                                 ui.label("theme:");
                                 egui::global_dark_light_mode_buttons(ui);
                             });
+                            fn binding(ui:&mut egui::Ui,action:&str,binding:&str){
+                                ui.label(action);
+                                ui.label(binding);
+                                ui.end_row();
+                            }
                             ui.menu_button("shortcuts", |ui|{
                                 egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
-                                    ui.label("camera");
-                                    ui.label("right-click + wasd + drag + wheel");
+                                    ui.heading("camera");
                                     ui.end_row();
-                                    ui.label("focus");
-                                    ui.label("F");
+                                    binding(ui,"move","right-click + wasd");
+                                    binding(ui,"rotate","right-click + drag");
+                                    binding(ui,"change speed", "scroll wheel");
+                                    ui.heading("viewport");
                                     ui.end_row();
-                                    ui.label("hide ui");
-                                    ui.label("H");
+                                    binding(ui,"hide ui","H");
+                                    binding(ui,"select","click");
+                                    ui.heading("actor");
                                     ui.end_row();
-                                    ui.label("duplicate");
-                                    ui.label("ctrl + D")
+                                    binding(ui,"focus","F");
+                                    binding(ui,"duplicate","ctrl + D");
                                 });
                             });
                             ui.menu_button("about",|ui|{
@@ -247,7 +254,7 @@ impl EventHandler for Stove {
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
         if !self.egui.egui_ctx().wants_pointer_input() {
-            self.camera.speed = (self.camera.speed as f32 - dy / 200.0).clamp(5.0, 250.0) as u8;
+            self.camera.speed = (self.camera.speed as f32 + dy / 10.0).clamp(5.0, 250.0) as u8;
         }
     }
 
