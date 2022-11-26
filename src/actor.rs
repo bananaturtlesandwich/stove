@@ -3,7 +3,7 @@ use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{Property, PropertyDataTrait},
     reader::asset_trait::AssetTrait,
-    unreal_types::PackageIndex,
+    unreal_types::{FName, PackageIndex},
     Asset,
 };
 
@@ -109,7 +109,27 @@ impl Actor {
     }
 }
 
-/// performs the provided closure on all of an export's possible references to other exports
+/// creates and assigns a unique name
+fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
+    let mut name = orig.content.clone();
+    let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
+        Some(index) if index != name.len() => name
+            .drain(index + 1..)
+            .collect::<String>()
+            .parse()
+            .unwrap_or_default(),
+        _ => 0,
+    };
+    while asset
+        .search_name_reference(&format!("{}{}", &name, id))
+        .is_some()
+    {
+        id += 1;
+    }
+    *orig = asset.add_fname(&(name + &id.to_string()))
+}
+
+/// on all of an export's possible references to other exports
 fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
@@ -132,7 +152,7 @@ fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
     func(&mut export.outer_index);
 }
 
-/// performs the provided closure on any possible references stashed away in properties
+/// on any possible references stashed away in properties
 fn update_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
     match prop {
         Property::ObjectProperty(obj) => {
