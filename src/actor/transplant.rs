@@ -69,15 +69,6 @@ impl super::Actor {
                 }
             })
         }
-        // resolve all name references
-        for child in children.iter_mut() {
-            if let Some(norm) = child.get_normal_export_mut() {
-                for prop in norm.properties.iter_mut() {
-                    update_prop_names(prop, recipient);
-                }
-            }
-        }
-
         // finally add the exports
         recipient.exports.append(&mut children);
 
@@ -111,6 +102,11 @@ impl super::Actor {
                 }
             }
             i += 1;
+        }
+        for import in imports.iter_mut() {
+            import.class_package = recipient.add_fname(&import.class_package.content);
+            import.class_name = recipient.add_fname(&import.class_name.content);
+            import.object_name = recipient.add_fname(&import.object_name.content);
         }
         recipient.imports.append(&mut imports);
     }
