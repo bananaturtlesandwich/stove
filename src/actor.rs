@@ -12,6 +12,7 @@ mod transform;
 mod transplant;
 mod ui;
 
+#[derive(Debug)]
 pub struct Actor {
     export: usize,
     transform: usize,
@@ -114,7 +115,7 @@ fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
     let mut name = orig.content.clone();
     let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
         Some(index) if index != name.len() => name
-            .drain(index + 1..)
+            .drain((index + 1)..)
             .collect::<String>()
             .parse()
             .unwrap_or_default(),
