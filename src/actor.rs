@@ -12,7 +12,6 @@ mod transform;
 mod transplant;
 mod ui;
 
-#[derive(Debug)]
 pub struct Actor {
     export: usize,
     transform: usize,

@@ -1,7 +1,6 @@
 use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::Property,
     reader::asset_trait::AssetTrait,
     unreal_types::PackageIndex,
     Asset, Import,
@@ -9,7 +8,7 @@ use unreal_asset::{
 
 impl super::Actor {
     pub fn transplant(&self, recipient: &mut Asset, donor: &Asset) {
-        let mut children = self.get_actor_exports(donor, donor.exports.len());
+        let mut children = self.get_actor_exports(donor, recipient.exports.len());
 
         // make sure the actor has a unique object name
         super::give_unique_name(
@@ -22,6 +21,7 @@ impl super::Actor {
         if let Some((pos, level)) = recipient
             .exports
             .iter_mut()
+            // least awkward way to get position and reference
             .enumerate()
             .find_map(|(i, ex)| cast!(Export, LevelExport, ex).map(|level| (i, level)))
         {
@@ -39,29 +39,29 @@ impl super::Actor {
                 .push(PackageIndex::new(actor_ref));
         }
 
-        let first_import = recipient.imports.len() as i32;
+        let import_offset = recipient.imports.len() as i32;
         let mut imports = Vec::new();
         // resolve all import references from exports
         for child in children.iter_mut() {
             on_import_refs(child, |index| {
                 if let Some(import) = donor.get_import(*index) {
-                    match recipient.find_import_no_index(
+                    index.index = match recipient.find_import_no_index(
                         &import.class_package,
                         &import.class_name,
                         &import.object_name,
                     ) {
-                        Some(existing) => index.index = existing,
+                        Some(existing) => existing,
                         None => {
                             match imports.iter().position(|imp: &Import| {
                                 imp.class_package.content == import.class_package.content
                                     && imp.class_name.content == import.class_name.content
                                     && imp.object_name.content == import.object_name.content
                             }) {
-                                // these are actually padded perfectly so no random + 1
-                                Some(existing) => index.index = first_import + existing as i32,
+                                Some(existing) => import_offset + existing as i32 + 1,
                                 None => {
                                     imports.push(import.clone());
-                                    index.index = first_import + imports.len() as i32;
+                                    // this actually pads perfectly so no need for + 1
+                                    import_offset + imports.len() as i32
                                 }
                             }
                         }
@@ -72,32 +72,31 @@ impl super::Actor {
         // finally add the exports
         recipient.exports.append(&mut children);
 
-        let mut len = imports.len();
         let mut i = 0;
         // use this because the vector is expanding while the operation occurs
-        while i < len {
+        // imports.len updates every loop
+        while i < imports.len() {
             if let Some(parent) = donor.get_import(imports[i].outer_index) {
-                match recipient.find_import_no_index(
+                imports[i].outer_index.index = match recipient.find_import_no_index(
                     &parent.class_package,
                     &parent.class_name,
                     &parent.object_name,
                 ) {
-                    Some(existing) => imports[i].outer_index.index = existing,
+                    Some(existing) => existing,
                     None => {
-                        imports[i].outer_index.index = first_import
+                        import_offset
                             + match imports.iter().position(|import: &Import| {
                                 import.class_package.content == parent.class_package.content
                                     && import.class_name.content == parent.class_name.content
                                     && import.object_name.content == parent.object_name.content
                             }) {
-                                // these are actually padded perfectly so no random + 1
-                                Some(existing) => existing,
+                                Some(existing) => existing + 1,
                                 None => {
                                     imports.push(parent.clone());
-                                    len += 1;
+                                    // this actually pads perfectly so no need for + 1
                                     imports.len()
                                 }
-                            } as i32;
+                            } as i32
                     }
                 }
             }
@@ -122,8 +121,13 @@ fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
     let export = export.get_base_export_mut();
     func(&mut export.class_index);
     func(&mut export.template_index);
+    // not serialization_before_serialization because only the first few map exports have those
     export
         .serialization_before_create_dependencies
+        .iter_mut()
+        .for_each(&mut func);
+    export
+        .create_before_serialization_dependencies
         .iter_mut()
         .for_each(&mut func);
 }
