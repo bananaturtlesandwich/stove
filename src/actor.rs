@@ -1,4 +1,5 @@
 use unreal_asset::{
+    cast,
     error::Error,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{Property, PropertyDataTrait},
@@ -109,8 +110,28 @@ impl Actor {
     }
 }
 
+/// gets all actor exports within a map (all exports direct children of PersistentLevel)
+pub fn get_actors(asset: &Asset) -> Vec<PackageIndex> {
+    match asset
+        .exports
+        .iter()
+        .find(|ex| cast!(Export, LevelExport, ex).is_some())
+    {
+        Some(ex) => ex
+            .get_base_export()
+            .create_before_serialization_dependencies
+            .clone(),
+        None => Vec::new(),
+    }
+}
+
 /// creates and assigns a unique name
 fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
+    // for the cases where the number is unnecessary
+    if asset.search_name_reference(&orig.content).is_none() {
+        *orig = asset.add_fname(&orig.content);
+        return;
+    }
     let mut name = orig.content.clone();
     let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
         Some(index) if index != name.len() => name

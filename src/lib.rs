@@ -1,8 +1,7 @@
 use miniquad::*;
 
 mod actor;
-mod asset_utils;
-mod map_utils;
+mod asset;
 mod rendering;
 
 pub struct Stove {
@@ -28,7 +27,7 @@ macro_rules! update_actors {
         $self.actors.clear();
         $self.selected = None;
         if let Some(map) = &$self.map {
-            for index in map_utils::get_actors(map) {
+            for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
                         $self.actors.push(actor);
@@ -54,7 +53,7 @@ impl Stove {
             .parse()
             .unwrap();
         let map = match std::env::args().nth(1) {
-            Some(path) => match asset_utils::open_asset(path, version) {
+            Some(path) => match asset::open(path, version) {
                 Ok(asset) => Some(asset),
                 Err(e) => {
                     notifs.error(e.to_string());
@@ -98,7 +97,7 @@ impl EventHandler for Stove {
                                     .add_filter("unreal map file", &["umap"])
                                     .show_open_single_file()
                                 {
-                                    match asset_utils::open_asset(path, self.version) {
+                                    match asset::open(path, self.version) {
                                         Ok(asset) => {
                                             self.map = Some(asset);
                                             update_actors!(self);
@@ -114,7 +113,7 @@ impl EventHandler for Stove {
                                     Some(map) => if let Ok(Some(path)) = native_dialog::FileDialog::new()
                                         .add_filter("unreal map file", &["umap"])
                                         .show_save_single_file(){
-                                            match asset_utils::save_asset(map, path){
+                                            match asset::save(map, path){
                                                 Ok(_) => self.notifs.success("saved map"),
                                                 Err(e) => self.notifs.error(e.to_string()),
                                             };
@@ -393,10 +392,10 @@ impl EventHandler for Stove {
                         .add_filter("unreal map file", &["umap"])
                         .show_open_single_file()
                     {
-                        match asset_utils::open_asset(path, self.version) {
+                        match asset::open(path, self.version) {
                             Ok(donor) => {
                                 // no need for verbose warnings here
-                                let actors = map_utils::get_actors(&donor)
+                                let actors = actor::get_actors(&donor)
                                     .into_iter()
                                     .filter_map(|index| actor::Actor::new(&donor, index).ok())
                                     .collect();

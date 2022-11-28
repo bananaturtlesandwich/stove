@@ -7,11 +7,12 @@ use unreal_asset::flags::EPackageFlags;
 use unreal_asset::Asset;
 
 /// creates an asset from the specified path and version
-pub fn open_asset(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> {
+pub fn open(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> {
+    let bulk = file.as_ref().with_extension("uexp");
     let mut asset = Asset::new(
         fs::read(&file)?,
-        match file.as_ref().exists() {
-            true => Some(fs::read(file.as_ref().with_extension("uexp"))?),
+        match bulk.exists() {
+            true => Some(fs::read(bulk)?),
             // the none option is given as some uassets may not use the event driven loader
             false => None,
         },
@@ -22,7 +23,7 @@ pub fn open_asset(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> 
 }
 
 /// saves an asset's data to the specified path
-pub fn save_asset(asset: &Asset, path: impl AsRef<Path>) -> Result<(), Error> {
+pub fn save(asset: &Asset, path: impl AsRef<Path>) -> Result<(), Error> {
     let mut main = io::Cursor::new(Vec::new());
     let mut bulk = main.clone();
     asset.write_data(
