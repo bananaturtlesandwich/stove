@@ -52,18 +52,19 @@ impl super::Actor {
                     ) {
                         Some(existing) => existing,
                         None => {
-                            match imports.iter().position(|imp: &Import| {
-                                imp.class_package.content == import.class_package.content
-                                    && imp.class_name.content == import.class_name.content
-                                    && imp.object_name.content == import.object_name.content
-                            }) {
-                                Some(existing) => import_offset + existing as i32 + 1,
-                                None => {
-                                    imports.push(import.clone());
-                                    // this actually pads perfectly so no need for + 1
-                                    import_offset + imports.len() as i32
-                                }
-                            }
+                            -import_offset
+                                - match imports.iter().position(|imp: &Import| {
+                                    imp.class_package.content == import.class_package.content
+                                        && imp.class_name.content == import.class_name.content
+                                        && imp.object_name.content == import.object_name.content
+                                }) {
+                                    Some(existing) => existing + 1,
+                                    None => {
+                                        imports.push(import.clone());
+                                        // this actually pads perfectly so no need for + 1
+                                        imports.len()
+                                    }
+                                } as i32
                         }
                     }
                 }
@@ -84,8 +85,8 @@ impl super::Actor {
                 ) {
                     Some(existing) => existing,
                     None => {
-                        import_offset
-                            + match imports.iter().position(|import: &Import| {
+                        -import_offset
+                            - match imports.iter().position(|import: &Import| {
                                 import.class_package.content == parent.class_package.content
                                     && import.class_name.content == parent.class_name.content
                                     && import.object_name.content == parent.object_name.content

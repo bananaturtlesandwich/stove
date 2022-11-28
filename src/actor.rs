@@ -95,7 +95,7 @@ impl Actor {
             .collect();
 
         let package_offset = (offset + 1) as i32;
-        // for each PackageIndex, update references in the exports to what they will be once added
+        // update export references to what they will be once added
         for (i, child_index) in child_indexes.into_iter().enumerate() {
             for child in children.iter_mut() {
                 on_export_refs(child, |index| {
