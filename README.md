@@ -8,12 +8,12 @@
 - [x] save and open unreal map files of any version
 - [x] display a selectable list of actors
 - [x] allow editing all of an actor's transforms
-- [x] render each actor as an cube/sprite in a 3d scene
+- [x] render each actor as a cube/sprite in a 3d scene
 - [x] walk around the scene with an unreal-editor-style camera
+- [x] duplicate actors in the same map
+- [ ] transplant actors from a different map
 - [ ] organise actor components in a satisfying way
 - [ ] allow editing of each actor's properties
-- [ ] duplicate actors in the same map
-- [ ] transplant actors from a different map
 - [ ] undo and redo certain actions
 - [ ] insert default values (many properties left as default are cut from the map file)
 - [ ] searching functionality

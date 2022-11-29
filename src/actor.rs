@@ -134,12 +134,12 @@ fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
     }
     let mut name = orig.content.clone();
     let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
-        Some(index) if index != name.len() => name
+        Some(index) if index != name.len() - 1 => name
             .drain((index + 1)..)
             .collect::<String>()
             .parse()
-            .unwrap_or_default(),
-        _ => 0,
+            .unwrap(),
+        _ => 1,
     };
     while asset
         .search_name_reference(&format!("{}{}", &name, id))
