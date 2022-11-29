@@ -53,9 +53,6 @@ impl Camera {
         glam::Mat4::look_at_lh(self.position, self.position + self.front, self.up)
     }
     pub fn move_cam(&mut self) {
-        if !self.can_move {
-            return;
-        }
         let velocity = (self.speed as f64 * self.delta_time) as f32;
         for keycode in self.held_keys.iter() {
             match keycode {
