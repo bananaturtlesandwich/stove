@@ -1,7 +1,7 @@
 use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::Property,
+    properties::{Property, PropertyDataTrait},
     reader::asset_trait::AssetTrait,
     unreal_types::PackageIndex,
     Asset, Import,
@@ -145,18 +145,9 @@ fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
 }
 
 fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
+    *prop.get_name_mut() = recipient.add_fname(&prop.get_name().content);
     match prop {
-        Property::BoolProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::UInt16Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::UInt32Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::UInt64Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::FloatProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::Int16Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::Int64Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::Int8Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::IntProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
         Property::ByteProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(index) = prop.enum_type.as_mut() {
                 // add_fname actually doesn't update the index...might have to update rest of codebase
                 *index = recipient
@@ -167,112 +158,36 @@ fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
                     as i64;
             }
         }
-        Property::DoubleProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
         Property::NameProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             prop.value = recipient.add_fname(&prop.name.content);
         }
-        Property::StrProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
         Property::TextProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(id) = prop.table_id.as_mut() {
                 *id = recipient.add_fname(&id.content);
             }
         }
-        Property::ObjectProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::AssetObjectProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
         Property::SoftObjectProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             prop.value = recipient.add_fname(&prop.value.content);
         }
-        Property::IntPointProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::VectorProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::Vector4Property(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::Vector2DProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::BoxProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::QuatProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::RotatorProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::LinearColorProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::ColorProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::TimeSpanProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::DateTimeProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::GuidProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::SetProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::ArrayProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::MapProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::PerPlatformBoolProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::PerPlatformIntProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::PerPlatformFloatProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::MaterialAttributesInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::ExpressionInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::ColorMaterialInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::ScalarMaterialInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::ShadingModelMaterialInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::VectorMaterialInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::Vector2MaterialInputProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::WeightedRandomSamplerProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::SkeletalMeshSamplingLODBuiltDataProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::SkeletalMeshAreaWeightedTriangleSampler(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
         Property::SoftAssetPathProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(path) = prop.asset_path_name.as_mut() {
                 *path = recipient.add_fname(&path.content);
             }
         }
         Property::SoftObjectPathProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(path) = prop.asset_path_name.as_mut() {
                 *path = recipient.add_fname(&path.content);
             }
         }
         Property::SoftClassPathProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(path) = prop.asset_path_name.as_mut() {
                 *path = recipient.add_fname(&path.content);
             }
         }
-        Property::MulticastDelegateProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::RichCurveKeyProperty(prop) => prop.name = recipient.add_fname(&prop.name.content),
-        Property::ViewTargetBlendParamsProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
-        Property::GameplayTagContainerProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content)
-        }
         Property::SmartNameProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             prop.display_name = recipient.add_fname(&prop.display_name.content);
         }
         Property::StructProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(typ) = prop.struct_type.as_mut() {
                 *typ = recipient.add_fname(&typ.content);
             }
@@ -281,17 +196,16 @@ fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
             }
         }
         Property::EnumProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             prop.value = recipient.add_fname(&prop.value.content);
             if let Some(typ) = prop.enum_type.as_mut() {
                 *typ = recipient.add_fname(&typ.content);
             }
         }
         Property::UnknownProperty(prop) => {
-            prop.name = recipient.add_fname(&prop.name.content);
             if let Some(typ) = prop.serialized_type.as_mut() {
                 *typ = recipient.add_fname(&typ.content);
             }
         }
+        _ => (),
     }
 }
