@@ -3,7 +3,7 @@ use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{Property, PropertyDataTrait},
     reader::asset_trait::AssetTrait,
-    unreal_types::PackageIndex,
+    unreal_types::{PackageIndex, ToFName},
     Asset, Import,
 };
 
@@ -145,11 +145,12 @@ fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
 }
 
 fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
-    *prop.get_name_mut() = recipient.add_fname(&prop.get_name().content);
+    recipient.add_fname(&prop.to_fname().content);
+    recipient.add_fname(&prop.get_name().content);
     match prop {
         Property::ByteProperty(prop) => {
             if let Some(index) = prop.enum_type.as_mut() {
-                // add_fname actually doesn't update the index...might have to update rest of codebase
+                // this is the only reason to have a mutable reference
                 *index = recipient
                     .add_name_reference(donor.get_name_reference(*index as i32), false)
                     as i64;
@@ -159,51 +160,56 @@ fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
             }
         }
         Property::NameProperty(prop) => {
-            prop.value = recipient.add_fname(&prop.name.content);
+            recipient.add_fname(&prop.name.content);
         }
         Property::TextProperty(prop) => {
-            if let Some(id) = prop.table_id.as_mut() {
-                *id = recipient.add_fname(&id.content);
+            if let Some(id) = prop.table_id.as_ref() {
+                recipient.add_fname(&id.content);
             }
         }
         Property::SoftObjectProperty(prop) => {
-            prop.value = recipient.add_fname(&prop.value.content);
+            recipient.add_fname(&prop.value.content);
         }
         Property::SoftAssetPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_mut() {
-                *path = recipient.add_fname(&path.content);
+            if let Some(path) = prop.asset_path_name.as_ref() {
+                recipient.add_fname(&path.content);
             }
         }
         Property::SoftObjectPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_mut() {
-                *path = recipient.add_fname(&path.content);
+            if let Some(path) = prop.asset_path_name.as_ref() {
+                recipient.add_fname(&path.content);
             }
         }
         Property::SoftClassPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_mut() {
-                *path = recipient.add_fname(&path.content);
+            if let Some(path) = prop.asset_path_name.as_ref() {
+                recipient.add_fname(&path.content);
             }
         }
         Property::SmartNameProperty(prop) => {
-            prop.display_name = recipient.add_fname(&prop.display_name.content);
+            recipient.add_fname(&prop.display_name.content);
         }
         Property::StructProperty(prop) => {
-            if let Some(typ) = prop.struct_type.as_mut() {
-                *typ = recipient.add_fname(&typ.content);
+            if let Some(typ) = prop.struct_type.as_ref() {
+                recipient.add_fname(&typ.content);
             }
+            for prop in prop.value.iter_mut() {
+                resolve_name(prop, recipient, donor);
+            }
+        }
+        Property::ArrayProperty(prop) => {
             for prop in prop.value.iter_mut() {
                 resolve_name(prop, recipient, donor);
             }
         }
         Property::EnumProperty(prop) => {
             prop.value = recipient.add_fname(&prop.value.content);
-            if let Some(typ) = prop.enum_type.as_mut() {
-                *typ = recipient.add_fname(&typ.content);
+            if let Some(typ) = prop.enum_type.as_ref() {
+                recipient.add_fname(&typ.content);
             }
         }
         Property::UnknownProperty(prop) => {
-            if let Some(typ) = prop.serialized_type.as_mut() {
-                *typ = recipient.add_fname(&typ.content);
+            if let Some(typ) = prop.serialized_type.as_ref() {
+                recipient.add_fname(&typ.content);
             }
         }
         _ => (),

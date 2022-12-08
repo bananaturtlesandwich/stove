@@ -380,10 +380,10 @@ impl EventHandler for Stove {
                         .unwrap(),
                     );
                     self.notifs
-                        .success(format!("cloned {}", &self.actors[index].name));
+                        .success(format!("duplicated {}", &self.actors[index].name));
                 }
                 None => {
-                    self.notifs.error("nothing selected to clone");
+                    self.notifs.error("nothing selected to duplicate");
                 }
             },
             KeyCode::T if keymods.ctrl => match &self.map {
