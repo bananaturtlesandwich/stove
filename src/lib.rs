@@ -138,7 +138,7 @@ impl EventHandler for Stove {
                                 egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
                                     ui.heading("camera");
                                     ui.end_row();
-                                    binding(ui,"move","right-click + wasd");
+                                    binding(ui,"move","wasd");
                                     binding(ui,"rotate","right-click + drag");
                                     binding(ui,"change speed", "scroll wheel");
                                     ui.heading("viewport");
