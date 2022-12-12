@@ -1,5 +1,5 @@
 fn main() {
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     winres::WindowsResource::new()
         .set_icon("assets/pot.ico")
         .compile()

@@ -19,7 +19,7 @@ egui-notify = "*"
 native-dialog = "*"
 dirs = "*"
 
-[target.'cfg(windows)'.build-dependencies]
+[target.'cfg(target_os="windows")'.build-dependencies]
 winres = "*"
 
 [profile.release]

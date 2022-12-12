@@ -135,7 +135,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::TextProperty(txt) => ui.text_edit_singleline(
                         txt.culture_invariant_string.get_or_insert(String::new()),
                     ),
-                    Property::ObjectProperty(obj) => drag(ui, &mut obj.value.index),
+                    Property::ObjectProperty(obj) => ui.link(obj.value.index.to_string()),
                     Property::AssetObjectProperty(obj) => {
                         ui.text_edit_singleline(obj.value.get_or_insert(String::new()))
                     }
