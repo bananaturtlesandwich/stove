@@ -1,6 +1,6 @@
 use unreal_asset::{
     exports::{ExportBaseTrait, ExportNormalTrait},
-    properties::{Property, PropertyDataTrait},
+    properties::{array_property::ArrayProperty, Property, PropertyDataTrait},
     unreal_types::{FName, ToFName},
     Asset,
 };
@@ -13,7 +13,7 @@ impl super::Actor {
             .unwrap()
             .properties
             .iter_mut()
-            .for_each(|prop| show_simple_property(ui, prop));
+            .for_each(|prop| show_property(ui, prop));
         for i in asset.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
@@ -27,14 +27,26 @@ impl super::Actor {
                         .unwrap()
                         .properties
                         .iter_mut()
-                        .for_each(|prop| show_simple_property(ui, prop));
+                        .for_each(|prop| show_property(ui, prop));
                 });
             }
         }
     }
 }
 
-// I don't want to have to install OrderedFloat to use functions
+fn show_array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Response {
+    ui.push_id(&arr.name.content, |ui| {
+        ui.collapsing("", |ui| {
+            for (i, entry) in arr.value.iter_mut().enumerate() {
+                ui.push_id(i, |ui| show_property(ui, entry));
+            }
+        })
+        .header_response
+    })
+    .response
+}
+
+// I don't want to install OrderedFloat
 macro_rules! show_vector {
     ($ui:ident,$val:expr) => {
         drag($ui, &mut $val.value.x.0)
@@ -88,22 +100,17 @@ fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Re
     ui.add(
         egui::widgets::DragValue::new(val)
             .clamp_range(Num::MIN..=Num::MAX)
-            .speed(10.0)
-            .fixed_decimals(1),
+            .speed(10.0),
     )
 }
 
 fn drag_angle(ui: &mut egui::Ui, val: &mut f32) -> egui::Response {
-    ui.add(
-        egui::widgets::DragValue::new(val)
-            .suffix("°")
-            .fixed_decimals(1),
-    )
+    ui.add(egui::widgets::DragValue::new(val).suffix("°"))
 }
 
-fn show_simple_property(ui: &mut egui::Ui, prop: &mut Property) {
+fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
     match prop.get_name().content.as_str() {
-        "UCSModifiedProperties" | "BlueprintCreatedComponents" => return,
+        "UCSModifiedProperties" | "UCSSerializationIndex" | "BlueprintCreatedComponents" => return,
         name => {
             ui.horizontal(|ui| {
                 ui.label(name);
@@ -117,7 +124,7 @@ fn show_simple_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::Int64Property(int) => drag(ui, &mut int.value),
                     Property::Int8Property(int) => drag(ui, &mut int.value),
                     Property::IntProperty(int) => drag(ui, &mut int.value),
-                    // Property::ByteProperty(_) => todo!(),
+                    Property::ByteProperty(byte) => drag(ui, &mut byte.value),
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
                     Property::NameProperty(name) => {
                         ui.text_edit_singleline(&mut name.value.content)
@@ -128,7 +135,7 @@ fn show_simple_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::TextProperty(txt) => ui.text_edit_singleline(
                         txt.culture_invariant_string.get_or_insert(String::new()),
                     ),
-                    // Property::ObjectProperty(_) => todo!(),
+                    Property::ObjectProperty(obj) => drag(ui, &mut obj.value.index),
                     Property::AssetObjectProperty(obj) => {
                         ui.text_edit_singleline(obj.value.get_or_insert(String::new()))
                     }
@@ -182,19 +189,16 @@ fn show_simple_property(ui: &mut egui::Ui, prop: &mut Property) {
                         }
                         response
                     }
-                    // Property::SetProperty(_) => todo!(),
-                    Property::ArrayProperty(arr) => {
-                        ui.push_id(&arr.name.content, |ui| {
-                            ui.collapsing("", |ui| {
-                                for (i, entry) in arr.value.iter_mut().enumerate() {
-                                    ui.push_id(i, |ui| show_simple_property(ui, entry));
-                                }
-                            })
-                            .header_response
+                    Property::SetProperty(set) => show_array_property(ui, &mut set.value),
+                    Property::ArrayProperty(arr) => show_array_property(ui, arr),
+                    Property::MapProperty(map) => {
+                        ui.push_id(&map.name.content, |ui| {
+                            for (_, value) in map.value.iter_mut() {
+                                show_property(ui, value);
+                            }
                         })
                         .response
                     }
-                    // Property::MapProperty(_) => todo!(),
                     Property::PerPlatformBoolProperty(bools) => {
                         ui.collapsing("", |ui| {
                             for bool in bools.value.iter_mut() {
@@ -247,7 +251,7 @@ fn show_simple_property(ui: &mut egui::Ui, prop: &mut Property) {
                         ui.push_id(&str.name.content, |ui| {
                             ui.collapsing("", |ui| {
                                 for val in str.value.iter_mut() {
-                                    show_simple_property(ui, val)
+                                    show_property(ui, val)
                                 }
                             })
                         })
