@@ -3,7 +3,12 @@ use std::io;
 use std::path::Path;
 
 use unreal_asset::error::Error;
+use unreal_asset::exports::ExportBaseTrait;
+use unreal_asset::exports::ExportNormalTrait;
 use unreal_asset::flags::EPackageFlags;
+use unreal_asset::properties::Property;
+use unreal_asset::properties::PropertyDataTrait;
+use unreal_asset::unreal_types::ToFName;
 use unreal_asset::Asset;
 
 /// creates an asset from the specified path and version
@@ -23,7 +28,8 @@ pub fn open(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> {
 }
 
 /// saves an asset's data to the specified path
-pub fn save(asset: &Asset, path: impl AsRef<Path>) -> Result<(), Error> {
+pub fn save(asset: &mut Asset, path: impl AsRef<Path>) -> Result<(), Error> {
+    resolve_names(asset);
     let mut main = io::Cursor::new(Vec::new());
     let mut bulk = main.clone();
     asset.write_data(
@@ -49,4 +55,83 @@ pub fn save(asset: &Asset, path: impl AsRef<Path>) -> Result<(), Error> {
         fs::write(path.as_ref().with_extension("uexp"), bulk.into_inner())?;
     }
     Ok(())
+}
+
+/// so i don't have to deal with borrow checker in ui code
+fn resolve_names(asset: &mut Asset) {
+    for import in asset.imports.clone().iter() {
+        asset.add_fname(&import.class_package.content);
+        asset.add_fname(&import.class_name.content);
+        asset.add_fname(&import.object_name.content);
+    }
+    for export in asset.exports.clone().iter() {
+        asset.add_fname(&export.get_base_export().object_name.content);
+        // resolve the rest of the name references
+        if let Some(norm) = export.get_normal_export() {
+            for prop in norm.properties.iter() {
+                resolve_name(prop, asset);
+            }
+        }
+    }
+}
+
+fn resolve_name(prop: &Property, asset: &mut Asset) {
+    asset.add_fname(&prop.to_fname().content);
+    asset.add_fname(&prop.get_name().content);
+    match prop {
+        Property::NameProperty(prop) => {
+            asset.add_fname(&prop.value.content);
+        }
+        Property::TextProperty(prop) => {
+            if let Some(id) = prop.table_id.as_ref() {
+                asset.add_fname(&id.content);
+            }
+        }
+        Property::SoftObjectProperty(prop) => {
+            asset.add_fname(&prop.value.content);
+        }
+        Property::SoftAssetPathProperty(prop) => {
+            if let Some(path) = prop.asset_path_name.as_ref() {
+                asset.add_fname(&path.content);
+            }
+        }
+        Property::SoftObjectPathProperty(prop) => {
+            if let Some(path) = prop.asset_path_name.as_ref() {
+                asset.add_fname(&path.content);
+            }
+        }
+        Property::SoftClassPathProperty(prop) => {
+            if let Some(path) = prop.asset_path_name.as_ref() {
+                asset.add_fname(&path.content);
+            }
+        }
+        Property::SmartNameProperty(prop) => {
+            asset.add_fname(&prop.display_name.content);
+        }
+        Property::StructProperty(prop) => {
+            if let Some(typ) = prop.struct_type.as_ref() {
+                asset.add_fname(&typ.content);
+            }
+            for prop in prop.value.iter() {
+                resolve_name(prop, asset);
+            }
+        }
+        Property::ArrayProperty(prop) => {
+            for prop in prop.value.iter() {
+                resolve_name(prop, asset);
+            }
+        }
+        Property::EnumProperty(prop) => {
+            asset.add_fname(&prop.value.content);
+            if let Some(typ) = prop.enum_type.as_ref() {
+                asset.add_fname(&typ.content);
+            }
+        }
+        Property::UnknownProperty(prop) => {
+            if let Some(typ) = prop.serialized_type.as_ref() {
+                asset.add_fname(&typ.content);
+            }
+        }
+        _ => (),
+    }
 }

@@ -1,9 +1,9 @@
 use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::{Property, PropertyDataTrait},
+    properties::Property,
     reader::asset_trait::AssetTrait,
-    unreal_types::{PackageIndex, ToFName},
+    unreal_types::PackageIndex,
     Asset, Import,
 };
 
@@ -16,13 +16,12 @@ impl super::Actor {
             &mut children[0].get_base_export_mut().object_name,
             recipient,
         );
-        // resolve the rest of the name references
+
+        // resolve byte properties
         for child in children.iter_mut() {
-            child.get_base_export_mut().object_name =
-                recipient.add_fname(&child.get_base_export().object_name.content);
             if let Some(norm) = child.get_normal_export_mut() {
                 for prop in norm.properties.iter_mut() {
-                    resolve_name(prop, recipient, donor);
+                    resolve_bytes(prop, recipient, donor);
                 }
             }
         }
@@ -114,11 +113,6 @@ impl super::Actor {
             }
             i += 1;
         }
-        for import in imports.iter_mut() {
-            import.class_package = recipient.add_fname(&import.class_package.content);
-            import.class_name = recipient.add_fname(&import.class_name.content);
-            import.object_name = recipient.add_fname(&import.object_name.content);
-        }
         recipient.imports.append(&mut imports);
     }
 }
@@ -144,9 +138,7 @@ fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
         .for_each(&mut func);
 }
 
-fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
-    recipient.add_fname(&prop.to_fname().content);
-    recipient.add_fname(&prop.get_name().content);
+fn resolve_bytes(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
     match prop {
         Property::ByteProperty(prop) => {
             if let Some(index) = prop.enum_type.as_mut() {
@@ -159,57 +151,14 @@ fn resolve_name(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
                     as i64;
             }
         }
-        Property::NameProperty(prop) => {
-            recipient.add_fname(&prop.name.content);
-        }
-        Property::TextProperty(prop) => {
-            if let Some(id) = prop.table_id.as_ref() {
-                recipient.add_fname(&id.content);
-            }
-        }
-        Property::SoftObjectProperty(prop) => {
-            recipient.add_fname(&prop.value.content);
-        }
-        Property::SoftAssetPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_ref() {
-                recipient.add_fname(&path.content);
-            }
-        }
-        Property::SoftObjectPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_ref() {
-                recipient.add_fname(&path.content);
-            }
-        }
-        Property::SoftClassPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_ref() {
-                recipient.add_fname(&path.content);
-            }
-        }
-        Property::SmartNameProperty(prop) => {
-            recipient.add_fname(&prop.display_name.content);
-        }
         Property::StructProperty(prop) => {
-            if let Some(typ) = prop.struct_type.as_ref() {
-                recipient.add_fname(&typ.content);
-            }
             for prop in prop.value.iter_mut() {
-                resolve_name(prop, recipient, donor);
+                resolve_bytes(prop, recipient, donor);
             }
         }
         Property::ArrayProperty(prop) => {
             for prop in prop.value.iter_mut() {
-                resolve_name(prop, recipient, donor);
-            }
-        }
-        Property::EnumProperty(prop) => {
-            prop.value = recipient.add_fname(&prop.value.content);
-            if let Some(typ) = prop.enum_type.as_ref() {
-                recipient.add_fname(&typ.content);
-            }
-        }
-        Property::UnknownProperty(prop) => {
-            if let Some(typ) = prop.serialized_type.as_ref() {
-                recipient.add_fname(&typ.content);
+                resolve_bytes(prop, recipient, donor);
             }
         }
         _ => (),

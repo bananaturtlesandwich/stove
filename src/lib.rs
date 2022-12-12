@@ -109,7 +109,7 @@ impl EventHandler for Stove {
                                 }
                             }
                             if ui.button("save as").clicked(){
-                                match &self.map{
+                                match &mut self.map{
                                     Some(map) => if let Ok(Some(path)) = native_dialog::FileDialog::new()
                                         .add_filter("unreal map file", &["umap"])
                                         .show_save_single_file(){
