@@ -13,7 +13,7 @@
 - [x] walk around the scene with an unreal-editor-style camera
 - [x] duplicate actors in the same map
 - [x] transplant actors from a different map
-- [ ] edit the properties of actors and their components
+- [x] edit the properties of actors and their components
 - [ ] insert default values (properties left as default are cut from the map)
 ### Convenience
 - [ ] undo and redo any action
