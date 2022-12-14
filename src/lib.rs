@@ -15,6 +15,9 @@ pub struct Stove {
     cube: rendering::Cube,
     ui: bool,
     donor: Option<(unreal_asset::Asset, Vec<actor::Actor>)>,
+    open_dialog: egui_file::FileDialog,
+    transplant_dialog: egui_file::FileDialog,
+    save_dialog: egui_file::FileDialog,
 }
 
 fn config() -> std::path::PathBuf {
@@ -52,14 +55,22 @@ impl Stove {
             .unwrap_or_else(|_| "0".to_string())
             .parse()
             .unwrap();
+        let mut open_dialog = egui_file::FileDialog::open_file(None)
+            .resizable(false)
+            .filter(Box::new(filter));
         let map = match std::env::args().nth(1) {
-            Some(path) => match asset::open(path, version) {
-                Ok(asset) => Some(asset),
-                Err(e) => {
-                    notifs.error(e.to_string());
-                    None
+            Some(path) => {
+                open_dialog = egui_file::FileDialog::open_file(Some(path.clone().into()))
+                    .resizable(false)
+                    .filter(Box::new(filter));
+                match asset::open(path, version) {
+                    Ok(asset) => Some(asset),
+                    Err(e) => {
+                        notifs.error(e.to_string());
+                        None
+                    }
                 }
-            },
+            }
             None => None,
         };
         let mut stove = Self {
@@ -73,10 +84,21 @@ impl Stove {
             cube: rendering::Cube::new(ctx),
             ui: true,
             donor: None,
+            transplant_dialog: egui_file::FileDialog::open_file(open_dialog.path())
+                .resizable(false)
+                .filter(Box::new(filter)),
+            save_dialog: egui_file::FileDialog::save_file(open_dialog.path())
+                .resizable(false)
+                .filter(Box::new(filter)),
+            open_dialog,
         };
         update_actors!(stove);
         stove
     }
+}
+
+fn filter(path: &std::path::Path) -> bool {
+    path.extension().map(|ext| ext.to_str()) == Some(Some("umap"))
 }
 
 impl EventHandler for Stove {
@@ -93,32 +115,12 @@ impl EventHandler for Stove {
                     ui.horizontal(|ui| {
                         ui.menu_button("file", |ui| {
                             if ui.button("open").clicked() {
-                                if let Ok(Some(path)) = native_dialog::FileDialog::new()
-                                    .add_filter("unreal map file", &["umap"])
-                                    .show_open_single_file()
-                                {
-                                    match asset::open(path, self.version) {
-                                        Ok(asset) => {
-                                            self.map = Some(asset);
-                                            update_actors!(self);
-                                        }
-                                        Err(e) => {
-                                            self.notifs.error(e.to_string());
-                                        }
-                                    }
-                                }
+                                self.open_dialog.open();
                             }
                             if ui.button("save as").clicked(){
-                                match &mut self.map{
-                                    Some(map) => if let Ok(Some(path)) = native_dialog::FileDialog::new()
-                                        .add_filter("unreal map file", &["umap"])
-                                        .show_save_single_file(){
-                                            match asset::save(map, path){
-                                                Ok(_) => self.notifs.success("saved map"),
-                                                Err(e) => self.notifs.error(e.to_string()),
-                                            };
-                                        },
-                                    None => {
+                                match self.map.is_some(){
+                                    true => self.save_dialog.open(),
+                                    false => {
                                         self.notifs.error("no map to save");
                                     },
                                 }
@@ -143,6 +145,8 @@ impl EventHandler for Stove {
                                     binding(ui,"change speed", "scroll wheel");
                                     ui.heading("viewport");
                                     ui.end_row();
+                                    binding(ui, "open map", "ctrl + O");
+                                    binding(ui, "save map as", "ctrl + S");
                                     binding(ui,"hide ui","H");
                                     binding(ui,"select","click");
                                     binding(ui, "transplant", "ctrl + T");
@@ -254,12 +258,53 @@ impl EventHandler for Stove {
                             );
                         }
                         if transplanted || !open {
-                            self.donor=None;
+                            self.donor = None;
                         }
                     }
                     scissor=ui.available_width() as i32;
                 });
                 self.notifs.show(ctx);
+                self.open_dialog.show(ctx);
+                if self.open_dialog.selected() {
+                    if let Some(path) = self.open_dialog.path() {
+                        match asset::open(path, self.version) {
+                            Ok(asset) => {
+                                self.map = Some(asset);
+                                update_actors!(self);
+                            }
+                            Err(e) => {
+                                self.notifs.error(e.to_string());
+                            }
+                        }
+                    }
+                }
+                self.transplant_dialog.show(ctx);
+                if self.transplant_dialog.selected() {
+                    if let Some(path) = self.transplant_dialog.path() {
+                        match asset::open(path, self.version) {
+                            Ok(donor) => {
+                                // no need for verbose warnings here
+                                let actors = actor::get_actors(&donor)
+                                    .into_iter()
+                                    .filter_map(|index| actor::Actor::new(&donor, index).ok())
+                                    .collect();
+                                self.donor = Some((donor, actors));
+                            }
+                            Err(e) => {
+                                self.notifs.error(e.to_string());
+                            }
+                        }
+                    }
+                }
+                self.save_dialog.show(ctx);
+                if self.save_dialog.selected(){
+                    if let Some(path)=self.save_dialog.path(){
+                        match asset::save(self.map.as_mut().unwrap(), path){
+                            Ok(_) => self.notifs.success("saved map"),
+                            Err(e) => self.notifs.error(e.to_string()),
+                        };
+                    }
+                }
             })
         }
         ctx.begin_default_pass(PassAction::Clear {
@@ -387,29 +432,19 @@ impl EventHandler for Stove {
                     self.notifs.error("nothing selected to duplicate");
                 }
             },
-            KeyCode::T if keymods.ctrl => match &self.map {
-                Some(_) => {
-                    if let Ok(Some(path)) = native_dialog::FileDialog::new()
-                        .add_filter("unreal map file", &["umap"])
-                        .show_open_single_file()
-                    {
-                        match asset::open(path, self.version) {
-                            Ok(donor) => {
-                                // no need for verbose warnings here
-                                let actors = actor::get_actors(&donor)
-                                    .into_iter()
-                                    .filter_map(|index| actor::Actor::new(&donor, index).ok())
-                                    .collect();
-                                self.donor = Some((donor, actors));
-                            }
-                            Err(e) => {
-                                self.notifs.error(e.to_string());
-                            }
-                        }
-                    }
+            KeyCode::T if keymods.ctrl => match &self.map.is_some() {
+                true => {
+                    self.transplant_dialog.open();
                 }
-                None => {
+                false => {
                     self.notifs.error("no map to transplant to");
+                }
+            },
+            KeyCode::O if keymods.ctrl => self.open_dialog.open(),
+            KeyCode::S if keymods.ctrl => match self.map.is_some() {
+                true => self.save_dialog.open(),
+                false => {
+                    self.notifs.error("no map to save");
                 }
             },
             _ => (),

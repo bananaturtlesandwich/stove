@@ -16,7 +16,7 @@ miniquad = "*"
 egui-miniquad = "*"
 egui = "*"
 egui-notify = "*"
-native-dialog = "*"
+egui_file = "*"
 dirs = "*"
 
 [target.'cfg(target_os="windows")'.build-dependencies]

@@ -22,12 +22,14 @@ impl super::Actor {
         {
             if let Some(ex) = asset.get_export_mut(*i) {
                 let name = &ex.get_base_export().object_name.content.clone();
-                ui.collapsing(name, |ui| {
-                    ex.get_normal_export_mut()
-                        .unwrap()
-                        .properties
-                        .iter_mut()
-                        .for_each(|prop| show_property(ui, prop));
+                ui.push_id(ex.get_base_export().serial_offset, |ui| {
+                    ui.collapsing(name, |ui| {
+                        ex.get_normal_export_mut()
+                            .unwrap()
+                            .properties
+                            .iter_mut()
+                            .for_each(|prop| show_property(ui, prop));
+                    });
                 });
             }
         }
