@@ -23,7 +23,7 @@
 - [ ] searching functionality
 ### Low Priority
 - [ ] display the mesh/sprite of an actor and their components rather than a cube
-- [ ] discord RPC (show your internet friends what you're doing)
+- [x] discord RPC (show your internet friends what you're doing)
 </details>
 
 <details>
