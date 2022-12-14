@@ -320,13 +320,10 @@ impl EventHandler for Stove {
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
-        if self.egui.egui_ctx().is_pointer_over_area() {
-            return;
-        }
         self.camera.handle_mouse_up(mb);
         // i think this picking code must be some of the hackiest shit i've ever written
         // funnily enough it's probably more performant than raycasting
-        if mb == MouseButton::Left {
+        if !self.egui.egui_ctx().is_pointer_over_area() && mb == MouseButton::Left {
             if let Some(map) = self.map.as_ref() {
                 // convert the mouse coordinates to uv
                 let (width, height) = ctx.screen_size();
