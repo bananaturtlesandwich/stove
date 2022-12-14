@@ -1,8 +1,10 @@
+use std::thread;
 use miniquad::*;
 
 mod actor;
 mod asset;
 mod rendering;
+mod rpc;
 
 pub struct Stove {
     camera: rendering::Camera,
@@ -267,10 +269,20 @@ impl EventHandler for Stove {
                 self.open_dialog.show(ctx);
                 if self.open_dialog.selected() {
                     if let Some(path) = self.open_dialog.path() {
-                        match asset::open(path, self.version) {
+                        match asset::open(path.clone(), self.version) {
                             Ok(asset) => {
                                 self.map = Some(asset);
                                 update_actors!(self);
+                                let file_name = path.clone()
+                                    .file_name()
+                                    .unwrap()
+                                    .to_os_string()
+                                    .into_string()
+                                    .unwrap()
+                                    .to_string();
+                                thread::spawn(|| {
+                                    rpc::rpc(file_name).expect("uh oh");
+                                });
                             }
                             Err(e) => {
                                 self.notifs.error(e.to_string());
