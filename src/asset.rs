@@ -69,13 +69,13 @@ fn resolve_names(asset: &mut Asset) {
         // resolve the rest of the name references
         if let Some(norm) = export.get_normal_export() {
             for prop in norm.properties.iter() {
-                resolve_name(prop, asset);
+                resolve_prop_name(prop, asset);
             }
         }
     }
 }
 
-fn resolve_name(prop: &Property, asset: &mut Asset) {
+fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
     asset.add_fname(&prop.to_fname().content);
     asset.add_fname(&prop.get_name().content);
     match prop {
@@ -105,6 +105,24 @@ fn resolve_name(prop: &Property, asset: &mut Asset) {
                 asset.add_fname(&path.content);
             }
         }
+        Property::DelegateProperty(del) => {
+            asset.add_fname(&del.value.delegate.content);
+        }
+        Property::MulticastDelegateProperty(del) => {
+            for delegate in del.value.iter() {
+                asset.add_fname(&delegate.delegate.content);
+            }
+        }
+        Property::MulticastSparseDelegateProperty(del) => {
+            for delegate in del.value.iter() {
+                asset.add_fname(&delegate.delegate.content);
+            }
+        }
+        Property::MulticastInlineDelegateProperty(del) => {
+            for delegate in del.value.iter() {
+                asset.add_fname(&delegate.delegate.content);
+            }
+        }
         Property::SmartNameProperty(prop) => {
             asset.add_fname(&prop.display_name.content);
         }
@@ -113,12 +131,12 @@ fn resolve_name(prop: &Property, asset: &mut Asset) {
                 asset.add_fname(&typ.content);
             }
             for prop in prop.value.iter() {
-                resolve_name(prop, asset);
+                resolve_prop_name(prop, asset);
             }
         }
         Property::ArrayProperty(prop) => {
             for prop in prop.value.iter() {
-                resolve_name(prop, asset);
+                resolve_prop_name(prop, asset);
             }
         }
         Property::EnumProperty(prop) => {

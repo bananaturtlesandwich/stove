@@ -96,6 +96,19 @@ macro_rules! show_path {
     };
 }
 
+macro_rules! show_delegate {
+    ($ui:ident,$val:expr) => {
+        $ui.push_id(&$val.name.content, |ui| {
+            ui.collapsing("", |ui| {
+                for delegate in $val.value.iter_mut() {
+                    ui.text_edit_singleline(&mut delegate.delegate.content);
+                }
+            })
+        })
+        .response
+    };
+}
+
 fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Response {
     ui.add(
         egui::widgets::DragValue::new(val)
@@ -109,8 +122,11 @@ fn drag_angle(ui: &mut egui::Ui, val: &mut f32) -> egui::Response {
 }
 
 fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
+    if let Property::ObjectProperty(_) = prop {
+        return;
+    }
     match prop.get_name().content.as_str() {
-        "UCSModifiedProperties" | "UCSSerializationIndex" | "BlueprintCreatedComponents" => return,
+        "UCSModifiedProperties" | "UCSSerializationIndex" | "BlueprintCreatedComponents" => (),
         name => {
             ui.horizontal(|ui| {
                 ui.label(name);
@@ -240,7 +256,12 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::SoftAssetPathProperty(path) => show_path!(ui, path),
                     Property::SoftObjectPathProperty(path) => show_path!(ui, path),
                     Property::SoftClassPathProperty(path) => show_path!(ui, path),
-                    // Property::MulticastDelegateProperty(_) => todo!(),
+                    Property::DelegateProperty(del) => {
+                        ui.text_edit_singleline(&mut del.value.delegate.content)
+                    }
+                    Property::MulticastDelegateProperty(del) => show_delegate!(ui, del),
+                    Property::MulticastSparseDelegateProperty(del) => show_delegate!(ui, del),
+                    Property::MulticastInlineDelegateProperty(del) => show_delegate!(ui, del),
                     // Property::RichCurveKeyProperty(_) => todo!(),
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
@@ -263,7 +284,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                 }
             })
             .response
-            .on_hover_text(prop.to_fname().content)
+            .on_hover_text(prop.to_fname().content);
         }
     };
 }

@@ -89,7 +89,7 @@ impl EventHandler for Stove {
         let mut scissor = 0;
         if self.ui {
             self.egui.run(ctx, |mqctx, ctx| {
-                egui::SidePanel::left("sidepanel").resizable(false).show(ctx, |ui| {
+                egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.menu_button("file", |ui| {
                             if ui.button("open").clicked() {
@@ -306,21 +306,21 @@ impl EventHandler for Stove {
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
-        if !self.egui.egui_ctx().wants_pointer_input() {
+        if !self.egui.egui_ctx().is_pointer_over_area() {
             self.camera.speed = (self.camera.speed as f32 + dy / 10.0).clamp(5.0, 250.0) as u8;
         }
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
-        if !self.egui.egui_ctx().wants_pointer_input() {
+        if !self.egui.egui_ctx().is_pointer_over_area() {
             self.camera.handle_mouse_down(mb);
         }
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
-        if self.egui.egui_ctx().wants_pointer_input() {
+        if self.egui.egui_ctx().is_pointer_over_area() {
             return;
         }
         self.camera.handle_mouse_up(mb);
@@ -351,7 +351,9 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
-        self.camera.handle_key_down(keycode);
+        if !self.egui.egui_ctx().is_pointer_over_area() {
+            self.camera.handle_key_down(keycode);
+        }
     }
 
     fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {

@@ -197,6 +197,22 @@ fn update_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
                 update_props(entry, func);
             }
         }
+        Property::DelegateProperty(del) => func(&mut del.value.object),
+        Property::MulticastDelegateProperty(del) => {
+            for delegate in del.value.iter_mut() {
+                func(&mut delegate.object)
+            }
+        }
+        Property::MulticastSparseDelegateProperty(del) => {
+            for delegate in del.value.iter_mut() {
+                func(&mut delegate.object)
+            }
+        }
+        Property::MulticastInlineDelegateProperty(del) => {
+            for delegate in del.value.iter_mut() {
+                func(&mut delegate.object)
+            }
+        }
         Property::StructProperty(struc) => {
             for entry in struc.value.iter_mut() {
                 update_props(entry, func);
