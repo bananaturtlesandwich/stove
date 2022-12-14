@@ -393,7 +393,7 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
-        if !self.egui.egui_ctx().is_pointer_over_area() {
+        if !self.egui.egui_ctx().is_pointer_over_area() && !keymods.ctrl {
             self.camera.handle_key_down(keycode);
         }
     }
