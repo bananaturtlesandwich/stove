@@ -14,7 +14,11 @@ pub(crate) fn rpc(file_name: String) -> Result<(), Box<dyn Error>> {
             .assets(
                 activity::Assets::new()
                     .large_image("pot"),
-            ),
+            )
+            .buttons(vec![activity::Button::new(
+                "Homepage",
+                "https://github.com/bananaturtlesandwich/stove"
+            )]),
     )?;
     loop {
         std::thread::sleep(std::time::Duration::from_secs(99999999));
