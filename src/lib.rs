@@ -1,3 +1,4 @@
+use discord_rich_presence::{activity::*, DiscordIpc, DiscordIpcClient};
 use miniquad::*;
 
 mod actor;
@@ -18,6 +19,7 @@ pub struct Stove {
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
+    client: Option<discord_rich_presence::DiscordIpcClient>,
 }
 
 fn config() -> std::path::PathBuf {
@@ -58,17 +60,47 @@ impl Stove {
         let mut open_dialog = egui_file::FileDialog::open_file(None)
             .resizable(false)
             .filter(Box::new(filter));
+        let mut filename = String::new();
         let map = match std::env::args().nth(1) {
             Some(path) => {
                 open_dialog = egui_file::FileDialog::open_file(Some(path.clone().into()))
                     .resizable(false)
                     .filter(Box::new(filter));
-                match asset::open(path, version) {
-                    Ok(asset) => Some(asset),
+                match asset::open(path.clone(), version) {
+                    Ok(asset) => {
+                        filename = path;
+                        Some(asset)
+                    }
                     Err(e) => {
                         notifs.error(e.to_string());
                         None
                     }
+                }
+            }
+            None => None,
+        };
+        let client = match DiscordIpcClient::new("1052633997638905996").ok() {
+            Some(mut client) => {
+                if client.connect().is_ok()
+                    && client
+                        .set_activity(
+                            match filename.as_str() {
+                                "" => Activity::new().state("idle"),
+                                name => Activity::new()
+                                    .details("currently editing:")
+                                    .state(name.split('\\').last().unwrap_or_default()),
+                            }
+                            .assets(Assets::new().large_image("pot"))
+                            .buttons(vec![Button::new(
+                                "homepage",
+                                "https://github.com/bananaturtlesandwich/stove",
+                            )]),
+                        )
+                        .is_ok()
+                {
+                    Some(client)
+                } else {
+                    None
                 }
             }
             None => None,
@@ -90,6 +122,7 @@ impl Stove {
             save_dialog: egui_file::FileDialog::save_file(open_dialog.path())
                 .resizable(false)
                 .filter(Box::new(filter)),
+            client,
             open_dialog,
         };
         update_actors!(stove);
@@ -267,8 +300,21 @@ impl EventHandler for Stove {
                 self.open_dialog.show(ctx);
                 if self.open_dialog.selected() {
                     if let Some(path) = self.open_dialog.path() {
-                        match asset::open(path, self.version) {
+                        match asset::open(path.clone(), self.version) {
                             Ok(asset) => {
+                                if let Some(client)=&mut self.client{
+                                    if client.set_activity(Activity::new()
+                                    .details("currently editing:")
+                                    .state(path.file_name().unwrap_or_default().to_str().unwrap_or_default().split('\\').last().unwrap_or_default())
+                                    .assets(Assets::new().large_image("pot"))
+                                    .buttons(vec![Button::new(
+                                        "homepage",
+                                        "https://github.com/bananaturtlesandwich/stove",
+                                    )])
+                                    ).is_err(){
+                                        self.client=None;
+                                    }
+                                }
                                 self.map = Some(asset);
                                 update_actors!(self);
                             }
@@ -448,6 +494,12 @@ impl EventHandler for Stove {
                 }
             },
             _ => (),
+        }
+    }
+
+    fn quit_requested_event(&mut self, _: &mut Context) {
+        if let Some(client) = &mut self.client {
+            client.close().unwrap()
         }
     }
 }
