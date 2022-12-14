@@ -358,7 +358,9 @@ impl EventHandler for Stove {
 
     fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
         self.egui.key_up_event(keycode, keymods);
-        self.camera.handle_key_up(keycode);
+        if !self.egui.egui_ctx().is_pointer_over_area() {
+            self.camera.handle_key_up(keycode);
+        }
         match keycode {
             KeyCode::F => {
                 if let Some(selected) = self.selected {
