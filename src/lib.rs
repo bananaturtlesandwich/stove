@@ -57,7 +57,8 @@ impl Stove {
             .unwrap_or_else(|_| "0".to_string())
             .parse()
             .unwrap();
-        let mut open_dialog = egui_file::FileDialog::open_file(None)
+        let home = dirs::home_dir().unwrap();
+        let mut open_dialog = egui_file::FileDialog::open_file(Some(home.clone()))
             .resizable(false)
             .filter(Box::new(filter));
         let mut filename = String::new();
@@ -79,32 +80,28 @@ impl Stove {
             }
             None => None,
         };
-        let client = match DiscordIpcClient::new("1052633997638905996").ok() {
-            Some(mut client) => {
-                if client.connect().is_ok()
-                    && client
-                        .set_activity(
-                            match filename.as_str() {
-                                "" => Activity::new().state("idle"),
-                                name => Activity::new()
-                                    .details("currently editing:")
-                                    .state(name.split('\\').last().unwrap_or_default()),
-                            }
-                            .assets(Assets::new().large_image("pot"))
-                            .buttons(vec![Button::new(
-                                "homepage",
-                                "https://github.com/bananaturtlesandwich/stove",
-                            )]),
-                        )
-                        .is_ok()
-                {
-                    Some(client)
-                } else {
-                    None
-                }
+        let mut client = DiscordIpcClient::new("1052633997638905996").ok();
+        if let Some(cl) = &mut client {
+            if cl.connect().is_err()
+                || cl
+                    .set_activity(
+                        match filename.as_str() {
+                            "" => Activity::new().state("idle"),
+                            name => Activity::new()
+                                .details("currently editing:")
+                                .state(name.split('\\').last().unwrap_or_default()),
+                        }
+                        .assets(Assets::new().large_image("pot"))
+                        .buttons(vec![Button::new(
+                            "homepage",
+                            "https://github.com/bananaturtlesandwich/stove",
+                        )]),
+                    )
+                    .is_err()
+            {
+                client = None;
             }
-            None => None,
-        };
+        }
         let mut stove = Self {
             camera: rendering::Camera::default(),
             notifs,
@@ -116,10 +113,10 @@ impl Stove {
             cube: rendering::Cube::new(ctx),
             ui: true,
             donor: None,
-            transplant_dialog: egui_file::FileDialog::open_file(open_dialog.path())
+            transplant_dialog: egui_file::FileDialog::open_file(Some(home.clone()))
                 .resizable(false)
                 .filter(Box::new(filter)),
-            save_dialog: egui_file::FileDialog::save_file(open_dialog.path())
+            save_dialog: egui_file::FileDialog::save_file(Some(home))
                 .resizable(false)
                 .filter(Box::new(filter)),
             client,
@@ -147,10 +144,10 @@ impl EventHandler for Stove {
                 egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.menu_button("file", |ui| {
-                            if ui.button("open").clicked() {
+                            if ui.add(egui::Button::new("open").shortcut_text("ctrl + O")).clicked() {
                                 self.open_dialog.open();
                             }
-                            if ui.button("save as").clicked(){
+                            if ui.add(egui::Button::new("save as").shortcut_text("ctrl + S")).clicked(){
                                 match self.map.is_some(){
                                     true => self.save_dialog.open(),
                                     false => {
@@ -181,7 +178,7 @@ impl EventHandler for Stove {
                                     binding(ui, "open map", "ctrl + O");
                                     binding(ui, "save map as", "ctrl + S");
                                     binding(ui,"hide ui","H");
-                                    binding(ui,"select","click");
+                                    binding(ui,"select","left-click");
                                     binding(ui, "transplant", "ctrl + T");
                                     ui.heading("actor");
                                     ui.end_row();
@@ -446,9 +443,7 @@ impl EventHandler for Stove {
 
     fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
         self.egui.key_up_event(keycode, keymods);
-        if !self.egui.egui_ctx().is_pointer_over_area() {
-            self.camera.handle_key_up(keycode);
-        }
+        self.camera.handle_key_up(keycode);
         match keycode {
             KeyCode::F => {
                 if let Some(selected) = self.selected {
