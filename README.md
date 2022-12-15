@@ -3,7 +3,7 @@
 *<h1 align="center">still an extremely heavy work in progress</h1>*
 
 <details>
-<summary><h1 align="center">Roadmap</h1></summary>
+<summary><h1>Roadmap</h1></summary>
 
 ### Basic functionality
 - [x] save and open unreal map files of any version
@@ -23,11 +23,11 @@
 - [ ] searching functionality
 ### Low Priority
 - [ ] display the mesh/sprite of an actor and their components rather than a cube
-- [ ] discord RPC (show your internet friends what you're doing)
+- [x] discord RPC (show your internet friends what you're doing)
 </details>
 
 <details>
-<summary><h1 align="center">Credits</h1></summary>
+<summary><h1>Credits</h1></summary>
 
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
 - [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their minimal yet easy-to-use [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates

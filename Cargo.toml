@@ -5,9 +5,7 @@ repository = "https://github.com/bananaturtlesandwich/stove"
 readme = "README.md"
 version = "0.1.1"
 edition = "2021"
-description = """
-An editor for cooked unreal engine 4 map files
-"""
+description = "An editor for cooked unreal engine 4 map files"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }

@@ -1,15 +1,13 @@
-use std::fs;
-use std::io;
-use std::path::Path;
+use std::{fs, io, path::Path};
 
-use unreal_asset::error::Error;
-use unreal_asset::exports::ExportBaseTrait;
-use unreal_asset::exports::ExportNormalTrait;
-use unreal_asset::flags::EPackageFlags;
-use unreal_asset::properties::Property;
-use unreal_asset::properties::PropertyDataTrait;
-use unreal_asset::unreal_types::ToFName;
-use unreal_asset::Asset;
+use unreal_asset::{
+    error::Error,
+    exports::{ExportBaseTrait, ExportNormalTrait},
+    flags::EPackageFlags,
+    properties::{Property, PropertyDataTrait},
+    unreal_types::ToFName,
+    Asset,
+};
 
 /// creates an asset from the specified path and version
 pub fn open(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> {
