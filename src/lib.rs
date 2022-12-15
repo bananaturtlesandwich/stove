@@ -16,6 +16,7 @@ pub struct Stove {
     cube: rendering::Cube,
     ui: bool,
     donor: Option<(unreal_asset::Asset, Vec<actor::Actor>)>,
+    filepath: String,
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
@@ -61,7 +62,7 @@ impl Stove {
         let mut open_dialog = egui_file::FileDialog::open_file(Some(home.clone()))
             .resizable(false)
             .filter(Box::new(filter));
-        let mut filename = String::new();
+        let mut filepath = String::new();
         let map = match std::env::args().nth(1) {
             Some(path) => {
                 open_dialog = egui_file::FileDialog::open_file(Some(path.clone().into()))
@@ -69,7 +70,7 @@ impl Stove {
                     .filter(Box::new(filter));
                 match asset::open(path.clone(), version) {
                     Ok(asset) => {
-                        filename = path;
+                        filepath = path;
                         Some(asset)
                     }
                     Err(e) => {
@@ -85,7 +86,7 @@ impl Stove {
             if cl.connect().is_err()
                 || cl
                     .set_activity(
-                        match filename.as_str() {
+                        match filepath.as_str() {
                             "" => Activity::new().state("idle"),
                             name => Activity::new()
                                 .details("currently editing:")
@@ -121,6 +122,7 @@ impl Stove {
                 .filter(Box::new(filter)),
             client,
             open_dialog,
+            filepath,
         };
         update_actors!(stove);
         stove
@@ -147,7 +149,18 @@ impl EventHandler for Stove {
                             if ui.add(egui::Button::new("open").shortcut_text("ctrl + O")).clicked() {
                                 self.open_dialog.open();
                             }
-                            if ui.add(egui::Button::new("save as").shortcut_text("ctrl + S")).clicked(){
+                            if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
+                                match &mut self.map{
+                                    Some(map) => match asset::save(map,&self.filepath){
+                                        Ok(_) => self.notifs.success("map saved"),
+                                        Err(e) => self.notifs.error(e.to_string()),
+                                    },
+                                    None => {
+                                        self.notifs.error("no map to save")
+                                    },
+                                };
+                            }
+                            if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift+ S")).clicked(){
                                 match self.map.is_some(){
                                     true => self.save_dialog.open(),
                                     false => {
@@ -168,18 +181,22 @@ impl EventHandler for Stove {
                             }
                             ui.menu_button("shortcuts", |ui|{
                                 egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
+                                    ui.heading("file");
+                                    ui.end_row();
+                                    binding(ui,"open map","ctrl + O");
+                                    binding(ui,"save map","ctrl + S");
+                                    binding(ui,"save map as","ctrl + shift + S");
                                     ui.heading("camera");
                                     ui.end_row();
                                     binding(ui,"move","wasd");
                                     binding(ui,"rotate","right-click + drag");
-                                    binding(ui,"change speed", "scroll wheel");
+                                    binding(ui,"change speed","scroll wheel");
                                     ui.heading("viewport");
                                     ui.end_row();
-                                    binding(ui, "open map", "ctrl + O");
-                                    binding(ui, "save map as", "ctrl + S");
+                                    binding(ui,"exit","escape");
                                     binding(ui,"hide ui","H");
                                     binding(ui,"select","left-click");
-                                    binding(ui, "transplant", "ctrl + T");
+                                    binding(ui,"transplant","ctrl + T");
                                     ui.heading("actor");
                                     ui.end_row();
                                     binding(ui,"focus","F");
@@ -195,7 +212,7 @@ impl EventHandler for Stove {
                                     ui.label(egui::special_emojis::GITHUB.to_string());
                                 });
                             });
-                            if ui.button("exit").clicked(){
+                            if ui.add(egui::Button::new("exit").shortcut_text("escape")).clicked(){
                                 mqctx.request_quit();
                             }
                         });
@@ -312,6 +329,7 @@ impl EventHandler for Stove {
                                         self.client=None;
                                     }
                                 }
+                                self.filepath = path.to_str().unwrap_or_default().to_string();
                                 self.map = Some(asset);
                                 update_actors!(self);
                             }
@@ -343,7 +361,7 @@ impl EventHandler for Stove {
                 if self.save_dialog.selected(){
                     if let Some(path)=self.save_dialog.path(){
                         match asset::save(self.map.as_mut().unwrap(), path){
-                            Ok(_) => self.notifs.success("saved map"),
+                            Ok(_) => self.notifs.success("map saved"),
                             Err(e) => self.notifs.error(e.to_string()),
                         };
                     }
@@ -441,7 +459,7 @@ impl EventHandler for Stove {
         }
     }
 
-    fn key_up_event(&mut self, _: &mut Context, keycode: KeyCode, keymods: KeyMods) {
+    fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
         self.egui.key_up_event(keycode, keymods);
         self.camera.handle_key_up(keycode);
         match keycode {
@@ -482,12 +500,28 @@ impl EventHandler for Stove {
                 }
             },
             KeyCode::O if keymods.ctrl => self.open_dialog.open(),
-            KeyCode::S if keymods.ctrl => match self.map.is_some() {
-                true => self.save_dialog.open(),
-                false => {
-                    self.notifs.error("no map to save");
-                }
+            KeyCode::S => match keymods.ctrl {
+                true => match &mut self.map {
+                    Some(map) => match asset::save(map, &self.filepath) {
+                        Ok(_) => {
+                            self.notifs.success("map saved");
+                        }
+                        Err(e) => {
+                            self.notifs.error(e.to_string());
+                        }
+                    },
+                    None => {
+                        self.notifs.error("no map to save");
+                    }
+                },
+                false => match self.map.is_some() {
+                    true => self.save_dialog.open(),
+                    false => {
+                        self.notifs.error("no map to save");
+                    }
+                },
             },
+            KeyCode::Escape => ctx.request_quit(),
             _ => (),
         }
     }
