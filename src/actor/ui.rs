@@ -211,9 +211,11 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::ArrayProperty(arr) => show_array_property(ui, arr),
                     Property::MapProperty(map) => {
                         ui.push_id(&map.name.content, |ui| {
-                            for (_, value) in map.value.iter_mut() {
-                                show_property(ui, value);
-                            }
+                            ui.collapsing("", |ui| {
+                                for (_, value) in map.value.iter_mut() {
+                                    show_property(ui, value);
+                                }
+                            })
                         })
                         .response
                     }
