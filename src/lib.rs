@@ -500,8 +500,14 @@ impl EventHandler for Stove {
                 }
             },
             KeyCode::O if keymods.ctrl => self.open_dialog.open(),
-            KeyCode::S => match keymods.ctrl {
-                true => match &mut self.map {
+            KeyCode::S if keymods.ctrl => match keymods.shift {
+                true => match self.map.is_some() {
+                    true => self.save_dialog.open(),
+                    false => {
+                        self.notifs.error("no map to save");
+                    }
+                },
+                false => match &mut self.map {
                     Some(map) => match asset::save(map, &self.filepath) {
                         Ok(_) => {
                             self.notifs.success("map saved");
@@ -511,12 +517,6 @@ impl EventHandler for Stove {
                         }
                     },
                     None => {
-                        self.notifs.error("no map to save");
-                    }
-                },
-                false => match self.map.is_some() {
-                    true => self.save_dialog.open(),
-                    false => {
                         self.notifs.error("no map to save");
                     }
                 },
