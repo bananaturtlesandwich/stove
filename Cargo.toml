@@ -16,7 +16,6 @@ egui = "*"
 egui-notify = "*"
 egui_file = "*"
 dirs = "*"
-discord-rich-presence = "*"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "*"
