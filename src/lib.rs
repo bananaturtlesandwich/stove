@@ -21,8 +21,8 @@ pub struct Stove {
     save_dialog: egui_file::FileDialog,
 }
 
-fn config() -> std::path::PathBuf {
-    dirs::config_dir().unwrap().join("stove")
+fn config() -> Option<std::path::PathBuf> {
+    dirs::config_dir().map(|path| path.join("stove"))
 }
 
 // the only way i could get it to compile and look nice :p
@@ -49,36 +49,33 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         let config = config();
-        if !config.exists() && std::fs::create_dir(&config).is_err() {
-            notifs.error("failed to create config directory");
-        }
-        let version = std::fs::read_to_string(config.join("VERSION"))
-            .unwrap_or_else(|_| "0".to_string())
-            .parse()
-            .unwrap();
-        let home = dirs::home_dir().unwrap();
-        let mut open_dialog = egui_file::FileDialog::open_file(Some(home.clone()))
-            .resizable(false)
-            .filter(Box::new(filter));
+        let version = match config {
+            Some(cfg) => {
+                if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
+                    notifs.error("failed to create config directory");
+                }
+                std::fs::read_to_string(cfg.join("VERSION"))
+                    .unwrap_or_else(|_| "0".to_string())
+                    .parse()
+                    .unwrap_or_default()
+            }
+            None => 0,
+        };
         let mut filepath = String::new();
         let map = match std::env::args().nth(1) {
-            Some(path) => {
-                open_dialog = egui_file::FileDialog::open_file(Some(path.clone().into()))
-                    .resizable(false)
-                    .filter(Box::new(filter));
-                match asset::open(path.clone(), version) {
-                    Ok(asset) => {
-                        filepath = path;
-                        Some(asset)
-                    }
-                    Err(e) => {
-                        notifs.error(e.to_string());
-                        None
-                    }
+            Some(path) => match asset::open(path.clone(), version) {
+                Ok(asset) => {
+                    filepath = path;
+                    Some(asset)
                 }
-            }
+                Err(e) => {
+                    notifs.error(e.to_string());
+                    None
+                }
+            },
             None => None,
         };
+        let home = dirs::home_dir();
         let mut stove = Self {
             camera: rendering::Camera::default(),
             notifs,
@@ -90,13 +87,15 @@ impl Stove {
             cube: rendering::Cube::new(ctx),
             ui: true,
             donor: None,
-            transplant_dialog: egui_file::FileDialog::open_file(Some(home.clone()))
+            open_dialog: egui_file::FileDialog::open_file(home.clone())
                 .resizable(false)
                 .filter(Box::new(filter)),
-            save_dialog: egui_file::FileDialog::save_file(Some(home))
+            transplant_dialog: egui_file::FileDialog::open_file(home.clone())
                 .resizable(false)
                 .filter(Box::new(filter)),
-            open_dialog,
+            save_dialog: egui_file::FileDialog::save_file(home)
+                .resizable(false)
+                .filter(Box::new(filter)),
             filepath,
         };
         update_actors!(stove);
@@ -201,11 +200,7 @@ impl EventHandler for Stove {
                             )
                             .show_ui(ui, |ui| {
                                 for version in VERSIONS {
-                                    if ui.selectable_value(&mut self.version, version.1, version.0).clicked(){
-                                        if let Err(e)=std::fs::write(config().join("VERSION"),version.1.to_string()) {
-                                            self.notifs.error(e.to_string());
-                                        }
-                                    }
+                                    ui.selectable_value(&mut self.version, version.1, version.0);
                                 }
                             });
                     });
@@ -366,6 +361,13 @@ impl EventHandler for Stove {
         }
         ctx.commit_frame();
     }
+
+    fn quit_requested_event(&mut self, _ctx: &mut Context) {
+        if let Some(path) = config() {
+            std::fs::write(path.join("VERSION"), self.version.to_string()).unwrap();
+        }
+    }
+
     // boilerplate >n<
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
