@@ -3,23 +3,27 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  release:
+    types: [published, created, edited]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-linux:
+  build-ubuntu:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2.6.0
       - name: build
         run: cargo build -r --verbose
+      - name: rename
+        run: mv target/release/stove target/release/stove-ubuntu
       - name: archive
         uses: actions/upload-artifact@v3.1.1
         with:
-          name: linux
-          path: target/release/stove
+          name: ubuntu
+          path: target/release/stove-ubuntu
 
   build-macos:
     runs-on: macos-latest
@@ -28,11 +32,13 @@ jobs:
       - uses: actions/checkout@v2.6.0
       - name: build
         run: cargo build -r --verbose
+      - name: rename
+        run: mv target/release/stove target/release/stove-macos
       - name: archive
         uses: actions/upload-artifact@v3.1.1
         with:
           name: macos
-          path: target/release/stove
+          path: target/release/stove-macos
 
   build-windows:
     runs-on: windows-latest
