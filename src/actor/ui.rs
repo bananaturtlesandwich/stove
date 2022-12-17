@@ -1,5 +1,5 @@
 use unreal_asset::{
-    exports::{ExportBaseTrait, ExportNormalTrait},
+    exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{array_property::ArrayProperty, Property, PropertyDataTrait},
     unreal_types::{FName, ToFName},
     Asset,
@@ -8,12 +8,14 @@ use unreal_asset::{
 impl super::Actor {
     pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
         ui.heading(&self.name);
-        asset.exports[self.export]
-            .get_normal_export_mut()
-            .unwrap()
-            .properties
-            .iter_mut()
-            .for_each(|prop| show_property(ui, prop));
+        fn show_export(ui: &mut egui::Ui, export: &mut Export) {
+            if let Some(norm) = export.get_normal_export_mut() {
+                for prop in norm.properties.iter_mut() {
+                    show_property(ui, prop);
+                }
+            }
+        }
+        show_export(ui, &mut asset.exports[self.export]);
         for i in asset.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
@@ -24,11 +26,7 @@ impl super::Actor {
                 let name = &ex.get_base_export().object_name.content.clone();
                 ui.push_id(ex.get_base_export().serial_offset, |ui| {
                     ui.collapsing(name, |ui| {
-                        ex.get_normal_export_mut()
-                            .unwrap()
-                            .properties
-                            .iter_mut()
-                            .for_each(|prop| show_property(ui, prop));
+                        show_export(ui, ex);
                     });
                 });
             }

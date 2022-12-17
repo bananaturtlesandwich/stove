@@ -14,7 +14,8 @@ miniquad = "*"
 egui-miniquad = "*"
 egui = "*"
 egui-notify = "*"
-egui_file = "*"
+# until my PR gets accepted which fixes folder double clicks on save file dialog
+egui_file = { git = "https://github.com/bananaturtlesandwich/egui_file" }
 dirs = "*"
 
 [target."cfg(windows)".build-dependencies]
