@@ -17,7 +17,7 @@ egui-notify = "*"
 egui_file = "*"
 dirs = "*"
 
-[target.'cfg(target_os="windows")'.build-dependencies]
+[target."cfg(windows)".build-dependencies]
 winres = "*"
 
 [profile.release]

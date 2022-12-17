@@ -114,224 +114,11 @@ impl EventHandler for Stove {
     }
 
     fn draw(&mut self, ctx: &mut Context) {
-        let mut scissor = 0;
-        if self.ui {
-            self.egui.run(ctx, |mqctx, ctx| {
-                egui::SidePanel::left("sidepanel").show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.menu_button("file", |ui| {
-                            if ui.add(egui::Button::new("open").shortcut_text("ctrl + O")).clicked() {
-                                self.open_dialog.open();
-                            }
-                            if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
-                                match &mut self.map{
-                                    Some(map) => match asset::save(map,&self.filepath){
-                                        Ok(_) => self.notifs.success("map saved"),
-                                        Err(e) => self.notifs.error(e.to_string()),
-                                    },
-                                    None => {
-                                        self.notifs.error("no map to save")
-                                    },
-                                };
-                            }
-                            if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift+ S")).clicked(){
-                                match self.map.is_some(){
-                                    true => self.save_dialog.open(),
-                                    false => {
-                                        self.notifs.error("no map to save");
-                                    },
-                                }
-                            }
-                        });
-                        ui.menu_button("options", |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("theme:");
-                                egui::global_dark_light_mode_buttons(ui);
-                            });
-                            fn binding(ui:&mut egui::Ui,action:&str,binding:&str){
-                                ui.label(action);
-                                ui.label(binding);
-                                ui.end_row();
-                            }
-                            ui.menu_button("shortcuts", |ui|{
-                                egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
-                                    ui.heading("file");
-                                    ui.end_row();
-                                    binding(ui,"open map","ctrl + O");
-                                    binding(ui,"save map","ctrl + S");
-                                    binding(ui,"save map as","ctrl + shift + S");
-                                    ui.heading("camera");
-                                    ui.end_row();
-                                    binding(ui,"move","wasd");
-                                    binding(ui,"rotate","right-click + drag");
-                                    binding(ui,"change speed","scroll wheel");
-                                    ui.heading("viewport");
-                                    ui.end_row();
-                                    binding(ui,"exit","escape");
-                                    binding(ui,"hide ui","H");
-                                    binding(ui,"select","left-click");
-                                    binding(ui,"transplant","ctrl + T");
-                                    ui.heading("actor");
-                                    ui.end_row();
-                                    binding(ui,"focus","F");
-                                    binding(ui,"duplicate","ctrl + D");
-                                });
-                            });
-                            ui.menu_button("about",|ui|{
-                                ui.horizontal_wrapped(|ui|{
-                                    let size=ui.fonts().glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' ');
-                                    ui.spacing_mut().item_spacing.x=size;
-                                    ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
-                                    ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
-                                    ui.label(egui::special_emojis::GITHUB.to_string());
-                                });
-                            });
-                            if ui.add(egui::Button::new("exit").shortcut_text("escape")).clicked(){
-                                mqctx.request_quit();
-                            }
-                        });
-                        egui::ComboBox::from_id_source("version")
-                            .selected_text(
-                                VERSIONS
-                                    .iter()
-                                    .find(|version| version.1 == self.version)
-                                    .unwrap()
-                                    .0,
-                            )
-                            .show_ui(ui, |ui| {
-                                for version in VERSIONS {
-                                    ui.selectable_value(&mut self.version, version.1, version.0);
-                                }
-                            });
-                    });
-                    if let Some(map)=&mut self.map {
-                        ui.add_space(10.0);
-                        ui.push_id("actors", |ui| egui::ScrollArea::vertical()
-                            .auto_shrink([false;2])
-                            .max_height(ui.available_height()*0.5)
-                            .show_rows(
-                                ui,
-                                ui.text_style_height(&egui::TextStyle::Body),
-                                self.actors.len(),
-                                |ui,range|{
-                                for i in range{
-                                    let is_selected=Some(i)==self.selected;
-                                    if ui.selectable_label(
-                                        is_selected,
-                                        &self.actors[i].name
-                                    )
-                                    .on_hover_text(&self.actors[i].class)
-                                    .clicked(){
-                                        self.selected=(!is_selected).then_some(i);
-                                    }
-                                };
-                            })
-                        );
-                        if let Some(selected)=self.selected{
-                            ui.add_space(10.0);
-                            ui.push_id("properties", |ui|egui::ScrollArea::vertical()
-                                .auto_shrink([false;2])
-                                .show(ui,|ui|{
-                                    self.actors[selected].show(map,ui);
-                                    // otherwise the scroll area bugs out at the bottom
-                                    ui.add_space(1.0);
-                                })
-                            );
-                        }
-                        let mut open = true;
-                        let mut transplanted = false;
-                        if let Some((donor, actors))=&self.donor{
-                            egui::Window::new("transplant actor")
-                                .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
-                                .resizable(false)
-                                .collapsible(false)
-                                .open(&mut open)
-                                .show(ctx, |ui|{
-                                egui::ScrollArea::vertical()
-                                    .auto_shrink([false;2])
-                                    .show_rows(
-                                        ui,
-                                        ui.text_style_height(&egui::TextStyle::Body),
-                                        actors.len(),
-                                        |ui,range|{
-                                            for i in range{
-                                                if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
-                                                    let insert = map.exports.len() as i32 + 1;
-                                                    actors[i].transplant(map, donor);
-                                                    self.actors.push(
-                                                        actor::Actor::new(
-                                                            map,
-                                                            unreal_asset::unreal_types::PackageIndex::new(insert),
-                                                        )
-                                                        .unwrap(),
-                                                    );
-                                                    self.notifs.success(format!("transplanted {}", actors[i].name));
-                                                    transplanted = true;
-                                                }
-                                            }
-                                        }
-                                    );
-                                }
-                            );
-                        }
-                        if transplanted || !open {
-                            self.donor = None;
-                        }
-                    }
-                    scissor=ui.available_width() as i32;
-                });
-                self.notifs.show(ctx);
-                self.open_dialog.show(ctx);
-                if self.open_dialog.selected() {
-                    if let Some(path) = self.open_dialog.path() {
-                        match asset::open(path.clone(), self.version) {
-                            Ok(asset) => {
-                                self.filepath = path.to_str().unwrap_or_default().to_string();
-                                self.map = Some(asset);
-                                update_actors!(self);
-                            }
-                            Err(e) => {
-                                self.notifs.error(e.to_string());
-                            }
-                        }
-                    }
-                }
-                self.transplant_dialog.show(ctx);
-                if self.transplant_dialog.selected() {
-                    if let Some(path) = self.transplant_dialog.path() {
-                        match asset::open(path, self.version) {
-                            Ok(donor) => {
-                                // no need for verbose warnings here
-                                let actors = actor::get_actors(&donor)
-                                    .into_iter()
-                                    .filter_map(|index| actor::Actor::new(&donor, index).ok())
-                                    .collect();
-                                self.donor = Some((donor, actors));
-                            }
-                            Err(e) => {
-                                self.notifs.error(e.to_string());
-                            }
-                        }
-                    }
-                }
-                self.save_dialog.show(ctx);
-                if self.save_dialog.selected(){
-                    if let Some(path)=self.save_dialog.path(){
-                        match asset::save(self.map.as_mut().unwrap(), path){
-                            Ok(_) => self.notifs.success("map saved"),
-                            Err(e) => self.notifs.error(e.to_string()),
-                        };
-                    }
-                }
-            })
-        }
         ctx.begin_default_pass(PassAction::Clear {
             color: Some((0.15, 0.15, 0.15, 1.0)),
             depth: Some(1.0),
             stencil: None,
         });
-        let (width, height) = ctx.display().screen_size();
-        ctx.apply_scissor_rect(scissor, 0, width as i32, height as i32);
         if let Some(map) = &mut self.map {
             for (i, actor) in self.actors.iter().enumerate() {
                 let rot = actor.get_rotation(map);
@@ -356,10 +143,217 @@ impl EventHandler for Stove {
             }
         }
         ctx.end_render_pass();
-        if self.ui {
-            self.egui.draw(ctx);
+        if !self.ui {
+            ctx.commit_frame();
         }
-        ctx.commit_frame();
+        self.egui.run(ctx, |mqctx, ctx| {
+            egui::SidePanel::left("sidepanel").show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.menu_button("file", |ui| {
+                        if ui.add(egui::Button::new("open").shortcut_text("ctrl + O")).clicked() {
+                            self.open_dialog.open();
+                        }
+                        if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
+                            match &mut self.map{
+                                Some(map) => match asset::save(map,&self.filepath){
+                                    Ok(_) => self.notifs.success("map saved"),
+                                    Err(e) => self.notifs.error(e.to_string()),
+                                },
+                                None => {
+                                    self.notifs.error("no map to save")
+                                },
+                            };
+                        }
+                        if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift+ S")).clicked(){
+                            match self.map.is_some(){
+                                true => self.save_dialog.open(),
+                                false => {
+                                    self.notifs.error("no map to save");
+                                },
+                            }
+                        }
+                    });
+                    ui.menu_button("options", |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("theme:");
+                            egui::global_dark_light_mode_buttons(ui);
+                        });
+                        fn binding(ui:&mut egui::Ui,action:&str,binding:&str){
+                            ui.label(action);
+                            ui.label(binding);
+                            ui.end_row();
+                        }
+                        ui.menu_button("shortcuts", |ui|{
+                            egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
+                                ui.heading("file");
+                                ui.end_row();
+                                binding(ui,"open map","ctrl + O");
+                                binding(ui,"save map","ctrl + S");
+                                binding(ui,"save map as","ctrl + shift + S");
+                                ui.heading("camera");
+                                ui.end_row();
+                                binding(ui,"move","wasd");
+                                binding(ui,"rotate","right-click + drag");
+                                binding(ui,"change speed","scroll wheel");
+                                ui.heading("viewport");
+                                ui.end_row();
+                                binding(ui,"exit","escape");
+                                binding(ui,"hide ui","H");
+                                binding(ui,"select","left-click");
+                                binding(ui,"transplant","ctrl + T");
+                                ui.heading("actor");
+                                ui.end_row();
+                                binding(ui,"focus","F");
+                                binding(ui,"duplicate","ctrl + D");
+                            });
+                        });
+                        ui.menu_button("about",|ui|{
+                            ui.horizontal_wrapped(|ui|{
+                                let size=ui.fonts().glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' ');
+                                ui.spacing_mut().item_spacing.x=size;
+                                ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
+                                ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                                ui.label(egui::special_emojis::GITHUB.to_string());
+                            });
+                        });
+                        if ui.add(egui::Button::new("exit").shortcut_text("escape")).clicked(){
+                            mqctx.request_quit();
+                        }
+                    });
+                    egui::ComboBox::from_id_source("version")
+                        .selected_text(
+                            VERSIONS
+                                .iter()
+                                .find(|version| version.1 == self.version)
+                                .unwrap()
+                                .0,
+                        )
+                        .show_ui(ui, |ui| {
+                            for version in VERSIONS {
+                                ui.selectable_value(&mut self.version, version.1, version.0);
+                            }
+                        });
+                });
+                if let Some(map)=&mut self.map {
+                    ui.add_space(10.0);
+                    ui.push_id("actors", |ui| egui::ScrollArea::vertical()
+                        .auto_shrink([false;2])
+                        .max_height(ui.available_height()*0.5)
+                        .show_rows(
+                            ui,
+                            ui.text_style_height(&egui::TextStyle::Body),
+                            self.actors.len(),
+                            |ui,range|{
+                            for i in range{
+                                let is_selected=Some(i)==self.selected;
+                                if ui.selectable_label(
+                                    is_selected,
+                                    &self.actors[i].name
+                                )
+                                .on_hover_text(&self.actors[i].class)
+                                .clicked(){
+                                    self.selected=(!is_selected).then_some(i);
+                                }
+                            };
+                        })
+                    );
+                    if let Some(selected)=self.selected{
+                        ui.add_space(10.0);
+                        ui.push_id("properties", |ui|egui::ScrollArea::vertical()
+                            .auto_shrink([false;2])
+                            .show(ui,|ui|{
+                                self.actors[selected].show(map,ui);
+                                // otherwise the scroll area bugs out at the bottom
+                                ui.add_space(1.0);
+                            })
+                        );
+                    }
+                    let mut open = true;
+                    let mut transplanted = false;
+                    if let Some((donor, actors))=&self.donor{
+                        egui::Window::new("transplant actor")
+                            .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
+                            .resizable(false)
+                            .collapsible(false)
+                            .open(&mut open)
+                            .show(ctx, |ui|{
+                            egui::ScrollArea::vertical()
+                                .auto_shrink([false;2])
+                                .show_rows(
+                                    ui,
+                                    ui.text_style_height(&egui::TextStyle::Body),
+                                    actors.len(),
+                                    |ui,range|{
+                                        for i in range{
+                                            if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
+                                                let insert = map.exports.len() as i32 + 1;
+                                                actors[i].transplant(map, donor);
+                                                self.actors.push(
+                                                    actor::Actor::new(
+                                                        map,
+                                                        unreal_asset::unreal_types::PackageIndex::new(insert),
+                                                    )
+                                                    .unwrap(),
+                                                );
+                                                self.notifs.success(format!("transplanted {}", actors[i].name));
+                                                transplanted = true;
+                                            }
+                                        }
+                                    }
+                                );
+                            }
+                        );
+                    }
+                    if transplanted || !open {
+                        self.donor = None;
+                    }
+                }
+            });
+            self.notifs.show(ctx);
+            self.open_dialog.show(ctx);
+            if self.open_dialog.selected() {
+                if let Some(path) = self.open_dialog.path() {
+                    match asset::open(path.clone(), self.version) {
+                        Ok(asset) => {
+                            self.filepath = path.to_str().unwrap_or_default().to_string();
+                            self.map = Some(asset);
+                            update_actors!(self);
+                        }
+                        Err(e) => {
+                            self.notifs.error(e.to_string());
+                        }
+                    }
+                }
+            }
+            self.transplant_dialog.show(ctx);
+            if self.transplant_dialog.selected() {
+                if let Some(path) = self.transplant_dialog.path() {
+                    match asset::open(path, self.version) {
+                        Ok(donor) => {
+                            // no need for verbose warnings here
+                            let actors = actor::get_actors(&donor)
+                                .into_iter()
+                                .filter_map(|index| actor::Actor::new(&donor, index).ok())
+                                .collect();
+                            self.donor = Some((donor, actors));
+                        }
+                        Err(e) => {
+                            self.notifs.error(e.to_string());
+                        }
+                    }
+                }
+            }
+            self.save_dialog.show(ctx);
+            if self.save_dialog.selected(){
+                if let Some(path)=self.save_dialog.path(){
+                    match asset::save(self.map.as_mut().unwrap(), path){
+                        Ok(_) => self.notifs.success("map saved"),
+                        Err(e) => self.notifs.error(e.to_string()),
+                    };
+                }
+            }
+        });
+        self.egui.draw(ctx);
     }
 
     fn quit_requested_event(&mut self, _ctx: &mut Context) {
