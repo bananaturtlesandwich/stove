@@ -145,6 +145,7 @@ impl EventHandler for Stove {
         ctx.end_render_pass();
         if !self.ui {
             ctx.commit_frame();
+            return;
         }
         self.egui.run(ctx, |mqctx, ctx| {
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
@@ -354,6 +355,7 @@ impl EventHandler for Stove {
             }
         });
         self.egui.draw(ctx);
+        ctx.commit_frame();
     }
 
     fn quit_requested_event(&mut self, _ctx: &mut Context) {
@@ -421,6 +423,18 @@ impl EventHandler for Stove {
         self.egui.key_up_event(keycode, keymods);
         self.camera.handle_key_up(keycode);
         match keycode {
+            KeyCode::Delete => match self.selected {
+                Some(index) => {
+                    self.selected = None;
+                    self.actors[index].delete(self.map.as_mut().unwrap());
+                    self.notifs
+                        .success(format!("deleted {}", &self.actors[index].name));
+                    self.actors.remove(index);
+                }
+                None => {
+                    self.notifs.error("nothing selected to delete");
+                }
+            },
             KeyCode::F => {
                 if let Some(selected) = self.selected {
                     self.camera.set_focus(

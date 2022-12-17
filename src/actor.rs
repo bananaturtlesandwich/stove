@@ -8,6 +8,7 @@ use unreal_asset::{
     Asset,
 };
 
+mod delete;
 mod duplicate;
 mod transform;
 mod transplant;
@@ -134,11 +135,9 @@ fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
     }
     let mut name = orig.content.clone();
     let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
-        Some(index) if index != name.len() - 1 => name
-            .drain((index + 1)..)
-            .collect::<String>()
-            .parse()
-            .unwrap(),
+        Some(index) if index != name.len() - 1 => {
+            name.drain(index + 1..).collect::<String>().parse().unwrap()
+        }
         _ => 1,
     };
     while asset
@@ -150,7 +149,7 @@ fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
     *orig = asset.add_fname(&(name + &id.to_string()))
 }
 
-/// on all of an export's possible references to other exports
+/// on all possible export references
 fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
