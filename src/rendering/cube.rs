@@ -26,7 +26,7 @@ impl Cube {
             block: Pipeline::with_params(
                 ctx,
                 &[BufferLayout::default()],
-                &[],
+                &[VertexAttribute::new("pos", VertexFormat::Float3)],
                 shader,
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
@@ -36,7 +36,22 @@ impl Cube {
                 },
             ),
             bindings: Bindings {
-                vertex_buffers: vec![],
+                vertex_buffers: vec![Buffer::immutable(
+                    ctx,
+                    BufferType::VertexBuffer,
+                    &[
+                        // front verts
+                        glam::vec3(-0.5, -0.5, -0.5),
+                        glam::vec3(-0.5, 0.5, -0.5),
+                        glam::vec3(0.5, -0.5, -0.5),
+                        glam::vec3(0.5, 0.5, -0.5),
+                        // back verts
+                        glam::vec3(-0.5, -0.5, 0.5),
+                        glam::vec3(-0.5, 0.5, 0.5),
+                        glam::vec3(0.5, -0.5, 0.5),
+                        glam::vec3(0.5, 0.5, 0.5),
+                    ],
+                )],
                 index_buffer: Buffer::immutable(
                     ctx,
                     BufferType::IndexBuffer,

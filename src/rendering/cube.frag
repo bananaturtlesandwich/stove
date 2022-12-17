@@ -1,8 +1,9 @@
-#version 330
+#version 100
+
+precision lowp float;
 
 uniform vec3 tint;
-out vec4 colour;
 
 void main() {
-    colour = vec4(tint, 1);
+    gl_FragColor = vec4(tint, 1);
 }

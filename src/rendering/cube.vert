@@ -1,4 +1,6 @@
-#version 330
+#version 100
+
+attribute vec3 pos;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -11,19 +13,6 @@ const mat4 PROJECTION = mat4(
     0, 0, -1, 0
 );
 
-const vec3 VERTICES[] = vec3[](
-    // front verts
-    vec3(-0.5, -0.5, -0.5),
-    vec3(-0.5,  0.5, -0.5),
-    vec3( 0.5, -0.5, -0.5),
-    vec3( 0.5,  0.5, -0.5),
-    // back verts
-    vec3(-0.5, -0.5,  0.5),
-    vec3(-0.5,  0.5,  0.5),
-    vec3( 0.5, -0.5,  0.5),
-    vec3( 0.5,  0.5,  0.5)
-);
-
 void main() {
-    gl_Position = PROJECTION * view * model * vec4(VERTICES[gl_VertexID], 1.0);
+    gl_Position = PROJECTION * view * model * vec4(pos, 1.0);
 }
