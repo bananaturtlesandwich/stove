@@ -3,9 +3,41 @@
 *<h1 align="center">still an extremely heavy work in progress</h1>*
 
 <details>
-<summary><h1>Roadmap</h1></summary>
+<summary><h1>use cases</h1></summary>
 
-### Basic functionality
+<details>
+<summary><h2>general map edits</h2></summary>
+
+stove is already a versatile tool because you can:
+- visualise actors relative to each other
+- see your transform edits as they happen
+- duplicate, delete and transplant actors
+- edit the vast majority of actor properties
+</details>
+
+<details>
+<summary><h2>custom actor spawning</h2></summary>
+
+stove allows transplanting (`ctrl + T`) of actors from other maps
+- this includes maps you have cooked yourself
+- this includes actors you have made yourself
+
+therefore you can add your own actors to the map *provided you package them with the mod*
+<iframe
+    width="640"
+    height="480"
+    src="https://www.youtube.com/embed/gnl3OSftqno"
+    allowfullscreen
+>
+</iframe>
+</details>
+
+</details>
+
+<details>
+<summary><h1>roadmap</h1></summary>
+
+### basic functionality
 - [x] save and open unreal map files of any version
 - [x] display a selectable list of actors
 - [x] allow editing all of an actor's transforms
@@ -15,19 +47,19 @@
 - [x] transplant actors from a different map
 - [x] edit the properties of actors and their components
 - [ ] insert default values (properties left as default are cut from the map)
-### Convenience
+### convenience
 - [ ] undo and redo any action
 - [ ] actor deletion
 - [ ] can move actors in the viewport instead of in the properties
 - [ ] multiple selection (requires above to be useful)
 - [ ] searching functionality
-### Low Priority
+### low Priority
 - [ ] display the mesh/sprite of an actor and their components rather than a cube
 - [x] discord RPC (show your internet friends what you're doing)
 </details>
 
 <details>
-<summary><h1>Credits</h1></summary>
+<summary><h1>credits</h1></summary>
 
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
 - [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their minimal yet easy-to-use [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates
