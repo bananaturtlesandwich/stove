@@ -2,6 +2,8 @@
 
 *<h1 align="center">still an extremely heavy work in progress</h1>*
 
+<h1 align="center"><img width="700" src="https://user-images.githubusercontent.com/71292624/208417568-840bb37d-57db-4273-84e9-b069a78964e1.png"></h1>
+
 <details>
 <summary><h1>use cases</h1></summary>
 
@@ -23,13 +25,7 @@ stove allows transplanting (`ctrl + T`) of actors from other maps
 - this includes actors you have made yourself
 
 therefore you can add your own actors to the map *provided you package them with the mod*
-<iframe
-    width="640"
-    height="480"
-    src="https://www.youtube.com/embed/gnl3OSftqno"
-    allowfullscreen
->
-</iframe>
+<a href="https://www.youtube.com/watch?v=gnl3OSftqno"><img width="700" src="https://user-images.githubusercontent.com/71292624/208414853-0a17badc-a4f0-4ddb-a157-677fe2fc88f4.png"></a>
 </details>
 
 </details>
