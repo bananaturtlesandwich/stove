@@ -2,6 +2,8 @@
 use stove::Stove;
 
 fn main() {
+    #[cfg(debug_assertions)]
+    std::env::set_var("RUST_BACKTRACE", "true");
     miniquad::start(
         miniquad::conf::Conf {
             window_title: "stove".to_string(),

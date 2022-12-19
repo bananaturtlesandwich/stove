@@ -1,3 +1,5 @@
+#[cfg(not(target_family = "wasm"))]
+use discord_rich_presence::{activity::*, DiscordIpc};
 use miniquad::*;
 
 mod actor;
@@ -19,10 +21,23 @@ pub struct Stove {
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
+    #[cfg(not(target_family = "wasm"))]
+    client: Option<discord_rich_presence::DiscordIpcClient>,
 }
 
 fn config() -> Option<std::path::PathBuf> {
     dirs::config_dir().map(|path| path.join("stove"))
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn default_activity() -> Activity<'static> {
+    Activity::new()
+        .state("idle")
+        .assets(Assets::new().large_image("pot"))
+        .buttons(vec![Button::new(
+            "homepage",
+            "https://github.com/bananaturtlesandwich/stove",
+        )])
 }
 
 // the only way i could get it to compile and look nice :p
@@ -76,6 +91,24 @@ impl Stove {
             None => None,
         };
         let home = dirs::home_dir();
+        #[cfg(not(target_family = "wasm"))]
+        let mut client = None;
+        #[cfg(not(target_family = "wasm"))]
+        if let Ok(mut cl) = discord_rich_presence::DiscordIpcClient::new("1052633997638905996") {
+            if cl.connect().is_ok()
+                && cl
+                    .set_activity(match filepath.as_str() {
+                        "" => default_activity(),
+                        name => default_activity()
+                            .details("currently editing:")
+                            .state(name.split('\\').last().unwrap_or_default()),
+                    })
+                    .is_ok()
+            {
+                client = Some(cl);
+            }
+        }
+
         let mut stove = Self {
             camera: rendering::Camera::default(),
             notifs,
@@ -97,6 +130,8 @@ impl Stove {
                 .resizable(false)
                 .filter(Box::new(filter)),
             filepath,
+            #[cfg(not(target_family = "wasm"))]
+            client,
         };
         update_actors!(stove);
         stove
@@ -317,6 +352,16 @@ impl EventHandler for Stove {
                     match asset::open(path.clone(), self.version) {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
+                            #[cfg(not(target_family = "wasm"))]
+                            if let Some(client)=&mut self.client{
+                                if client.set_activity(
+                                        default_activity()
+                                            .details("currently editing:")
+                                            .state(self.filepath.split('\\').last().unwrap_or_default())).is_err() {
+                                        client.close().unwrap_or_default();
+                                        self.client=None;
+                                    }
+                            }
                             self.map = Some(asset);
                             update_actors!(self);
                         }
@@ -361,6 +406,10 @@ impl EventHandler for Stove {
     fn quit_requested_event(&mut self, _ctx: &mut Context) {
         if let Some(path) = config() {
             std::fs::write(path.join("VERSION"), self.version.to_string()).unwrap();
+        }
+        #[cfg(not(target_family = "wasm"))]
+        if let Some(client) = &mut self.client {
+            client.close().unwrap_or_default();
         }
     }
 
