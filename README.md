@@ -53,7 +53,7 @@ therefore you can add your own actors to the map *provided you package them with
 - [ ] can move actors in the viewport instead of in the properties
 - [ ] multiple selection (requires above to be useful)
 - [ ] searching functionality
-### low Priority
+### low priority
 - [ ] display the mesh/sprite of an actor and their components rather than a cube
 - [x] discord RPC (show your internet friends what you're doing)
 </details>

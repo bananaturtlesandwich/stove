@@ -90,7 +90,6 @@ impl Stove {
             },
             None => None,
         };
-        let home = dirs::home_dir();
         #[cfg(not(target_family = "wasm"))]
         let mut client = None;
         #[cfg(not(target_family = "wasm"))]
@@ -108,6 +107,7 @@ impl Stove {
                 client = Some(cl);
             }
         }
+        let home = dirs::home_dir();
 
         let mut stove = Self {
             camera: rendering::Camera::default(),
@@ -252,6 +252,38 @@ impl EventHandler for Stove {
                                 ui.label(egui::special_emojis::GITHUB.to_string());
                             });
                         });
+                        if ui.add(egui::Button::new("duplicate").shortcut_text("ctrl + D")).clicked(){
+                            match self.selected {
+                                Some(index) => {
+                                    let map = self.map.as_mut().unwrap();
+                                    let insert = map.exports.len() as i32 + 1;
+                                    self.selected = Some(self.actors.len());
+                                    self.actors[index].duplicate(map);
+                                    self.actors.push(
+                                        actor::Actor::new(
+                                            map,
+                                            unreal_asset::unreal_types::PackageIndex::new(insert),
+                                        )
+                                        .unwrap(),
+                                    );
+                                    self.notifs
+                                        .success(format!("duplicated {}", &self.actors[index].name));
+                                }
+                                None => {
+                                    self.notifs.error("nothing selected to duplicate");
+                                }
+                            }
+                        }
+                        if ui.add(egui::Button::new("transplant").shortcut_text("ctrl + T")).clicked(){
+                            match &self.map.is_some() {
+                                true => {
+                                    self.transplant_dialog.open();
+                                }
+                                false => {
+                                    self.notifs.error("no map to transplant to");
+                                }
+                            }
+                        }
                         if ui.add(egui::Button::new("exit").shortcut_text("escape")).clicked(){
                             mqctx.request_quit();
                         }
