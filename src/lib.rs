@@ -241,6 +241,7 @@ impl EventHandler for Stove {
                                 ui.end_row();
                                 binding(ui,"focus","F");
                                 binding(ui,"duplicate","ctrl + D");
+                                binding(ui,"delete","delete");
                             });
                         });
                         ui.menu_button("about",|ui|{
@@ -252,6 +253,20 @@ impl EventHandler for Stove {
                                 ui.label(egui::special_emojis::GITHUB.to_string());
                             });
                         });
+                        if ui.add(egui::Button::new("delete").shortcut_text("delete")).clicked(){
+                            match self.selected {
+                                Some(index) => {
+                                    self.selected = None;
+                                    self.actors[index].delete(self.map.as_mut().unwrap());
+                                    self.notifs
+                                        .success(format!("deleted {}", &self.actors[index].name));
+                                    self.actors.remove(index);
+                                }
+                                None => {
+                                    self.notifs.error("nothing selected to delete");
+                                }
+                            }
+                        }
                         if ui.add(egui::Button::new("duplicate").shortcut_text("ctrl + D")).clicked(){
                             match self.selected {
                                 Some(index) => {
