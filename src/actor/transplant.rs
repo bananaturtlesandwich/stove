@@ -1,7 +1,6 @@
 use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::Property,
     reader::asset_trait::AssetTrait,
     unreal_types::PackageIndex,
     Asset, Import,
@@ -16,15 +15,6 @@ impl super::Actor {
             &mut children[0].get_base_export_mut().object_name,
             recipient,
         );
-
-        // resolve byte properties
-        for child in children.iter_mut() {
-            if let Some(norm) = child.get_normal_export_mut() {
-                for prop in norm.properties.iter_mut() {
-                    resolve_bytes(prop, recipient, donor);
-                }
-            }
-        }
 
         let actor_ref = recipient.exports.len() as i32 + 1;
         // add the actor to persistent level
@@ -42,7 +32,7 @@ impl super::Actor {
                 .get_base_export_mut()
                 .create_before_create_dependencies = vec![level_ref];
             // add actor to level data
-            level.index_data.push(actor_ref);
+            level.actors.push(actor_ref);
             level
                 .get_base_export_mut()
                 .create_before_serialization_dependencies
@@ -136,31 +126,4 @@ fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
         .create_before_serialization_dependencies
         .iter_mut()
         .for_each(&mut func);
-}
-
-fn resolve_bytes(prop: &mut Property, recipient: &mut Asset, donor: &Asset) {
-    match prop {
-        Property::ByteProperty(prop) => {
-            if let Some(index) = prop.enum_type.as_mut() {
-                // this is the only reason to have a mutable reference
-                *index = recipient
-                    .add_name_reference(donor.get_name_reference(*index as i32), false)
-                    as i64;
-                prop.value = recipient
-                    .add_name_reference(donor.get_name_reference(prop.value as i32), false)
-                    as i64;
-            }
-        }
-        Property::StructProperty(prop) => {
-            for prop in prop.value.iter_mut() {
-                resolve_bytes(prop, recipient, donor);
-            }
-        }
-        Property::ArrayProperty(prop) => {
-            for prop in prop.value.iter_mut() {
-                resolve_bytes(prop, recipient, donor);
-            }
-        }
-        _ => (),
-    }
 }

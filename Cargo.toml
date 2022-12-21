@@ -17,11 +17,11 @@ egui-notify = "*"
 egui_file = "*"
 dirs = "*"
 
+[build-dependencies]
+winres = "*"
+
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 discord-rich-presence = "*"
-
-[target.'cfg(windows)'.build-dependencies]
-winres = "*"
 
 [profile.release]
 strip = true

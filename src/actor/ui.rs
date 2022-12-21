@@ -140,7 +140,16 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::Int64Property(int) => drag(ui, &mut int.value),
                     Property::Int8Property(int) => drag(ui, &mut int.value),
                     Property::IntProperty(int) => drag(ui, &mut int.value),
-                    Property::ByteProperty(byte) => drag(ui, &mut byte.value),
+                    Property::ByteProperty(byte) => match &mut byte.value {
+                        unreal_asset::properties::int_property::BytePropertyValue::Byte(byte) => {
+                            drag(ui, byte)
+                        }
+                        unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
+                            ui.text_edit_singleline(
+                                &mut byte.enum_type.get_or_insert(FName::from_slice("")).content,
+                            ) | ui.text_edit_singleline(&mut name.content)
+                        }
+                    },
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
                     Property::NameProperty(name) => {
                         ui.text_edit_singleline(&mut name.value.content)
@@ -156,7 +165,9 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         ui.text_edit_singleline(obj.value.get_or_insert(String::new()))
                     }
                     Property::SoftObjectProperty(obj) => {
-                        ui.text_edit_singleline(&mut obj.value.content)
+                        ui.text_edit_singleline(
+                            obj.value.sub_path_string.get_or_insert(String::new()),
+                        ) | ui.text_edit_singleline(&mut obj.value.asset_path_name.content)
                     }
                     Property::IntPointProperty(point) => {
                         drag(ui, &mut point.x) | drag(ui, &mut point.y)
@@ -207,16 +218,17 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     }
                     Property::SetProperty(set) => show_array_property(ui, &mut set.value),
                     Property::ArrayProperty(arr) => show_array_property(ui, arr),
-                    Property::MapProperty(map) => {
-                        ui.push_id(&map.name.content, |ui| {
-                            ui.collapsing("", |ui| {
-                                for (_, value) in map.value.iter_mut() {
-                                    show_property(ui, value);
-                                }
-                            })
-                        })
-                        .response
-                    }
+                    // values_mut currently being worked on
+                    // Property::MapProperty(map) => {
+                    //     ui.push_id(&map.name.content, |ui| {
+                    //         ui.collapsing("", |ui| {
+                    //             for (_, value) in map.value.iter_mut() {
+                    //                 show_property(ui, value);
+                    //             }
+                    //         })
+                    //     })
+                    //     .response
+                    // }
                     Property::PerPlatformBoolProperty(bools) => {
                         ui.collapsing("", |ui| {
                             for bool in bools.value.iter_mut() {

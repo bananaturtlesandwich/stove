@@ -1,6 +1,7 @@
 use std::{fs, io, path::Path};
 
 use unreal_asset::{
+    engine_version::EngineVersion,
     error::Error,
     exports::{ExportBaseTrait, ExportNormalTrait},
     flags::EPackageFlags,
@@ -10,7 +11,7 @@ use unreal_asset::{
 };
 
 /// creates an asset from the specified path and version
-pub fn open(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> {
+pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<Asset, Error> {
     let bulk = file.as_ref().with_extension("uexp");
     let mut asset = Asset::new(
         fs::read(&file)?,
@@ -20,7 +21,7 @@ pub fn open(file: impl AsRef<Path>, version: i32) -> Result<Asset, Error> {
             false => None,
         },
     );
-    asset.engine_version = version;
+    asset.set_engine_version(version);
     asset.parse_data()?;
     Ok(asset)
 }
@@ -77,6 +78,13 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
     asset.add_fname(&prop.to_fname().content);
     asset.add_fname(&prop.get_name().content);
     match prop {
+        Property::ByteProperty(prop) => {
+            if let unreal_asset::properties::int_property::BytePropertyValue::FName(name) =
+                &prop.value
+            {
+                asset.add_fname(&name.content);
+            }
+        }
         Property::NameProperty(prop) => {
             asset.add_fname(&prop.value.content);
         }
@@ -86,7 +94,7 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
             }
         }
         Property::SoftObjectProperty(prop) => {
-            asset.add_fname(&prop.value.content);
+            asset.add_fname(&prop.value.asset_path_name.content);
         }
         Property::SoftAssetPathProperty(prop) => {
             if let Some(path) = prop.asset_path_name.as_ref() {
@@ -144,9 +152,7 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
             }
         }
         Property::UnknownProperty(prop) => {
-            if let Some(typ) = prop.serialized_type.as_ref() {
-                asset.add_fname(&typ.content);
-            }
+            asset.add_fname(&prop.serialized_type.content);
         }
         _ => (),
     }

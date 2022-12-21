@@ -1,6 +1,7 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use miniquad::*;
+use unreal_asset::engine_version::EngineVersion;
 
 mod actor;
 mod asset;
@@ -10,7 +11,7 @@ pub struct Stove {
     camera: rendering::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset>,
-    version: i32,
+    version: unreal_asset::engine_version::EngineVersion,
     egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
@@ -64,18 +65,19 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         let config = config();
-        let version = match config {
+        let version = EngineVersion::try_from(match config {
             Some(cfg) => {
                 if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
                 std::fs::read_to_string(cfg.join("VERSION"))
-                    .unwrap_or_else(|_| "0".to_string())
+                    .unwrap_or_else(|_| "1".to_string())
                     .parse()
                     .unwrap_or_default()
             }
-            None => 0,
-        };
+            None => 1,
+        })
+        .unwrap_or(EngineVersion::UNKNOWN);
         let mut filepath = String::new();
         let map = match std::env::args().nth(1) {
             Some(path) => match asset::open(path.clone(), version) {
@@ -304,24 +306,22 @@ impl EventHandler for Stove {
                         }
                     });
                     egui::ComboBox::from_id_source("version")
-                        .selected_text(
-                            VERSIONS
-                                .iter()
-                                .find(|version| version.1 == self.version)
-                                .unwrap()
-                                .0,
-                        )
+                        .selected_text(*VERSIONS.iter().find_map(|(version,name)|(version==&self.version).then_some(name)).unwrap_or(&"unknown"))
                         .show_ui(ui, |ui| {
-                            for version in VERSIONS {
-                                ui.selectable_value(&mut self.version, version.1, version.0);
+                            for (version,name) in VERSIONS {
+                                if ui.selectable_value(&mut self.version, version, name).clicked(){
+                                    if let Some(path) = config() {
+                                        std::fs::write(path.join("VERSION"), (self.version as u8).to_string()).unwrap();
+                                    }
+                                }
                             }
                         });
                 });
                 if let Some(map)=&mut self.map {
                     ui.add_space(10.0);
                     ui.push_id("actors", |ui| egui::ScrollArea::vertical()
-                        .auto_shrink([false;2])
-                        .max_height(ui.available_height()*0.5)
+                        .auto_shrink([false; 2])
+                        .max_height(ui.available_height() * 0.5)
                         .show_rows(
                             ui,
                             ui.text_style_height(&egui::TextStyle::Body),
@@ -450,11 +450,8 @@ impl EventHandler for Stove {
         ctx.commit_frame();
     }
 
+    #[cfg(not(target_family = "wasm"))]
     fn quit_requested_event(&mut self, _ctx: &mut Context) {
-        if let Some(path) = config() {
-            std::fs::write(path.join("VERSION"), self.version.to_string()).unwrap();
-        }
-        #[cfg(not(target_family = "wasm"))]
         if let Some(client) = &mut self.client {
             client.close().unwrap_or_default();
         }
@@ -595,30 +592,37 @@ impl EventHandler for Stove {
     }
 }
 
-use unreal_asset::ue4version::*;
-const VERSIONS: &[(&str, i32)] = &[
-    ("unknown", UNKNOWN),
-    ("oldest", VER_UE4_OLDEST_LOADABLE_PACKAGE),
-    ("4.0", VER_UE4_0),
-    ("4.1", VER_UE4_1),
-    ("4.2", VER_UE4_2),
-    ("4.3", VER_UE4_3),
-    ("4.4", VER_UE4_4),
-    ("4.5", VER_UE4_5),
-    ("4.6", VER_UE4_6),
-    ("4.7", VER_UE4_7),
-    ("4.8", VER_UE4_8),
-    ("4.9/10", VER_UE4_9),
-    ("4.11", VER_UE4_11),
-    ("4.12", VER_UE4_12),
-    ("4.13", VER_UE4_13),
-    ("4.14", VER_UE4_14),
-    ("4.15", VER_UE4_15),
-    ("4.16/17", VER_UE4_16),
-    ("4.18", VER_UE4_18),
-    ("4.19/20", VER_UE4_19),
-    ("4.21/22/23", VER_UE4_21),
-    ("4.24/25", VER_UE4_24),
-    ("4.26", VER_UE4_26),
-    ("4.27", VER_UE4_27),
+use EngineVersion::*;
+const VERSIONS: [(EngineVersion, &str); 31] = [
+    (UNKNOWN, "unknown"),
+    (VER_UE4_OLDEST_LOADABLE_PACKAGE, "oldest"),
+    (VER_UE4_0, "4.0"),
+    (VER_UE4_1, "4.1"),
+    (VER_UE4_2, "4.2"),
+    (VER_UE4_3, "4.3"),
+    (VER_UE4_4, "4.4"),
+    (VER_UE4_5, "4.5"),
+    (VER_UE4_6, "4.6"),
+    (VER_UE4_7, "4.7"),
+    (VER_UE4_8, "4.8"),
+    (VER_UE4_9, "4.9"),
+    (VER_UE4_10, "4.10"),
+    (VER_UE4_11, "4.11"),
+    (VER_UE4_12, "4.12"),
+    (VER_UE4_13, "4.13"),
+    (VER_UE4_14, "4.14"),
+    (VER_UE4_15, "4.15"),
+    (VER_UE4_16, "4.16"),
+    (VER_UE4_17, "4.17"),
+    (VER_UE4_18, "4.18"),
+    (VER_UE4_19, "4.19"),
+    (VER_UE4_20, "4.20"),
+    (VER_UE4_21, "4.21"),
+    (VER_UE4_22, "4.22"),
+    (VER_UE4_23, "4.23"),
+    (VER_UE4_24, "4.24"),
+    (VER_UE4_25, "4.25"),
+    (VER_UE4_26, "4.26"),
+    (VER_UE4_27, "4.27"),
+    (VER_UE5_0, "5.0"),
 ];

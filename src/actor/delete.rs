@@ -14,8 +14,8 @@ impl super::Actor {
             .find_map(|ex| cast!(Export, LevelExport, ex))
         {
             level
-                .index_data
-                .remove(level.index_data.iter().position(|&i| i == val).unwrap());
+                .actors
+                .remove(level.actors.iter().position(|&i| i == val).unwrap());
             let pos = level
                 .get_base_export()
                 .create_before_serialization_dependencies

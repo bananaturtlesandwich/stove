@@ -21,7 +21,7 @@ impl super::Actor {
             .iter_mut()
             .find_map(|ex| cast!(Export, LevelExport, ex))
         {
-            level.index_data.push(actor_ref);
+            level.actors.push(actor_ref);
             level
                 .get_base_export_mut()
                 .create_before_serialization_dependencies
