@@ -183,12 +183,11 @@ fn update_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
                 update_props(entry, func);
             }
         }
-        // values_mut not available yet
-        // Property::MapProperty(map) => {
-        //     for val in map.value.values_mut() {
-        //         update_props(val, func);
-        //     }
-        // }
+        Property::MapProperty(map) => {
+            for val in map.value.values_mut() {
+                update_props(val, func);
+            }
+        }
         Property::SetProperty(set) => {
             for entry in set.value.value.iter_mut() {
                 update_props(entry, func);

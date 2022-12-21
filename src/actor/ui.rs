@@ -218,17 +218,16 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     }
                     Property::SetProperty(set) => show_array_property(ui, &mut set.value),
                     Property::ArrayProperty(arr) => show_array_property(ui, arr),
-                    // values_mut currently being worked on
-                    // Property::MapProperty(map) => {
-                    //     ui.push_id(&map.name.content, |ui| {
-                    //         ui.collapsing("", |ui| {
-                    //             for (_, value) in map.value.iter_mut() {
-                    //                 show_property(ui, value);
-                    //             }
-                    //         })
-                    //     })
-                    //     .response
-                    // }
+                    Property::MapProperty(map) => {
+                        ui.push_id(&map.name.content, |ui| {
+                            ui.collapsing("", |ui| {
+                                for value in map.value.values_mut() {
+                                    show_property(ui, value);
+                                }
+                            })
+                        })
+                        .response
+                    }
                     Property::PerPlatformBoolProperty(bools) => {
                         ui.collapsing("", |ui| {
                             for bool in bools.value.iter_mut() {
