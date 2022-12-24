@@ -2,7 +2,7 @@ use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     reader::asset_trait::AssetTrait,
-    unreal_types::PackageIndex,
+    types::PackageIndex,
     Asset, Import,
 };
 
@@ -16,7 +16,7 @@ impl super::Actor {
             recipient,
         );
 
-        let actor_ref = recipient.exports.len() as i32 + 1;
+        let actor_ref = PackageIndex::new(recipient.exports.len() as i32 + 1);
         // add the actor to persistent level
         if let Some((pos, level)) = recipient
             .exports
@@ -36,7 +36,7 @@ impl super::Actor {
             level
                 .get_base_export_mut()
                 .create_before_serialization_dependencies
-                .push(PackageIndex::new(actor_ref));
+                .push(actor_ref);
         }
 
         let import_offset = recipient.imports.len() as i32;

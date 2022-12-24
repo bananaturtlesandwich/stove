@@ -4,7 +4,7 @@ use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{Property, PropertyDataTrait},
     reader::asset_trait::AssetTrait,
-    unreal_types::{FName, PackageIndex},
+    types::{FName, PackageIndex},
     Asset,
 };
 

@@ -279,7 +279,7 @@ impl EventHandler for Stove {
                                     self.actors.push(
                                         actor::Actor::new(
                                             map,
-                                            unreal_asset::unreal_types::PackageIndex::new(insert),
+                                            unreal_asset::types::PackageIndex::new(insert),
                                         )
                                         .unwrap(),
                                     );
@@ -374,7 +374,7 @@ impl EventHandler for Stove {
                                                 self.actors.push(
                                                     actor::Actor::new(
                                                         map,
-                                                        unreal_asset::unreal_types::PackageIndex::new(insert),
+                                                        unreal_asset::types::PackageIndex::new(insert),
                                                     )
                                                     .unwrap(),
                                                 );
@@ -543,11 +543,8 @@ impl EventHandler for Stove {
                     self.selected = Some(self.actors.len());
                     self.actors[index].duplicate(map);
                     self.actors.push(
-                        actor::Actor::new(
-                            map,
-                            unreal_asset::unreal_types::PackageIndex::new(insert),
-                        )
-                        .unwrap(),
+                        actor::Actor::new(map, unreal_asset::types::PackageIndex::new(insert))
+                            .unwrap(),
                     );
                     self.notifs
                         .success(format!("duplicated {}", &self.actors[index].name));

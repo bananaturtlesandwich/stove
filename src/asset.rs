@@ -6,7 +6,7 @@ use unreal_asset::{
     exports::{ExportBaseTrait, ExportNormalTrait},
     flags::EPackageFlags,
     properties::{Property, PropertyDataTrait},
-    unreal_types::ToFName,
+    types::ToFName,
     Asset,
 };
 
@@ -15,11 +15,8 @@ pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<Asset, Err
     let bulk = file.as_ref().with_extension("uexp");
     let mut asset = Asset::new(
         fs::read(&file)?,
-        match bulk.exists() {
-            true => Some(fs::read(bulk)?),
-            // the none option is given as some uassets may not use the event driven loader
-            false => None,
-        },
+        // the none option is given as some uassets may not use the event driven loader
+        bulk.exists().then_some(fs::read(bulk)?),
     );
     asset.set_engine_version(version);
     asset.parse_data()?;
@@ -33,10 +30,7 @@ pub fn save(asset: &mut Asset, path: impl AsRef<Path>) -> Result<(), Error> {
     let mut bulk = main.clone();
     asset.write_data(
         &mut main,
-        match asset.use_separate_bulk_data_files {
-            true => Some(&mut bulk),
-            false => None,
-        },
+        asset.use_separate_bulk_data_files.then_some(&mut bulk),
     )?;
     fs::write(
         path.as_ref().with_extension(
@@ -79,6 +73,9 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
     asset.add_fname(&prop.get_name().content);
     match prop {
         Property::ByteProperty(prop) => {
+            if let Some(en) = &prop.enum_type {
+                asset.add_fname(&en.content);
+            }
             if let unreal_asset::properties::int_property::BytePropertyValue::FName(name) =
                 &prop.value
             {
@@ -153,6 +150,75 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
         }
         Property::UnknownProperty(prop) => {
             asset.add_fname(&prop.serialized_type.content);
+        }
+        Property::SetProperty(prop) => {
+            for prop in prop.value.value.iter() {
+                resolve_prop_name(prop, asset);
+            }
+            for prop in prop.removed_items.value.iter() {
+                resolve_prop_name(prop, asset);
+            }
+        }
+        Property::MapProperty(prop) => {
+            for (_, key, value) in prop.value.iter() {
+                resolve_prop_name(key, asset);
+                resolve_prop_name(value, asset);
+            }
+        }
+        Property::MaterialAttributesInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::ExpressionInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::ColorMaterialInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::ScalarMaterialInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::ShadingModelMaterialInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::VectorMaterialInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::Vector2MaterialInputProperty(prop) => {
+            asset.add_fname(&prop.material_expression.input_name.content);
+            asset.add_fname(&prop.material_expression.expression_name.content);
+        }
+        Property::StringAssetReferenceProperty(prop) => {
+            if let Some(path) = &prop.asset_path_name {
+                asset.add_fname(&path.content);
+            }
+        }
+        Property::GameplayTagContainerProperty(prop) => {
+            for name in prop.value.iter() {
+                asset.add_fname(&name.content);
+            }
+        }
+        Property::UniqueNetIdProperty(net) => {
+            if let Some(id) = &net.value {
+                asset.add_fname(&id.ty.content);
+            }
+        }
+        Property::NiagaraVariableProperty(prop) => {
+            for prop in prop.struct_property.value.iter() {
+                resolve_prop_name(prop, asset);
+            }
+            asset.add_fname(&prop.variable_name.content);
+        }
+        Property::NiagaraVariableWithOffsetProperty(prop) => {
+            for prop in prop.niagara_variable.struct_property.value.iter() {
+                resolve_prop_name(prop, asset);
+            }
+            asset.add_fname(&prop.niagara_variable.variable_name.content);
         }
         _ => (),
     }

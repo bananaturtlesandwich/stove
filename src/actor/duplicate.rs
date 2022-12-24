@@ -1,7 +1,7 @@
 use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait},
-    unreal_types::PackageIndex,
+    types::PackageIndex,
     Asset,
 };
 
@@ -14,7 +14,7 @@ impl super::Actor {
         // make sure the actor has a unique object name
         super::give_unique_name(&mut children[0].get_base_export_mut().object_name, asset);
 
-        let actor_ref = len as i32 + 1;
+        let actor_ref = PackageIndex::new(len as i32 + 1);
         // add the actor to persistent level
         if let Some(level) = asset
             .exports
@@ -25,7 +25,7 @@ impl super::Actor {
             level
                 .get_base_export_mut()
                 .create_before_serialization_dependencies
-                .push(PackageIndex::new(actor_ref));
+                .push(actor_ref);
         }
 
         // actually add the exports ;p

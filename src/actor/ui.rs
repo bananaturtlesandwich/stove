@@ -1,7 +1,7 @@
 use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{array_property::ArrayProperty, Property, PropertyDataTrait},
-    unreal_types::{FName, ToFName},
+    types::{FName, ToFName},
     Asset,
 };
 
