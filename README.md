@@ -45,7 +45,7 @@ therefore you can add your own actors to the map *provided you package them with
 - [ ] insert default values (properties left as default are cut from the map)
 ### convenience
 - [ ] undo and redo any action
-- [ ] actor deletion
+- [x] actor deletion
 - [ ] can move actors in the viewport instead of in the properties
 - [ ] multiple selection (requires above to be useful)
 - [ ] searching functionality

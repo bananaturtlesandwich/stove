@@ -5,6 +5,7 @@ use unreal_asset::engine_version::EngineVersion;
 
 mod actor;
 mod asset;
+pub mod mesh;
 mod rendering;
 
 pub struct Stove {

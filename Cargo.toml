@@ -16,6 +16,7 @@ egui = "*"
 egui-notify = "*"
 egui_file = "*"
 dirs = "*"
+byteorder = "*"
 
 [build-dependencies]
 winres = "*"
