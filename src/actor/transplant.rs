@@ -30,7 +30,7 @@ impl super::Actor {
             children[0].get_base_export_mut().outer_index = level_ref;
             children[0]
                 .get_base_export_mut()
-                .create_before_create_dependencies = vec![level_ref];
+                .create_before_create_dependencies[0] = level_ref;
             // add actor to level data
             level.actors.push(actor_ref);
             level

@@ -63,9 +63,11 @@ impl Cube {
             },
         }
     }
-    pub fn draw(&self, ctx: &mut Context, model: glam::Mat4, view: glam::Mat4, tint: glam::Vec3) {
+    pub fn apply(&self, ctx: &mut Context) {
         ctx.apply_pipeline(&self.block);
         ctx.apply_bindings(&self.bindings);
+    }
+    pub fn draw(&self, ctx: &mut Context, model: glam::Mat4, view: glam::Mat4, tint: glam::Vec3) {
         ctx.apply_uniforms(&Uniforms { model, view, tint });
         ctx.draw(0, 24, 1);
     }

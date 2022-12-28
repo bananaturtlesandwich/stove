@@ -1,8 +1,11 @@
-mod parsing;
-pub use parsing::*;
+// still under development
+#![allow(dead_code)]
+mod mesh;
+
 use std::io;
 
 use byteorder::ReadBytesExt;
+pub use mesh::*;
 
 pub struct StripDataFlags {
     pub global: u8,

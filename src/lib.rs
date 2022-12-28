@@ -5,7 +5,7 @@ use unreal_asset::engine_version::EngineVersion;
 
 mod actor;
 mod asset;
-pub mod mesh;
+mod extras;
 mod rendering;
 
 pub struct Stove {
@@ -158,6 +158,7 @@ impl EventHandler for Stove {
             stencil: None,
         });
         if let Some(map) = &mut self.map {
+            self.cube.apply(ctx);
             for (i, actor) in self.actors.iter().enumerate() {
                 let rot = actor.get_rotation(map);
                 self.cube.draw(
@@ -318,7 +319,7 @@ impl EventHandler for Stove {
                             }
                         });
                 });
-                if let Some(map)=&mut self.map {
+                if let Some(map) = &mut self.map {
                     ui.add_space(10.0);
                     ui.push_id("actors", |ui| egui::ScrollArea::vertical()
                         .auto_shrink([false; 2])
@@ -329,7 +330,7 @@ impl EventHandler for Stove {
                             self.actors.len(),
                             |ui,range|{
                             for i in range{
-                                let is_selected=Some(i)==self.selected;
+                                let is_selected = Some(i) == self.selected;
                                 if ui.selectable_label(
                                     is_selected,
                                     &self.actors[i].name
@@ -341,9 +342,9 @@ impl EventHandler for Stove {
                             };
                         })
                     );
-                    if let Some(selected)=self.selected{
+                    if let Some(selected) = self.selected{
                         ui.add_space(10.0);
-                        ui.push_id("properties", |ui|egui::ScrollArea::vertical()
+                        ui.push_id("properties", |ui| egui::ScrollArea::vertical()
                             .auto_shrink([false;2])
                             .show(ui,|ui|{
                                 self.actors[selected].show(map,ui);
@@ -354,7 +355,7 @@ impl EventHandler for Stove {
                     }
                     let mut open = true;
                     let mut transplanted = false;
-                    if let Some((donor, actors))=&self.donor{
+                    if let Some((donor, actors)) = &self.donor{
                         egui::Window::new("transplant actor")
                             .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
                             .resizable(false)
@@ -401,11 +402,12 @@ impl EventHandler for Stove {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
                             #[cfg(not(target_family = "wasm"))]
-                            if let Some(client)=&mut self.client{
+                            if let Some(client) = &mut self.client{
                                 if client.set_activity(
-                                        default_activity()
-                                            .details("currently editing:")
-                                            .state(self.filepath.split('\\').last().unwrap_or_default())).is_err() {
+                                            default_activity()
+                                                .details("currently editing:")
+                                                .state(self.filepath.split('\\').last().unwrap_or_default())
+                                        ).is_err() {
                                         client.close().unwrap_or_default();
                                         self.client=None;
                                     }
@@ -439,9 +441,12 @@ impl EventHandler for Stove {
             }
             self.save_dialog.show(ctx);
             if self.save_dialog.selected(){
-                if let Some(path)=self.save_dialog.path(){
-                    match asset::save(self.map.as_mut().unwrap(), path){
-                        Ok(_) => self.notifs.success("map saved"),
+                if let Some(path) = self.save_dialog.path(){
+                    match asset::save(self.map.as_mut().unwrap(), path.clone()){
+                        Ok(_) => {
+                            self.filepath = path.to_str().unwrap_or_default().to_string();
+                            self.notifs.success("map saved")
+                        },
                         Err(e) => self.notifs.error(e.to_string()),
                     };
                 }
