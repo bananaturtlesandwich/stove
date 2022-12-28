@@ -371,47 +371,49 @@ impl EventHandler for Stove {
                             })
                         );
                     }
-                    let mut open = true;
-                    let mut transplanted = false;
-                    if let Some((donor, actors)) = &self.donor{
-                        egui::Window::new("transplant actor")
-                            .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
-                            .resizable(false)
-                            .collapsible(false)
-                            .open(&mut open)
-                            .show(ctx, |ui|{
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false;2])
-                                .show_rows(
-                                    ui,
-                                    ui.text_style_height(&egui::TextStyle::Body),
-                                    actors.len(),
-                                    |ui,range|{
-                                        for i in range{
-                                            if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
-                                                let insert = map.exports.len() as i32 + 1;
-                                                actors[i].transplant(map, donor);
-                                                self.actors.push(
-                                                    actor::Actor::new(
-                                                        map,
-                                                        unreal_asset::types::PackageIndex::new(insert),
-                                                    )
-                                                    .unwrap(),
-                                                );
-                                                self.notifs.success(format!("transplanted {}", actors[i].name));
-                                                transplanted = true;
-                                            }
-                                        }
-                                    }
-                                );
-                            }
-                        );
-                    }
-                    if transplanted || !open {
-                        self.donor = None;
-                    }
                 }
             });
+            if let Some(map) = &mut self.map {
+                let mut open = true;
+                let mut transplanted = false;
+                if let Some((donor, actors)) = &self.donor{
+                    egui::Window::new("transplant actor")
+                        .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
+                        .resizable(false)
+                        .collapsible(false)
+                        .open(&mut open)
+                        .show(ctx, |ui|{
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false;2])
+                            .show_rows(
+                                ui,
+                                ui.text_style_height(&egui::TextStyle::Body),
+                                actors.len(),
+                                |ui,range|{
+                                    for i in range{
+                                        if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
+                                            let insert = map.exports.len() as i32 + 1;
+                                            actors[i].transplant(map, donor);
+                                            self.actors.push(
+                                                actor::Actor::new(
+                                                    map,
+                                                    unreal_asset::types::PackageIndex::new(insert),
+                                                )
+                                                .unwrap(),
+                                            );
+                                            self.notifs.success(format!("transplanted {}", actors[i].name));
+                                            transplanted = true;
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                    );
+                }
+                if transplanted || !open {
+                    self.donor = None;
+                }
+            }
             self.notifs.show(ctx);
             self.open_dialog.show(ctx);
             if self.open_dialog.selected() {
