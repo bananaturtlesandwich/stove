@@ -8,6 +8,14 @@ mod asset;
 mod extras;
 mod rendering;
 
+#[derive(PartialEq, Eq)]
+enum Mode {
+    None,
+    Translation,
+    Rotation,
+    Scale,
+}
+
 pub struct Stove {
     camera: rendering::Camera,
     notifs: egui_notify::Toasts,
@@ -24,7 +32,7 @@ pub struct Stove {
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
     held: Vec<KeyCode>,
-    grabbing: bool,
+    mode: Mode,
     last_mouse_pos: glam::Vec2,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
@@ -137,7 +145,7 @@ impl Stove {
                 .filter(Box::new(filter)),
             filepath,
             held: Vec::new(),
-            grabbing: false,
+            mode: Mode::None,
             last_mouse_pos: glam::Vec2::ZERO,
             #[cfg(not(target_family = "wasm"))]
             client,
@@ -252,6 +260,10 @@ impl EventHandler for Stove {
                                 binding(ui,"focus","F");
                                 binding(ui,"duplicate","ctrl + D");
                                 binding(ui,"delete","delete");
+                                binding(ui,"move","left-click + drag");
+                                binding(ui,"rotate","right-click + drag");
+                                binding(ui,"scale","middle-click + drag");
+                                binding(ui,"lock axis","X/Y/Z");
                             });
                         });
                         ui.menu_button("about",|ui|{
@@ -473,29 +485,70 @@ impl EventHandler for Stove {
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
-        self.camera.handle_mouse_motion(delta);
-        if self.grabbing {
-            let left = self.camera.left();
-            let distance = self.actors[self.selected.unwrap()]
-                .get_translation(self.map.as_ref().unwrap())
-                .distance(self.camera.position);
-            let offset = (self.camera.front.cross(left).normalize() * delta.y + left * -delta.x)
-                * distance
-                * 0.1;
-            self.actors[self.selected.unwrap()].add_translation(
-                self.map.as_mut().unwrap(),
-                if self.held.contains(&KeyCode::X) {
-                    glam::vec3(offset.x, 0.0, 0.0)
-                } else if self.held.contains(&KeyCode::Z) {
-                    glam::vec3(0.0, offset.y, 0.0)
-                } else if self.held.contains(&KeyCode::Y) {
-                    glam::vec3(0.0, 0.0, offset.z)
-                } else {
-                    offset
-                },
-            )
-        }
         self.last_mouse_pos = glam::vec2(x, y);
+
+        if self.mode != Mode::Rotation {
+            self.camera.handle_mouse_motion(delta);
+        }
+        match self.mode {
+            Mode::None => (),
+            Mode::Translation => {
+                let distance = self.actors[self.selected.unwrap()]
+                    .get_translation(self.map.as_ref().unwrap())
+                    .distance(self.camera.position);
+                let left = self.camera.left();
+                let offset = (self.camera.front.cross(left).normalize() * delta.y
+                    + left * -delta.x)
+                    * distance
+                    * self.camera.delta_time as f32
+                    * 3.0;
+                self.actors[self.selected.unwrap()].add_translation(
+                    self.map.as_mut().unwrap(),
+                    if self.held.contains(&KeyCode::X) {
+                        glam::vec3(offset.x, 0.0, 0.0)
+                    } else if self.held.contains(&KeyCode::Y) {
+                        glam::vec3(0.0, offset.y, 0.0)
+                    } else if self.held.contains(&KeyCode::Z) {
+                        glam::vec3(0.0, 0.0, offset.z)
+                    } else {
+                        offset
+                    },
+                )
+            }
+            Mode::Rotation => {
+                let change = (delta.x - delta.y) * self.camera.delta_time as f32 * 5.0;
+                self.actors[self.selected.unwrap()].add_rotation(
+                    self.map.as_mut().unwrap(),
+                    if self.held.contains(&KeyCode::X) {
+                        glam::vec3(change, 0.0, 0.0)
+                    } else if self.held.contains(&KeyCode::Y) {
+                        glam::vec3(0.0, change, 0.0)
+                    } else if self.held.contains(&KeyCode::Z) {
+                        glam::vec3(0.0, 0.0, change)
+                    } else {
+                        glam::Vec3::ZERO
+                    },
+                );
+            }
+            Mode::Scale => {
+                let distance = self.actors[self.selected.unwrap()]
+                    .get_translation(self.map.as_ref().unwrap())
+                    .distance(self.camera.position);
+                let change = (delta.x - delta.y) * distance * self.camera.delta_time as f32 * 0.5;
+                self.actors[self.selected.unwrap()].add_scale(
+                    self.map.as_mut().unwrap(),
+                    if self.held.contains(&KeyCode::X) {
+                        glam::vec3(change, 0.0, 0.0)
+                    } else if self.held.contains(&KeyCode::Z) {
+                        glam::vec3(0.0, change, 0.0)
+                    } else if self.held.contains(&KeyCode::Y) {
+                        glam::vec3(0.0, 0.0, change)
+                    } else {
+                        glam::Vec3::splat(change)
+                    },
+                );
+            }
+        }
     }
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
@@ -513,32 +566,35 @@ impl EventHandler for Stove {
         self.camera.handle_mouse_down(mb);
         // i think this picking code must be some of the hackiest shit i've ever written
         // funnily enough it's probably more performant than raycasting
-        if mb == MouseButton::Left {
-            if let Some(map) = self.map.as_ref() {
-                // convert the mouse coordinates to uv
-                let (width, height) = ctx.screen_size();
-                let coords = (x / width, 1.0 - y / height);
-                let proj = self.camera.projection() * self.camera.view_matrix();
-                self.selected = self.actors.iter().position(|actor| {
-                    let proj = proj * actor.get_translation(map).extend(1.0);
-                    // convert the actor position to uv
-                    let uv = (
-                        0.5 * (proj.x / proj.w.abs() + 1.0),
-                        0.5 * (proj.y / proj.w.abs() + 1.0),
-                    );
-                    (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01
-                });
+        if let Some(map) = self.map.as_ref() {
+            // convert the mouse coordinates to uv
+            let (width, height) = ctx.screen_size();
+            let coords = (x / width, 1.0 - y / height);
+            let proj = self.camera.projection() * self.camera.view_matrix();
+            self.selected = self.actors.iter().position(|actor| {
+                let proj = proj * actor.get_translation(map).extend(1.0);
+                // convert the actor position to uv
+                let uv = (
+                    0.5 * (proj.x / proj.w.abs() + 1.0),
+                    0.5 * (proj.y / proj.w.abs() + 1.0),
+                );
+                (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01
+            });
+        }
+        if self.selected.is_some() {
+            self.mode = match mb {
+                MouseButton::Right => Mode::Rotation,
+                MouseButton::Left => Mode::Translation,
+                MouseButton::Middle => Mode::Scale,
+                MouseButton::Unknown => Mode::None,
             }
-            self.grabbing = self.selected.is_some();
         }
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
         self.camera.handle_mouse_up(mb);
-        if mb == MouseButton::Left {
-            self.grabbing = false;
-        }
+        self.mode = Mode::None;
     }
 
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {

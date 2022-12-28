@@ -15,7 +15,7 @@ pub struct Camera {
     pub up: glam::Vec3,
     yaw: f32,
     pitch: f32,
-    delta_time: f64,
+    pub delta_time: f64,
     last_time: f64,
     pub speed: u8,
 }
