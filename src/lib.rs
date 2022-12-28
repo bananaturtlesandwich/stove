@@ -23,6 +23,9 @@ pub struct Stove {
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
+    held: Vec<KeyCode>,
+    grabbing: bool,
+    last_mouse_pos: glam::Vec2,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -133,6 +136,9 @@ impl Stove {
                 .resizable(false)
                 .filter(Box::new(filter)),
             filepath,
+            held: Vec::new(),
+            grabbing: false,
+            last_mouse_pos: glam::Vec2::ZERO,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -148,7 +154,7 @@ fn filter(path: &std::path::Path) -> bool {
 impl EventHandler for Stove {
     fn update(&mut self, _: &mut Context) {
         self.camera.update_times();
-        self.camera.move_cam()
+        self.camera.move_cam(&self.held)
     }
 
     fn draw(&mut self, ctx: &mut Context) {
@@ -466,7 +472,30 @@ impl EventHandler for Stove {
     // boilerplate >n<
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
-        self.camera.handle_mouse_motion(x, y);
+        let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
+        self.camera.handle_mouse_motion(delta);
+        if self.grabbing {
+            let left = self.camera.left();
+            let distance = self.actors[self.selected.unwrap()]
+                .get_translation(self.map.as_ref().unwrap())
+                .distance(self.camera.position);
+            let offset = (self.camera.front.cross(left).normalize() * delta.y + left * -delta.x)
+                * distance
+                * 0.1;
+            self.actors[self.selected.unwrap()].add_translation(
+                self.map.as_mut().unwrap(),
+                if self.held.contains(&KeyCode::X) {
+                    glam::vec3(offset.x, 0.0, 0.0)
+                } else if self.held.contains(&KeyCode::Z) {
+                    glam::vec3(0.0, offset.y, 0.0)
+                } else if self.held.contains(&KeyCode::Y) {
+                    glam::vec3(0.0, 0.0, offset.z)
+                } else {
+                    offset
+                },
+            )
+        }
+        self.last_mouse_pos = glam::vec2(x, y);
     }
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
@@ -478,17 +507,13 @@ impl EventHandler for Stove {
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
-        if !self.egui.egui_ctx().is_pointer_over_area() {
-            self.camera.handle_mouse_down(mb);
+        if self.egui.egui_ctx().is_pointer_over_area() {
+            return;
         }
-    }
-
-    fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-        self.egui.mouse_button_up_event(ctx, mb, x, y);
-        self.camera.handle_mouse_up(mb);
+        self.camera.handle_mouse_down(mb);
         // i think this picking code must be some of the hackiest shit i've ever written
         // funnily enough it's probably more performant than raycasting
-        if !self.egui.egui_ctx().is_pointer_over_area() && mb == MouseButton::Left {
+        if mb == MouseButton::Left {
             if let Some(map) = self.map.as_ref() {
                 // convert the mouse coordinates to uv
                 let (width, height) = ctx.screen_size();
@@ -504,6 +529,15 @@ impl EventHandler for Stove {
                     (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01
                 });
             }
+            self.grabbing = self.selected.is_some();
+        }
+    }
+
+    fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
+        self.egui.mouse_button_up_event(ctx, mb, x, y);
+        self.camera.handle_mouse_up(mb);
+        if mb == MouseButton::Left {
+            self.grabbing = false;
         }
     }
 
@@ -514,13 +548,17 @@ impl EventHandler for Stove {
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
         if !self.egui.egui_ctx().is_pointer_over_area() && !keymods.ctrl {
-            self.camera.handle_key_down(keycode);
+            if !self.held.contains(&keycode) {
+                self.held.push(keycode)
+            }
         }
     }
 
     fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
         self.egui.key_up_event(keycode, keymods);
-        self.camera.handle_key_up(keycode);
+        if let Some(pos) = self.held.iter().position(|k| k == &keycode) {
+            self.held.remove(pos);
+        }
         match keycode {
             KeyCode::Delete => match self.selected {
                 Some(index) => {
