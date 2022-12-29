@@ -384,7 +384,7 @@ impl EventHandler for Stove {
                         );
                     }
                 }
-                self.ui_width = ui.available_width();
+                self.ui_width = ui.available_width() + mqctx.screen_size().0 / 10.0;
             });
             if let Some(map) = &mut self.map {
                 let mut open = true;
@@ -512,7 +512,7 @@ impl EventHandler for Stove {
         }
         match mb {
             // trying to minimise case where clicking the gizmo deselects the actor
-            MouseButton::Left => {
+            MouseButton::Left if self.prev == glam::Vec3::ZERO => {
                 if let Some(map) = self.map.as_mut() {
                     // normalise mouse coordinates
                     let (width, height) = ctx.screen_size();
