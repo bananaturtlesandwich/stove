@@ -25,6 +25,8 @@ pub struct Stove {
     save_dialog: egui_file::FileDialog,
     held: Vec<KeyCode>,
     last_mouse_pos: glam::Vec2,
+    mode: egui_gizmo::GizmoMode,
+    prev: glam::Vec3,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -137,6 +139,8 @@ impl Stove {
             filepath,
             held: Vec::new(),
             last_mouse_pos: glam::Vec2::ZERO,
+            mode: egui_gizmo::GizmoMode::Translate,
+            prev: glam::Vec3::ZERO,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -164,19 +168,9 @@ impl EventHandler for Stove {
         if let Some(map) = &mut self.map {
             self.cube.apply(ctx);
             for (i, actor) in self.actors.iter().enumerate() {
-                let rot = actor.get_rotation(map);
                 self.cube.draw(
                     ctx,
-                    glam::Mat4::from_scale_rotation_translation(
-                        actor.get_scale(map),
-                        glam::Quat::from_euler(
-                            glam::EulerRot::XYZ,
-                            rot.x.to_radians(),
-                            rot.y.to_radians(),
-                            rot.z.to_radians(),
-                        ),
-                        actor.get_translation(map),
-                    ),
+                    actor.model_matrix(map),
                     self.camera.view_matrix(),
                     match self.selected == Some(i) {
                         true => glam::vec3(1.0, 1.0, 0.5),
@@ -191,6 +185,30 @@ impl EventHandler for Stove {
             return;
         }
         self.egui.run(ctx, |mqctx, ctx| {
+            if let Some(selected) = self.selected {
+                egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui|{
+                    match egui_gizmo::Gizmo::new("gizmo")
+                        .model_matrix(self.actors[selected].model_matrix(self.map.as_ref().unwrap()).to_cols_array_2d())
+                        .view_matrix(self.camera.view_matrix().to_cols_array_2d())
+                        .projection_matrix(rendering::PROJECTION.to_cols_array_2d())
+                        .mode(self.mode)
+                        .interact(ui) {
+                            Some(interaction) => {
+                                let mut val = glam::Vec3::from_array(interaction.value);
+                                if interaction.mode == egui_gizmo::GizmoMode::Scale {
+                                    val -= 1.0
+                                }
+                                match interaction.mode {
+                                    egui_gizmo::GizmoMode::Rotate => self.actors[selected].add_rotation(self.map.as_mut().unwrap(), val - self.prev),
+                                    egui_gizmo::GizmoMode::Translate => self.actors[selected].add_location(self.map.as_mut().unwrap(), val - self.prev),
+                                    egui_gizmo::GizmoMode::Scale => self.actors[selected].add_scale(self.map.as_mut().unwrap(), (val - self.prev) * 25.0),
+                                }
+                                self.prev = val;
+                            }
+                            None => self.prev = glam::Vec3::ZERO
+                    }
+                });
+            }
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -486,6 +504,11 @@ impl EventHandler for Stove {
         if !self.egui.egui_ctx().is_pointer_over_area() {
             self.camera.speed = (self.camera.speed as f32 + dy / 10.0).clamp(5.0, 250.0) as u8;
         }
+        self.mode = match self.mode {
+            egui_gizmo::GizmoMode::Rotate => egui_gizmo::GizmoMode::Translate,
+            egui_gizmo::GizmoMode::Translate => egui_gizmo::GizmoMode::Scale,
+            egui_gizmo::GizmoMode::Scale => egui_gizmo::GizmoMode::Rotate,
+        }
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
@@ -503,9 +526,9 @@ impl EventHandler for Stove {
             // convert the mouse coordinates to uv
             let (width, height) = ctx.screen_size();
             let coords = (x / width, 1.0 - y / height);
-            let proj = self.camera.projection() * self.camera.view_matrix();
+            let proj = rendering::PROJECTION * self.camera.view_matrix();
             self.selected = self.actors.iter().position(|actor| {
-                let proj = proj * actor.get_translation(map).extend(1.0);
+                let proj = proj * actor.get_location(map).extend(1.0);
                 // convert the actor position to uv
                 let uv = (
                     0.5 * (proj.x / proj.w.abs() + 1.0),
@@ -527,7 +550,7 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
-        if !self.egui.egui_ctx().is_pointer_over_area() && !keymods.ctrl {
+        if !self.egui.egui_ctx().wants_keyboard_input() && !keymods.ctrl {
             if !self.held.contains(&keycode) {
                 self.held.push(keycode)
             }
@@ -554,9 +577,8 @@ impl EventHandler for Stove {
             },
             KeyCode::F => {
                 if let Some(selected) = self.selected {
-                    self.camera.set_focus(
-                        self.actors[selected].get_translation(self.map.as_ref().unwrap()),
-                    )
+                    self.camera
+                        .set_focus(self.actors[selected].get_location(self.map.as_ref().unwrap()))
                 }
             }
             KeyCode::H => self.ui = !self.ui,

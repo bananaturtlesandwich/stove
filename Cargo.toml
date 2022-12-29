@@ -11,8 +11,10 @@ description = "An editor for cooked unreal engine 4 map files"
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
 glam = { version = "*", features = ["fast-math"] }
 miniquad = "*"
-egui-miniquad = "*"
 egui = "*"
+egui-miniquad = "*"
+# use this fork until the PR is accepted
+egui-gizmo = { git = "https://github.com/matthiascy/egui-gizmo" }
 egui-notify = "*"
 egui_file = "*"
 dirs = "*"

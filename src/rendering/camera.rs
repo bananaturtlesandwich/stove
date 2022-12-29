@@ -1,13 +1,5 @@
 use miniquad::*;
 
-// this isn't going to change so might as well just make it a constant
-const PROJECTION: glam::Mat4 = glam::mat4(
-    glam::vec4(1.0, 0.0, 0.0, 0.0),
-    glam::vec4(0.0, 1.8, 0.0, 0.0),
-    glam::vec4(0.0, 0.0, 1.0, 1.0),
-    glam::vec4(0.0, 0.0, -1.0, 0.0),
-);
-
 pub struct Camera {
     pub position: glam::Vec3,
     can_move: bool,
@@ -37,9 +29,6 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn projection(&self) -> glam::Mat4 {
-        PROJECTION
-    }
     pub fn update_times(&mut self) {
         let time = date::now();
         self.delta_time = time - self.last_time;
