@@ -528,12 +528,12 @@ impl EventHandler for Stove {
                                 0.5 * (proj.x / proj.w.abs() + 1.0),
                                 0.5 * (proj.y / proj.w.abs() + 1.0),
                             );
-                            ((uv.0 - x).abs().powi(2) + (uv.1 - y).abs().powi(2)).sqrt()
+                            ((uv.0 - x).powi(2) + (uv.1 - y).powi(2)).sqrt()
                         })
                         .enumerate()
                         .min_by(|(_, x), (_, y)| x.total_cmp(y))
                     {
-                        self.selected = (closest.1 < 0.05).then_some(closest.0)
+                        self.selected = (closest.1 < 0.08).then_some(closest.0)
                     }
                 }
             }

@@ -86,7 +86,7 @@ impl super::Actor {
                         }
                         None
                     })
-                    .map(|rot| glam::vec3(rot.value.z.0, rot.value.y.0, rot.value.x.0))
+                    .map(|rot| glam::vec3(rot.value.x.0, rot.value.z.0, rot.value.y.0))
                     .unwrap_or_default()
             })
             .unwrap_or_default()
@@ -108,9 +108,9 @@ impl super::Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::RotatorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 += rotation.z;
-                        vec.value.y.0 += rotation.x;
-                        vec.value.z.0 += rotation.y;
+                        vec.value.x.0 -= rotation.x;
+                        vec.value.y.0 -= rotation.z;
+                        vec.value.z.0 -= rotation.y;
                     }
                 }
             }
@@ -127,7 +127,7 @@ impl super::Actor {
                         name: FName::from_slice("RelativeRotation"),
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(rotation.z.into(), rotation.x.into(), rotation.y.into()),
+                        value: Vector::new(rotation.x.into(), rotation.z.into(), rotation.y.into()),
                     })],
                 })),
         }
