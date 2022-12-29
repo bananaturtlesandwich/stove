@@ -73,12 +73,10 @@ impl Camera {
             .normalize();
         }
     }
-    pub fn handle_mouse_down(&mut self, button: MouseButton) {
-        self.can_move = button == MouseButton::Right;
+    pub fn enable_move(&mut self) {
+        self.can_move = true;
     }
-    pub fn handle_mouse_up(&mut self, button: MouseButton) {
-        if button == MouseButton::Right {
-            self.can_move = false;
-        }
+    pub fn disable_move(&mut self) {
+        self.can_move = false;
     }
 }

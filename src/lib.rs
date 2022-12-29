@@ -1,7 +1,7 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use miniquad::*;
-use unreal_asset::engine_version::EngineVersion;
+use unreal_asset::engine_version::EngineVersion::{self, *};
 
 mod actor;
 mod asset;
@@ -27,6 +27,7 @@ pub struct Stove {
     last_mouse_pos: glam::Vec2,
     mode: egui_gizmo::GizmoMode,
     prev: glam::Vec3,
+    ui_width: f32,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -141,6 +142,7 @@ impl Stove {
             last_mouse_pos: glam::Vec2::ZERO,
             mode: egui_gizmo::GizmoMode::Translate,
             prev: glam::Vec3::ZERO,
+            ui_width: 0.0,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -380,6 +382,7 @@ impl EventHandler for Stove {
                         );
                     }
                 }
+                self.ui_width = ui.available_width();
             });
             if let Some(map) = &mut self.map {
                 let mut open = true;
@@ -484,13 +487,6 @@ impl EventHandler for Stove {
         ctx.commit_frame();
     }
 
-    #[cfg(not(target_family = "wasm"))]
-    fn quit_requested_event(&mut self, _ctx: &mut Context) {
-        if let Some(client) = &mut self.client {
-            client.close().unwrap_or_default();
-        }
-    }
-
     // boilerplate >n<
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
@@ -501,47 +497,37 @@ impl EventHandler for Stove {
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
-        if !self.egui.egui_ctx().is_pointer_over_area() {
+        // better than storing more stuff in self
+        if self.last_mouse_pos.x > self.ui_width {
             self.camera.speed = (self.camera.speed as f32 + dy / 10.0).clamp(5.0, 250.0) as u8;
-        }
-        self.mode = match self.mode {
-            egui_gizmo::GizmoMode::Rotate => egui_gizmo::GizmoMode::Translate,
-            egui_gizmo::GizmoMode::Translate => egui_gizmo::GizmoMode::Scale,
-            egui_gizmo::GizmoMode::Scale => egui_gizmo::GizmoMode::Rotate,
         }
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
-        if self.egui.egui_ctx().is_pointer_over_area() {
+        // i think this breaks the gizmo because click detection takes too long
+        if x < self.ui_width {
             return;
         }
-        self.camera.handle_mouse_down(mb);
-        if mb != MouseButton::Left {
-            return;
-        }
-        // i think this picking code must be some of the hackiest shit i've ever written
-        // funnily enough it's probably more performant than raycasting
-        if let Some(map) = self.map.as_ref() {
-            // convert the mouse coordinates to uv
-            let (width, height) = ctx.screen_size();
-            let coords = (x / width, 1.0 - y / height);
-            let proj = rendering::PROJECTION * self.camera.view_matrix();
-            self.selected = self.actors.iter().position(|actor| {
-                let proj = proj * actor.get_location(map).extend(1.0);
-                // convert the actor position to uv
-                let uv = (
-                    0.5 * (proj.x / proj.w.abs() + 1.0),
-                    0.5 * (proj.y / proj.w.abs() + 1.0),
-                );
-                (uv.0 - coords.0).abs() < 0.01 && (uv.1 - coords.1).abs() < 0.01
-            });
-        }
+        match mb {
+            MouseButton::Left => (),
+            MouseButton::Right => self.camera.enable_move(),
+            MouseButton::Middle => {
+                self.mode = match self.mode {
+                    egui_gizmo::GizmoMode::Rotate => egui_gizmo::GizmoMode::Translate,
+                    egui_gizmo::GizmoMode::Translate => egui_gizmo::GizmoMode::Scale,
+                    egui_gizmo::GizmoMode::Scale => egui_gizmo::GizmoMode::Rotate,
+                }
+            }
+            MouseButton::Unknown => (),
+        };
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
-        self.camera.handle_mouse_up(mb);
+        if mb == MouseButton::Right {
+            self.camera.disable_move();
+        }
     }
 
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
@@ -633,9 +619,15 @@ impl EventHandler for Stove {
             _ => (),
         }
     }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn quit_requested_event(&mut self, _ctx: &mut Context) {
+        if let Some(client) = &mut self.client {
+            client.close().unwrap_or_default();
+        }
+    }
 }
 
-use EngineVersion::*;
 const VERSIONS: [(EngineVersion, &str); 31] = [
     (UNKNOWN, "unknown"),
     (VER_UE4_OLDEST_LOADABLE_PACKAGE, "oldest"),
