@@ -194,6 +194,10 @@ impl EventHandler for Stove {
                         .view_matrix(self.camera.view_matrix().to_cols_array_2d())
                         .projection_matrix(rendering::PROJECTION.to_cols_array_2d())
                         .mode(self.mode)
+                        .visuals(egui_gizmo::GizmoVisuals {
+                            gizmo_size: 50.0,
+                            ..Default::default()
+                        })
                         .interact(ui) {
                             Some(interaction) => {
                                 let mut val = glam::Vec3::from_array(interaction.value);
@@ -270,10 +274,8 @@ impl EventHandler for Stove {
                                 binding(ui,"focus","F");
                                 binding(ui,"duplicate","ctrl + D");
                                 binding(ui,"delete","delete");
-                                binding(ui,"move","left-click + drag");
-                                binding(ui,"rotate","right-click + drag");
-                                binding(ui,"scale","middle-click + drag");
-                                binding(ui,"lock axis","X/Y/Z");
+                                binding(ui,"transform","drag gizmo");
+                                binding(ui,"change mode","middle-click");
                             });
                         });
                         ui.menu_button("about",|ui|{
@@ -440,7 +442,7 @@ impl EventHandler for Stove {
                                                 .state(self.filepath.split('\\').last().unwrap_or_default())
                                         ).is_err() {
                                         client.close().unwrap_or_default();
-                                        self.client=None;
+                                        self.client = None;
                                     }
                             }
                             self.map = Some(asset);
@@ -505,12 +507,36 @@ impl EventHandler for Stove {
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
-        // i think this breaks the gizmo because click detection takes too long
         if x < self.ui_width {
             return;
         }
         match mb {
-            MouseButton::Left => (),
+            // trying to minimise case where clicking the gizmo deselects the actor
+            MouseButton::Left => {
+                if let Some(map) = self.map.as_mut() {
+                    // normalise mouse coordinates
+                    let (width, height) = ctx.screen_size();
+                    let (x, y) = (x / width, 1.0 - y / height);
+                    let proj = rendering::PROJECTION * self.camera.view_matrix();
+                    if let Some(closest) = self
+                        .actors
+                        .iter()
+                        .map(|actor| {
+                            let proj = proj * actor.get_location(map).extend(1.0);
+                            // convert the actor position to uv via black magic
+                            let uv = (
+                                0.5 * (proj.x / proj.w.abs() + 1.0),
+                                0.5 * (proj.y / proj.w.abs() + 1.0),
+                            );
+                            ((uv.0 - x).abs().powi(2) + (uv.1 - y).abs().powi(2)).sqrt()
+                        })
+                        .enumerate()
+                        .min_by(|(_, x), (_, y)| x.total_cmp(y))
+                    {
+                        self.selected = (closest.1 < 0.05).then_some(closest.0)
+                    }
+                }
+            }
             MouseButton::Right => self.camera.enable_move(),
             MouseButton::Middle => {
                 self.mode = match self.mode {
@@ -519,14 +545,14 @@ impl EventHandler for Stove {
                     egui_gizmo::GizmoMode::Scale => egui_gizmo::GizmoMode::Rotate,
                 }
             }
-            MouseButton::Unknown => (),
+            _ => (),
         };
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_up_event(ctx, mb, x, y);
         if mb == MouseButton::Right {
-            self.camera.disable_move();
+            self.camera.disable_move()
         }
     }
 
