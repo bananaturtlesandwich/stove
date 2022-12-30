@@ -26,6 +26,11 @@ impl Actor {
         PackageIndex::new(self.export as i32 + 1)
     }
     pub fn new(asset: &Asset, package: PackageIndex) -> Result<Self, Error> {
+        if package.index == 0 {
+            return Err(Error::invalid_package_index(
+                "actor was null reference".to_string(),
+            ));
+        }
         let export = package.index as usize - 1;
         let Some(ex) = asset.get_export(package) else{
             return Err(Error::invalid_package_index(format!(
@@ -116,12 +121,14 @@ pub fn get_actors(asset: &Asset) -> Vec<PackageIndex> {
     match asset
         .exports
         .iter()
-        .find(|ex| cast!(Export, LevelExport, ex).is_some())
+        .find_map(|ex| cast!(Export, LevelExport, ex))
     {
-        Some(ex) => ex
-            .get_base_export()
-            .create_before_serialization_dependencies
-            .clone(),
+        Some(level) => level
+            .actors
+            .iter()
+            .filter(|index| index.is_export())
+            .copied()
+            .collect(),
         None => Vec::new(),
     }
 }

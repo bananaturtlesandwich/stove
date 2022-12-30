@@ -13,8 +13,6 @@ glam = { version = "*", features = ["fast-math"] }
 miniquad = "*"
 egui = "*"
 egui-miniquad = "*"
-# use this fork until the PR is accepted
-egui-gizmo = { git = "https://github.com/matthiascy/egui-gizmo" }
 egui-notify = "*"
 egui_file = "*"
 dirs = "*"

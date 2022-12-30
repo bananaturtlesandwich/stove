@@ -25,9 +25,6 @@ pub struct Stove {
     save_dialog: egui_file::FileDialog,
     held: Vec<KeyCode>,
     last_mouse_pos: glam::Vec2,
-    mode: egui_gizmo::GizmoMode,
-    prev: glam::Vec3,
-    ui_width: f32,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -140,9 +137,6 @@ impl Stove {
             filepath,
             held: Vec::new(),
             last_mouse_pos: glam::Vec2::ZERO,
-            mode: egui_gizmo::GizmoMode::Translate,
-            prev: glam::Vec3::ZERO,
-            ui_width: 0.0,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -187,34 +181,6 @@ impl EventHandler for Stove {
             return;
         }
         self.egui.run(ctx, |mqctx, ctx| {
-            if let Some(selected) = self.selected {
-                egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui|{
-                    match egui_gizmo::Gizmo::new("gizmo")
-                        .model_matrix(self.actors[selected].model_matrix(self.map.as_ref().unwrap()).to_cols_array_2d())
-                        .view_matrix(self.camera.view_matrix().to_cols_array_2d())
-                        .projection_matrix(rendering::PROJECTION.to_cols_array_2d())
-                        .mode(self.mode)
-                        .visuals(egui_gizmo::GizmoVisuals {
-                            gizmo_size: 50.0,
-                            ..Default::default()
-                        })
-                        .interact(ui) {
-                            Some(interaction) => {
-                                let mut val = glam::Vec3::from_array(interaction.value);
-                                if interaction.mode == egui_gizmo::GizmoMode::Scale {
-                                    val -= 1.0
-                                }
-                                match interaction.mode {
-                                    egui_gizmo::GizmoMode::Rotate => self.actors[selected].add_rotation(self.map.as_mut().unwrap(), val - self.prev),
-                                    egui_gizmo::GizmoMode::Translate => self.actors[selected].add_location(self.map.as_mut().unwrap(), val - self.prev),
-                                    egui_gizmo::GizmoMode::Scale => self.actors[selected].add_scale(self.map.as_mut().unwrap(), (val - self.prev) * 25.0),
-                                }
-                                self.prev = val;
-                            }
-                            None => self.prev = glam::Vec3::ZERO
-                    }
-                });
-            }
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -384,7 +350,6 @@ impl EventHandler for Stove {
                         );
                     }
                 }
-                self.ui_width = ui.available_width() + mqctx.screen_size().0 / 10.0;
             });
             if let Some(map) = &mut self.map {
                 let mut open = true;
@@ -500,19 +465,19 @@ impl EventHandler for Stove {
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
         // better than storing more stuff in self
-        if self.last_mouse_pos.x > self.ui_width {
+        if !self.egui.egui_ctx().is_pointer_over_area() {
             self.camera.speed = (self.camera.speed as f32 + dy / 10.0).clamp(5.0, 250.0) as u8;
         }
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
         self.egui.mouse_button_down_event(ctx, mb, x, y);
-        if x < self.ui_width {
+        if self.egui.egui_ctx().is_pointer_over_area() {
             return;
         }
         match mb {
             // trying to minimise case where clicking the gizmo deselects the actor
-            MouseButton::Left if self.prev == glam::Vec3::ZERO => {
+            MouseButton::Left => {
                 if let Some(map) = self.map.as_mut() {
                     // normalise mouse coordinates
                     let (width, height) = ctx.screen_size();
@@ -538,13 +503,6 @@ impl EventHandler for Stove {
                 }
             }
             MouseButton::Right => self.camera.enable_move(),
-            MouseButton::Middle => {
-                self.mode = match self.mode {
-                    egui_gizmo::GizmoMode::Rotate => egui_gizmo::GizmoMode::Translate,
-                    egui_gizmo::GizmoMode::Translate => egui_gizmo::GizmoMode::Scale,
-                    egui_gizmo::GizmoMode::Scale => egui_gizmo::GizmoMode::Rotate,
-                }
-            }
             _ => (),
         };
     }
@@ -562,10 +520,11 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
-        if !self.egui.egui_ctx().wants_keyboard_input() && !keymods.ctrl {
-            if !self.held.contains(&keycode) {
-                self.held.push(keycode)
-            }
+        if !self.egui.egui_ctx().wants_keyboard_input()
+            && !keymods.ctrl
+            && !self.held.contains(&keycode)
+        {
+            self.held.push(keycode)
         }
     }
 
