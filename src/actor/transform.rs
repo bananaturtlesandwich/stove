@@ -1,4 +1,13 @@
-use unreal_asset::{cast, exports::ExportNormalTrait, properties::Property, Asset};
+use unreal_asset::{
+    cast,
+    exports::ExportNormalTrait,
+    properties::{
+        struct_property::StructProperty, vector_property::VectorProperty, Property,
+        PropertyDataTrait,
+    },
+    types::{vector::Vector, FName},
+    Asset,
+};
 
 impl super::Actor {
     pub fn location(&self, map: &Asset) -> glam::Vec3 {
@@ -20,6 +29,44 @@ impl super::Actor {
                     .unwrap_or_default()
             })
             .unwrap_or_default()
+    }
+
+    pub fn add_location(&self, map: &mut Asset, factor: glam::Vec3) {
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut()
+        else {
+            return;
+        };
+        match norm
+            .properties
+            .iter_mut()
+            .find(|prop| prop.get_name().content == "RelativeLocation")
+        {
+            Some(scale) => {
+                if let Property::StructProperty(struc) = scale {
+                    if let Property::VectorProperty(vec) = &mut struc.value[0] {
+                        vec.value.x.0 += factor.x;
+                        vec.value.y.0 += factor.z;
+                        vec.value.z.0 += factor.y;
+                    }
+                }
+            }
+            None => norm
+                .properties
+                .push(Property::StructProperty(StructProperty {
+                    name: FName::from_slice("RelativeLocation"),
+                    struct_type: Some(FName::from_slice("Vector")),
+                    struct_guid: None,
+                    property_guid: None,
+                    duplication_index: 0,
+                    serialize_none: true,
+                    value: vec![Property::VectorProperty(VectorProperty {
+                        name: FName::from_slice("RelativeLocation"),
+                        property_guid: None,
+                        duplication_index: 0,
+                        value: Vector::new((factor.x).into(), (factor.z).into(), (factor.y).into()),
+                    })],
+                })),
+        }
     }
 
     pub fn rotation(&self, map: &Asset) -> glam::Vec3 {

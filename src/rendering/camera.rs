@@ -37,7 +37,7 @@ impl Camera {
     pub fn view_matrix(&self) -> glam::Mat4 {
         glam::Mat4::look_at_lh(self.position, self.position + self.front, self.up)
     }
-    pub fn right(&self) -> glam::Vec3 {
+    pub fn left(&self) -> glam::Vec3 {
         self.front.cross(self.up).normalize()
     }
     pub fn move_cam(&mut self, held: &[KeyCode]) {
@@ -45,9 +45,9 @@ impl Camera {
         for keycode in held.iter() {
             match keycode {
                 KeyCode::W => self.position += self.front * velocity,
-                KeyCode::A => self.position += self.right() * velocity,
+                KeyCode::A => self.position += self.left() * velocity,
                 KeyCode::S => self.position -= self.front * velocity,
-                KeyCode::D => self.position -= self.right() * velocity,
+                KeyCode::D => self.position -= self.left() * velocity,
                 KeyCode::E => self.position += glam::vec3(0.0, velocity, 0.0),
                 KeyCode::Q => self.position -= glam::vec3(0.0, velocity, 0.0),
                 _ => (),

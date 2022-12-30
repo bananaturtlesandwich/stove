@@ -1,12 +1,23 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use miniquad::*;
-use unreal_asset::engine_version::EngineVersion::{self, *};
+use unreal_asset::{
+    engine_version::EngineVersion::{self, *},
+    types::PackageIndex,
+};
 
 mod actor;
 mod asset;
 mod extras;
 mod rendering;
+
+enum Grab {
+    None,
+    // holds distance from camera
+    Location(f32),
+    Rotation,
+    Scale3D,
+}
 
 pub struct Stove {
     camera: rendering::Camera,
@@ -25,6 +36,7 @@ pub struct Stove {
     save_dialog: egui_file::FileDialog,
     held: Vec<KeyCode>,
     last_mouse_pos: glam::Vec2,
+    grab: Grab,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -137,6 +149,7 @@ impl Stove {
             filepath,
             held: Vec::new(),
             last_mouse_pos: glam::Vec2::ZERO,
+            grab: Grab::None,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -240,8 +253,6 @@ impl EventHandler for Stove {
                                 binding(ui,"focus","F");
                                 binding(ui,"duplicate","ctrl + D");
                                 binding(ui,"delete","delete");
-                                binding(ui,"transform","drag gizmo");
-                                binding(ui,"change mode","middle-click");
                             });
                         });
                         ui.menu_button("about",|ui|{
@@ -277,7 +288,7 @@ impl EventHandler for Stove {
                                     self.actors.push(
                                         actor::Actor::new(
                                             map,
-                                            unreal_asset::types::PackageIndex::new(insert),
+                                            PackageIndex::new(insert),
                                         )
                                         .unwrap(),
                                     );
@@ -375,7 +386,7 @@ impl EventHandler for Stove {
                                             self.actors.push(
                                                 actor::Actor::new(
                                                     map,
-                                                    unreal_asset::types::PackageIndex::new(insert),
+                                                    PackageIndex::new(insert),
                                                 )
                                                 .unwrap(),
                                             );
@@ -458,8 +469,25 @@ impl EventHandler for Stove {
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
-        self.last_mouse_pos = glam::vec2(x, y);
         self.camera.handle_mouse_motion(delta);
+        match self.grab {
+            Grab::None => (),
+            Grab::Location(dist) => self.actors[self.selected.unwrap()].add_location(
+                self.map.as_mut().unwrap(),
+                // move across the camera view plane
+                (self.camera.left() * -delta.x
+                        + self.camera.front.cross(self.camera.left()) * delta.y)
+                        // scale by consistent distance
+                        * dist
+                        // make consistent across hardware
+                        * self.camera.delta_time as f32
+                        // scale to match mouse cursor
+                        * 6.0,
+            ),
+            Grab::Rotation => (),
+            Grab::Scale3D => (),
+        }
+        self.last_mouse_pos = glam::vec2(x, y);
     }
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
@@ -486,7 +514,7 @@ impl EventHandler for Stove {
                 if let Some(map) = self.map.as_mut() {
                     // normalise mouse coordinates to NDC
                     let (width, height) = ctx.screen_size();
-                    let mouse = (((x * 2.0) / width) - 1.0, 1.0 - ((y * 2.0) / height));
+                    let mouse = (x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
                     let proj = rendering::PROJECTION * self.camera.view_matrix();
                     if let Some((pos, distance)) = self
                         .actors
@@ -508,6 +536,19 @@ impl EventHandler for Stove {
             MouseButton::Right => self.camera.enable_move(),
             _ => (),
         };
+        // grabby time
+        if let Some(selected) = self.selected {
+            self.grab = match mb {
+                MouseButton::Right => Grab::Rotation,
+                MouseButton::Left => Grab::Location(
+                    self.actors[selected]
+                        .location(self.map.as_ref().unwrap())
+                        .distance(self.camera.position),
+                ),
+                MouseButton::Middle => Grab::Scale3D,
+                MouseButton::Unknown => Grab::None,
+            }
+        }
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
@@ -515,6 +556,7 @@ impl EventHandler for Stove {
         if mb == MouseButton::Right {
             self.camera.disable_move()
         }
+        self.grab = Grab::None;
     }
 
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
@@ -564,10 +606,8 @@ impl EventHandler for Stove {
                     let insert = map.exports.len() as i32 + 1;
                     self.selected = Some(self.actors.len());
                     self.actors[index].duplicate(map);
-                    self.actors.push(
-                        actor::Actor::new(map, unreal_asset::types::PackageIndex::new(insert))
-                            .unwrap(),
-                    );
+                    self.actors
+                        .push(actor::Actor::new(map, PackageIndex::new(insert)).unwrap());
                     self.notifs
                         .success(format!("duplicated {}", &self.actors[index].name));
                 }
