@@ -1,7 +1,7 @@
 use unreal_asset::{cast, exports::ExportNormalTrait, properties::Property, Asset};
 
 impl super::Actor {
-    pub fn get_location(&self, map: &Asset) -> glam::Vec3 {
+    pub fn location(&self, map: &Asset) -> glam::Vec3 {
         map.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -22,7 +22,7 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn get_rotation(&self, map: &Asset) -> glam::Vec3 {
+    pub fn rotation(&self, map: &Asset) -> glam::Vec3 {
         map.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -43,7 +43,7 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn get_scale(&self, map: &Asset) -> glam::Vec3 {
+    pub fn scale(&self, map: &Asset) -> glam::Vec3 {
         map.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -65,16 +65,16 @@ impl super::Actor {
     }
 
     pub fn model_matrix(&self, map: &Asset) -> glam::Mat4 {
-        let rot = self.get_rotation(map);
+        let rot = self.rotation(map);
         glam::Mat4::from_scale_rotation_translation(
-            self.get_scale(map),
+            self.scale(map),
             glam::Quat::from_euler(
                 glam::EulerRot::XYZ,
                 rot.x.to_radians(),
                 rot.y.to_radians(),
                 rot.z.to_radians(),
             ),
-            self.get_location(map),
+            self.location(map),
         )
     }
 }

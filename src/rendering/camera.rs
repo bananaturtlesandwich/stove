@@ -20,7 +20,7 @@ impl Default for Camera {
             position: glam::Vec3::ZERO,
             can_move: false,
             up: glam::Vec3::Y,
-            front: glam::vec3(0.0, 0.0, -1.0),
+            front: glam::Vec3::NEG_Z,
             pitch: 0.0,
             yaw: -90.0,
             speed: 25,

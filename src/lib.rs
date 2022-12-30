@@ -476,29 +476,27 @@ impl EventHandler for Stove {
             return;
         }
         match mb {
-            // trying to minimise case where clicking the gizmo deselects the actor
+            // THE HACKIEST MOUSE PICKING TO EVER EXIST
             MouseButton::Left => {
                 if let Some(map) = self.map.as_mut() {
-                    // normalise mouse coordinates
+                    // normalise mouse coordinates to NDC
                     let (width, height) = ctx.screen_size();
-                    let (x, y) = (x / width, 1.0 - y / height);
+                    let mouse = (((x * 2.0) / width) - 1.0, 1.0 - ((y * 2.0) / height));
                     let proj = rendering::PROJECTION * self.camera.view_matrix();
-                    if let Some(closest) = self
+                    if let Some((pos, distance)) = self
                         .actors
                         .iter()
                         .map(|actor| {
-                            let proj = proj * actor.get_location(map).extend(1.0);
-                            // convert the actor position to uv via black magic
-                            let uv = (
-                                0.5 * (proj.x / proj.w.abs() + 1.0),
-                                0.5 * (proj.y / proj.w.abs() + 1.0),
-                            );
-                            ((uv.0 - x).powi(2) + (uv.1 - y).powi(2)).sqrt()
+                            let proj = proj * actor.location(map).extend(1.0);
+                            // get NDC coordinates of actor
+                            let actor = (proj.x / proj.w.abs(), proj.y / proj.w.abs());
+                            // return distance via pythagoras
+                            ((actor.0 - mouse.0).powi(2) + (actor.1 - mouse.1).powi(2)).sqrt()
                         })
                         .enumerate()
                         .min_by(|(_, x), (_, y)| x.total_cmp(y))
                     {
-                        self.selected = (closest.1 < 0.08).then_some(closest.0)
+                        self.selected = (distance < 0.08).then_some(pos)
                     }
                 }
             }
@@ -549,7 +547,7 @@ impl EventHandler for Stove {
             KeyCode::F => {
                 if let Some(selected) = self.selected {
                     self.camera
-                        .set_focus(self.actors[selected].get_location(self.map.as_ref().unwrap()))
+                        .set_focus(self.actors[selected].location(self.map.as_ref().unwrap()))
                 }
             }
             KeyCode::H => self.ui = !self.ui,
