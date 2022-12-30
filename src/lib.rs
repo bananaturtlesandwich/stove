@@ -464,9 +464,14 @@ impl EventHandler for Stove {
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
-        // better than storing more stuff in self
+        // a scaling speed increase is better because unreal maps can get massive
         if !self.egui.egui_ctx().is_pointer_over_area() {
-            self.camera.speed = (self.camera.speed as f32 + dy / 10.0).clamp(5.0, 250.0) as u8;
+            self.camera.speed = (self.camera.speed as f32
+                * match dy.is_sign_negative() {
+                    true => 100.0 / -dy,
+                    false => dy / 100.0,
+                })
+            .clamp(5.0, 25000.0) as u16;
         }
     }
 
@@ -496,7 +501,7 @@ impl EventHandler for Stove {
                         .enumerate()
                         .min_by(|(_, x), (_, y)| x.total_cmp(y))
                     {
-                        self.selected = (distance < 0.08).then_some(pos)
+                        self.selected = (distance < 0.05).then_some(pos)
                     }
                 }
             }
@@ -518,7 +523,7 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         self.egui.key_down_event(ctx, keycode, keymods);
-        if !self.egui.egui_ctx().wants_keyboard_input()
+        if !self.egui.egui_ctx().is_pointer_over_area()
             && !keymods.ctrl
             && !self.held.contains(&keycode)
         {
@@ -546,8 +551,10 @@ impl EventHandler for Stove {
             },
             KeyCode::F => {
                 if let Some(selected) = self.selected {
-                    self.camera
-                        .set_focus(self.actors[selected].location(self.map.as_ref().unwrap()))
+                    self.camera.set_focus(
+                        self.actors[selected].location(self.map.as_ref().unwrap()),
+                        self.actors[selected].scale(self.map.as_ref().unwrap()),
+                    )
                 }
             }
             KeyCode::H => self.ui = !self.ui,

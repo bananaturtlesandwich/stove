@@ -9,7 +9,7 @@ pub struct Camera {
     pitch: f32,
     pub delta_time: f64,
     last_time: f64,
-    pub speed: u8,
+    pub speed: u16,
 }
 
 impl Default for Camera {
@@ -54,8 +54,9 @@ impl Camera {
             }
         }
     }
-    pub fn set_focus(&mut self, pos: glam::Vec3) {
-        self.position = pos - self.front * glam::Vec3::splat(4.0);
+    pub fn set_focus(&mut self, pos: glam::Vec3, sca: glam::Vec3) {
+        let avg = (sca.x + sca.y + sca.z) / 3.0;
+        self.position = pos - self.front * avg * 4.0;
     }
     pub fn handle_mouse_motion(&mut self, delta: glam::Vec2) {
         if self.can_move {

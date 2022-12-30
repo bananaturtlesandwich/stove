@@ -86,13 +86,14 @@ macro_rules! show_sampler {
 
 macro_rules! show_path {
     ($ui:ident,$val:expr) => {
-        $ui.text_edit_singleline(
+        text_edit(
+            $ui,
             &mut $val
                 .asset_path_name
                 .get_or_insert(FName::from_slice(""))
                 .content,
-        ) | $ui.text_edit_singleline($val.sub_path.get_or_insert(String::new()))
-            | $ui.text_edit_singleline($val.path.get_or_insert(String::new()))
+        ) | text_edit($ui, $val.sub_path.get_or_insert(String::new()))
+            | text_edit($ui, $val.path.get_or_insert(String::new()))
     };
 }
 
@@ -101,7 +102,7 @@ macro_rules! show_delegate {
         $ui.push_id(&$val.name.content, |ui| {
             ui.collapsing("", |ui| {
                 for delegate in $val.value.iter_mut() {
-                    ui.text_edit_singleline(&mut delegate.delegate.content);
+                    text_edit(ui, &mut delegate.delegate.content);
                 }
             })
         })
@@ -119,6 +120,11 @@ fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Re
 
 fn drag_angle(ui: &mut egui::Ui, val: &mut f32) -> egui::Response {
     ui.add(egui::widgets::DragValue::new(val).suffix("°"))
+}
+
+fn text_edit(ui: &mut egui::Ui, val: &mut String) -> egui::Response {
+    let len = (val.len() * 7) as f32;
+    ui.add(egui::widgets::TextEdit::singleline(val).desired_width(len))
 }
 
 fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
@@ -145,29 +151,28 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             drag(ui, byte)
                         }
                         unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
-                            ui.text_edit_singleline(
+                            text_edit(
+                                ui,
                                 &mut byte.enum_type.get_or_insert(FName::from_slice("")).content,
-                            ) | ui.text_edit_singleline(&mut name.content)
+                            ) | text_edit(ui, &mut name.content)
                         }
                     },
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
-                    Property::NameProperty(name) => {
-                        ui.text_edit_singleline(&mut name.value.content)
-                    }
+                    Property::NameProperty(name) => text_edit(ui, &mut name.value.content),
                     Property::StrProperty(str) => {
-                        ui.text_edit_singleline(str.value.get_or_insert(String::new()))
+                        text_edit(ui, str.value.get_or_insert(String::new()))
                     }
-                    Property::TextProperty(txt) => ui.text_edit_singleline(
+                    Property::TextProperty(txt) => text_edit(
+                        ui,
                         txt.culture_invariant_string.get_or_insert(String::new()),
                     ),
                     Property::ObjectProperty(obj) => ui.link(obj.value.index.to_string()),
                     Property::AssetObjectProperty(obj) => {
-                        ui.text_edit_singleline(obj.value.get_or_insert(String::new()))
+                        text_edit(ui, obj.value.get_or_insert(String::new()))
                     }
                     Property::SoftObjectProperty(obj) => {
-                        ui.text_edit_singleline(
-                            obj.value.sub_path_string.get_or_insert(String::new()),
-                        ) | ui.text_edit_singleline(&mut obj.value.asset_path_name.content)
+                        text_edit(ui, obj.value.sub_path_string.get_or_insert(String::new()))
+                            | text_edit(ui, &mut obj.value.asset_path_name.content)
                     }
                     Property::IntPointProperty(point) => {
                         drag(ui, &mut point.x) | drag(ui, &mut point.y)
@@ -270,7 +275,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::SoftObjectPathProperty(path) => show_path!(ui, path),
                     Property::SoftClassPathProperty(path) => show_path!(ui, path),
                     Property::DelegateProperty(del) => {
-                        ui.text_edit_singleline(&mut del.value.delegate.content)
+                        text_edit(ui, &mut del.value.delegate.content)
                     }
                     Property::MulticastDelegateProperty(del) => show_delegate!(ui, del),
                     Property::MulticastSparseDelegateProperty(del) => show_delegate!(ui, del),
@@ -279,7 +284,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
                     Property::SmartNameProperty(name) => {
-                        ui.text_edit_singleline(&mut name.display_name.content)
+                        text_edit(ui, &mut name.display_name.content)
                     }
                     Property::StructProperty(str) => {
                         ui.push_id(&str.name.content, |ui| {
@@ -291,7 +296,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         })
                         .response
                     }
-                    Property::EnumProperty(enm) => ui.text_edit_singleline(&mut enm.value.content),
+                    Property::EnumProperty(enm) => text_edit(ui, &mut enm.value.content),
                     // Property::UnknownProperty(unknown) => todo!(),
                     _ => ui.link("unimplemented"),
                 }
