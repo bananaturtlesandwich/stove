@@ -476,13 +476,11 @@ impl EventHandler for Stove {
                 self.map.as_mut().unwrap(),
                 // move across the camera view plane
                 (self.camera.left() * -delta.x
-                        + self.camera.front.cross(self.camera.left()) * delta.y)
-                        // scale by consistent distance
-                        * dist
-                        // make consistent across hardware
-                        * self.camera.delta_time as f32
-                        // scale to match mouse cursor
-                        * 6.0,
+                    + self.camera.front.cross(self.camera.left()) * delta.y)
+                    // scale by consistent distance
+                    * dist
+                    // scale to match mouse cursor
+                    * 0.1,
             ),
             Grab::Rotation => (),
             Grab::Scale3D => (),
