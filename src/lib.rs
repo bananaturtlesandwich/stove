@@ -110,7 +110,7 @@ impl Stove {
         #[cfg(not(target_family = "wasm"))]
         let mut client = None;
         #[cfg(not(target_family = "wasm"))]
-        if let Ok(mut cl) = discord_rich_presence::DiscordIpcClient::new("1052633997638905996") {
+        if let Ok(mut cl) = discord_rich_presence::DiscordIpcClient::new("1059578289737433249") {
             if cl.connect().is_ok()
                 && cl
                     .set_activity(match filepath.as_str() {
@@ -379,16 +379,22 @@ impl EventHandler for Stove {
                                 ui.text_style_height(&egui::TextStyle::Body),
                                 actors.len(),
                                 |ui,range|{
-                                    for i in range{
+                                    for i in range {
                                         if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
                                             let insert = map.exports.len() as i32 + 1;
                                             actors[i].transplant(map, donor);
+                                            let selected = self.actors.len();
                                             self.actors.push(
                                                 actor::Actor::new(
                                                     map,
                                                     PackageIndex::new(insert),
                                                 )
                                                 .unwrap(),
+                                            );
+                                            self.selected = Some(selected);
+                                            self.camera.set_focus(
+                                                self.actors[selected].location(&map),
+                                                self.actors[selected].scale(&map),
                                             );
                                             self.notifs.success(format!("transplanted {}", actors[i].name));
                                             transplanted = true;
@@ -589,14 +595,15 @@ impl EventHandler for Stove {
                     self.notifs.error("nothing selected to delete");
                 }
             },
-            KeyCode::F => {
-                if let Some(selected) = self.selected {
-                    self.camera.set_focus(
-                        self.actors[selected].location(self.map.as_ref().unwrap()),
-                        self.actors[selected].scale(self.map.as_ref().unwrap()),
-                    )
+            KeyCode::F => match self.selected {
+                Some(selected) => self.camera.set_focus(
+                    self.actors[selected].location(self.map.as_ref().unwrap()),
+                    self.actors[selected].scale(self.map.as_ref().unwrap()),
+                ),
+                None => {
+                    self.notifs.error("nothing selected to focus on");
                 }
-            }
+            },
             KeyCode::H => self.ui = !self.ui,
             KeyCode::D if keymods.ctrl => match self.selected {
                 Some(index) => {
