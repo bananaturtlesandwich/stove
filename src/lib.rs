@@ -336,7 +336,7 @@ impl EventHandler for Stove {
                             ui.text_style_height(&egui::TextStyle::Body),
                             self.actors.len(),
                             |ui,range|{
-                            for i in range{
+                            for i in range {
                                 let is_selected = Some(i) == self.selected;
                                 if ui.selectable_label(
                                     is_selected,

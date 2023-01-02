@@ -4,7 +4,6 @@ use unreal_asset::{
     engine_version::EngineVersion,
     error::Error,
     exports::{ExportBaseTrait, ExportNormalTrait},
-    flags::EPackageFlags,
     properties::{Property, PropertyDataTrait},
     types::ToFName,
     Asset,
@@ -32,17 +31,7 @@ pub fn save(asset: &mut Asset, path: impl AsRef<Path>) -> Result<(), Error> {
         &mut main,
         asset.use_separate_bulk_data_files.then_some(&mut bulk),
     )?;
-    fs::write(
-        path.as_ref().with_extension(
-            match EPackageFlags::from_bits_truncate(asset.package_flags)
-                .intersects(EPackageFlags::PKG_CONTAINS_MAP)
-            {
-                true => "umap",
-                false => "uasset",
-            },
-        ),
-        main.into_inner(),
-    )?;
+    fs::write(path.as_ref().with_extension("umap"), main.into_inner())?;
     // if the asset has no bulk data then the bulk cursor will be empty
     if asset.use_separate_bulk_data_files {
         fs::write(path.as_ref().with_extension("uexp"), bulk.into_inner())?;
@@ -62,15 +51,18 @@ fn resolve_names(asset: &mut Asset) {
         // resolve the rest of the name references
         if let Some(norm) = export.get_normal_export() {
             for prop in norm.properties.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, false);
             }
         }
     }
 }
 
-fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
+fn resolve_prop_name(prop: &Property, asset: &mut Asset, is_array: bool) {
     asset.add_fname(&prop.to_fname().content);
-    asset.add_fname(&prop.get_name().content);
+    // the name of properties in arrays is their index
+    if !is_array {
+        asset.add_fname(&prop.get_name().content);
+    }
     match prop {
         Property::ByteProperty(prop) => {
             if let Some(en) = &prop.enum_type {
@@ -134,12 +126,12 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
                 asset.add_fname(&typ.content);
             }
             for prop in prop.value.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, false);
             }
         }
         Property::ArrayProperty(prop) => {
             for prop in prop.value.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, true);
             }
         }
         Property::EnumProperty(prop) => {
@@ -153,16 +145,16 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
         }
         Property::SetProperty(prop) => {
             for prop in prop.value.value.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, true);
             }
             for prop in prop.removed_items.value.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, true);
             }
         }
         Property::MapProperty(prop) => {
             for (_, key, value) in prop.value.iter() {
-                resolve_prop_name(key, asset);
-                resolve_prop_name(value, asset);
+                resolve_prop_name(key, asset, false);
+                resolve_prop_name(value, asset, false);
             }
         }
         Property::MaterialAttributesInputProperty(prop) => {
@@ -210,13 +202,13 @@ fn resolve_prop_name(prop: &Property, asset: &mut Asset) {
         }
         Property::NiagaraVariableProperty(prop) => {
             for prop in prop.struct_property.value.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, false);
             }
             asset.add_fname(&prop.variable_name.content);
         }
         Property::NiagaraVariableWithOffsetProperty(prop) => {
             for prop in prop.niagara_variable.struct_property.value.iter() {
-                resolve_prop_name(prop, asset);
+                resolve_prop_name(prop, asset, false);
             }
             asset.add_fname(&prop.niagara_variable.variable_name.content);
         }
