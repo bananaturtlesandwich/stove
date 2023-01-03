@@ -41,8 +41,32 @@ pub struct Stove {
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
 
+fn home_dir() -> Option<std::path::PathBuf> {
+    #[cfg(target_family = "wasm")]
+    return None;
+    #[cfg(not(target_family = "wasm"))]
+    std::env::var_os(
+        #[cfg(target_family = "windows")]
+        "USERPROFILE",
+        #[cfg(target_family = "unix")]
+        "HOME",
+    )
+    .and_then(|home| (!home.is_empty()).then_some(home))
+    .map(std::path::PathBuf::from)
+}
+
 fn config() -> Option<std::path::PathBuf> {
-    dirs::config_dir().map(|path| path.join("stove"))
+    home_dir().map(convert).map(|path| path.join("stove"))
+}
+
+#[cfg(target_family = "windows")]
+fn convert(path: std::path::PathBuf) -> std::path::PathBuf {
+    path.join("AppData").join("Local")
+}
+
+#[cfg(target_family = "unix")]
+fn convert(path: std::path::PathBuf) -> std::path::PathBuf {
+    path.join(".config")
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -86,11 +110,11 @@ impl Stove {
                     notifs.error("failed to create config directory");
                 }
                 std::fs::read_to_string(cfg.join("VERSION"))
-                    .unwrap_or_else(|_| "1".to_string())
+                    .unwrap_or_else(|_| "0".to_string())
                     .parse()
                     .unwrap_or_default()
             }
-            None => 1,
+            None => 0,
         })
         .unwrap_or(EngineVersion::UNKNOWN);
         let mut filepath = String::new();
@@ -124,7 +148,7 @@ impl Stove {
                 client = Some(cl);
             }
         }
-        let home = dirs::home_dir();
+        let home = home_dir();
 
         let mut stove = Self {
             camera: rendering::Camera::default(),

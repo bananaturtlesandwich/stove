@@ -2,10 +2,10 @@
 name = "stove"
 authors = ["spuds"]
 repository = "https://github.com/bananaturtlesandwich/stove"
+description = "an editor for cooked unreal engine 4 map files"
 readme = "README.md"
 version = "0.2.0"
 edition = "2021"
-description = "An editor for cooked unreal engine 4 map files"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
@@ -15,7 +15,6 @@ egui = "*"
 egui-miniquad = "*"
 egui-notify = "*"
 egui_file = "*"
-dirs = "*"
 byteorder = "*"
 
 [build-dependencies]
