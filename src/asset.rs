@@ -1,6 +1,7 @@
 use std::{fs, io, path::Path};
 
 use unreal_asset::{
+    ac7,
     engine_version::EngineVersion,
     error::Error,
     exports::{ExportBaseTrait, ExportNormalTrait},
@@ -11,16 +12,36 @@ use unreal_asset::{
 
 /// creates an asset from the specified path and version
 pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<Asset, Error> {
+    let uasset = fs::read(&file)?;
+    let stem = file
+        .as_ref()
+        .file_stem()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default();
+    let mut key = (&uasset[0..4] == b"ACE7").then_some(ac7::AC7XorKey::new(stem));
     let bulk = file.as_ref().with_extension("uexp");
     let mut asset = Asset::new(
-        fs::read(&file)?,
+        match key.as_mut() {
+            Some(key) => ac7::decrypt_uasset(&uasset, key),
+            None => uasset,
+        },
         // the none option is given as some uassets may not use the event driven loader
-        bulk.exists().then_some(fs::read(bulk)?),
+        bulk.exists().then_some(match key.as_mut() {
+            Some(key) => ac7::decrypt_uexp(&fs::read(bulk)?, key),
+            None => fs::read(bulk)?,
+        }),
     );
     asset.set_engine_version(version);
     asset.parse_data()?;
+    if key.is_some() {
+        asset.info += AC7;
+        asset.info += stem;
+    }
     Ok(asset)
 }
+
+const AC7: &str = " and encrypted with ac7 key ";
 
 /// saves an asset's data to the specified path
 pub fn save(asset: &mut Asset, path: impl AsRef<Path>) -> Result<(), Error> {
@@ -31,10 +52,25 @@ pub fn save(asset: &mut Asset, path: impl AsRef<Path>) -> Result<(), Error> {
         &mut main,
         asset.use_separate_bulk_data_files.then_some(&mut bulk),
     )?;
-    fs::write(path.as_ref().with_extension("umap"), main.into_inner())?;
+    let mut key = asset.info.contains(AC7).then_some(ac7::AC7XorKey::new(
+        &asset.info.split(AC7).last().unwrap_or_default(),
+    ));
+    fs::write(
+        path.as_ref().with_extension("umap"),
+        match key.as_mut() {
+            Some(key) => ac7::encrypt_uasset(&main.into_inner(), key),
+            None => main.into_inner(),
+        },
+    )?;
     // if the asset has no bulk data then the bulk cursor will be empty
     if asset.use_separate_bulk_data_files {
-        fs::write(path.as_ref().with_extension("uexp"), bulk.into_inner())?;
+        fs::write(
+            path.as_ref().with_extension("uexp"),
+            match key.as_mut() {
+                Some(key) => ac7::encrypt_uasset(&bulk.into_inner(), key),
+                None => bulk.into_inner(),
+            },
+        )?;
     }
     Ok(())
 }
