@@ -515,10 +515,8 @@ impl EventHandler for Stove {
             Grab::Scale3D(coords) => self.actors[self.selected.unwrap()].mul_scale(
                 self.map.as_mut().unwrap(),
                 glam::Vec3::ONE
-                    + match delta.length() {
-                        dist if coords.distance(self.last_mouse_pos) > dist => -dist,
-                        dist => dist,
-                    } * glam::Vec3::ONE,
+                    + (coords.distance(glam::vec2(x, y)) - coords.distance(self.last_mouse_pos))
+                        * 0.01,
             ),
         }
         self.last_mouse_pos = glam::vec2(x, y);
@@ -587,8 +585,8 @@ impl EventHandler for Stove {
                             .extend(1.0);
                     let (width, height) = ctx.screen_size();
                     glam::vec2(
-                        0.5 * (proj.x / proj.w.abs() + 1.0) * width,
-                        1.0 - (0.5 * (proj.y / proj.w.abs() + 1.0)) * height,
+                        (proj.x / proj.w.abs() + 1.0) * width * 0.5,
+                        (1.0 - proj.y / proj.w.abs()) * height * 0.5,
                     )
                 }),
                 MouseButton::Unknown => Grab::None,
