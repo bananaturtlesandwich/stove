@@ -16,7 +16,7 @@ enum Grab {
     // holds distance from camera
     Location(f32),
     Rotation,
-    Scale3D,
+    Scale3D(glam::Vec2),
 }
 
 pub struct Stove {
@@ -495,7 +495,6 @@ impl EventHandler for Stove {
         ctx.commit_frame();
     }
 
-    // boilerplate >n<
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
@@ -513,7 +512,14 @@ impl EventHandler for Stove {
                     * 0.1,
             ),
             Grab::Rotation => (),
-            Grab::Scale3D => (),
+            Grab::Scale3D(coords) => self.actors[self.selected.unwrap()].mul_scale(
+                self.map.as_mut().unwrap(),
+                glam::Vec3::ONE
+                    + match delta.length() {
+                        dist if coords.distance(self.last_mouse_pos) > dist => -dist,
+                        dist => dist,
+                    } * glam::Vec3::ONE,
+            ),
         }
         self.last_mouse_pos = glam::vec2(x, y);
     }
@@ -542,7 +548,7 @@ impl EventHandler for Stove {
                 if let Some(map) = self.map.as_mut() {
                     // normalise mouse coordinates to NDC
                     let (width, height) = ctx.screen_size();
-                    let mouse = (x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
+                    let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
                     let proj = rendering::PROJECTION * self.camera.view_matrix();
                     if let Some((pos, distance)) = self
                         .actors
@@ -550,9 +556,8 @@ impl EventHandler for Stove {
                         .map(|actor| {
                             let proj = proj * actor.location(map).extend(1.0);
                             // get NDC coordinates of actor
-                            let actor = (proj.x / proj.w.abs(), proj.y / proj.w.abs());
-                            // return distance via pythagoras
-                            ((actor.0 - mouse.0).powi(2) + (actor.1 - mouse.1).powi(2)).sqrt()
+                            let actor = glam::vec2(proj.x / proj.w.abs(), proj.y / proj.w.abs());
+                            mouse.distance(actor)
                         })
                         .enumerate()
                         .min_by(|(_, x), (_, y)| x.total_cmp(y))
@@ -573,7 +578,19 @@ impl EventHandler for Stove {
                         .location(self.map.as_ref().unwrap())
                         .distance(self.camera.position),
                 ),
-                MouseButton::Middle => Grab::Scale3D,
+                MouseButton::Middle => Grab::Scale3D({
+                    // convert to mouse coordinates
+                    let proj = rendering::PROJECTION
+                        * self.camera.view_matrix()
+                        * self.actors[selected]
+                            .location(self.map.as_ref().unwrap())
+                            .extend(1.0);
+                    let (width, height) = ctx.screen_size();
+                    glam::vec2(
+                        0.5 * (proj.x / proj.w.abs() + 1.0) * width,
+                        1.0 - (0.5 * (proj.y / proj.w.abs() + 1.0)) * height,
+                    )
+                }),
                 MouseButton::Unknown => Grab::None,
             }
         }
@@ -587,6 +604,7 @@ impl EventHandler for Stove {
         self.grab = Grab::None;
     }
 
+    // boilerplate >n<
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
         self.egui.char_event(character);
     }

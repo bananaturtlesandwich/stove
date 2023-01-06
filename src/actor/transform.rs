@@ -110,6 +110,43 @@ impl super::Actor {
             })
             .unwrap_or(glam::Vec3::ONE)
     }
+    pub fn mul_scale(&self, map: &mut Asset, offset: glam::Vec3) {
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut()
+        else {
+            return;
+        };
+        match norm
+            .properties
+            .iter_mut()
+            .find(|prop| prop.get_name().content == "RelativeScale3D")
+        {
+            Some(scale) => {
+                if let Property::StructProperty(struc) = scale {
+                    if let Property::VectorProperty(vec) = &mut struc.value[0] {
+                        vec.value.x.0 *= offset.x;
+                        vec.value.y.0 *= offset.z;
+                        vec.value.z.0 *= offset.y;
+                    }
+                }
+            }
+            None => norm
+                .properties
+                .push(Property::StructProperty(StructProperty {
+                    name: FName::from_slice("RelativeScale3D"),
+                    struct_type: Some(FName::from_slice("Vector")),
+                    struct_guid: None,
+                    property_guid: None,
+                    duplication_index: 0,
+                    serialize_none: true,
+                    value: vec![Property::VectorProperty(VectorProperty {
+                        name: FName::from_slice("RelativeScale3D"),
+                        property_guid: None,
+                        duplication_index: 0,
+                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
+                    })],
+                })),
+        }
+    }
 
     pub fn model_matrix(&self, map: &Asset) -> glam::Mat4 {
         let rot = self.rotation(map);
