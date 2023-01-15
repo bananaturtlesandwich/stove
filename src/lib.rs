@@ -277,6 +277,9 @@ impl EventHandler for Stove {
                                 ui.heading("actor");
                                 ui.end_row();
                                 binding(ui,"focus","F");
+                                binding(ui,"move","left-click + drag");
+                                binding(ui,"rotate","right-click + drag");
+                                binding(ui,"scale","middle-click + drag");
                                 binding(ui,"duplicate","ctrl + D");
                                 binding(ui,"delete","delete");
                             });
@@ -497,7 +500,7 @@ impl EventHandler for Stove {
         ctx.commit_frame();
     }
 
-    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32) {
+    fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
         self.camera.handle_mouse_motion(delta);
