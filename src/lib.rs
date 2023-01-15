@@ -13,9 +13,10 @@ mod rendering;
 
 enum Grab {
     None,
-    // holds distance from camera
+    // actor distance from camera
     Location(f32),
     Rotation,
+    // actor screen coords
     Scale3D(glam::Vec2),
 }
 
@@ -510,8 +511,7 @@ impl EventHandler for Stove {
                     // scale by consistent distance
                     * dist
                     // scale to match mouse cursor
-                    * ctx.screen_size().1
-                    * 0.00005,
+                    * 0.1,
             ),
             Grab::Rotation => self.actors[self.selected.unwrap()].combine_rotation(
                 self.map.as_mut().unwrap(),
@@ -535,7 +535,7 @@ impl EventHandler for Stove {
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
         self.egui.mouse_wheel_event(dx, dy);
-        // a scaling speed increase is better because unreal maps can get massive
+        // a logarithmic speed increase is better because unreal maps can get massive
         if !self.egui.egui_ctx().is_pointer_over_area() {
             self.camera.speed = (self.camera.speed as f32
                 * match dy.is_sign_negative() {
@@ -551,59 +551,64 @@ impl EventHandler for Stove {
         if self.egui.egui_ctx().is_pointer_over_area() {
             return;
         }
-        match mb {
-            // THE HACKIEST MOUSE PICKING TO EVER EXIST
-            MouseButton::Left => {
-                self.selected = self
-                    .map
-                    .as_mut()
-                    .and_then(|map| {
-                        // normalise mouse coordinates to NDC
-                        let (width, height) = ctx.screen_size();
-                        let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                        let proj = rendering::PROJECTION * self.camera.view_matrix();
-                        self.actors
-                            .iter()
-                            .map(|actor| {
-                                let proj = proj * actor.location(map).extend(1.0);
-                                // get NDC coordinates of actor
-                                let actor =
-                                    glam::vec2(proj.x / proj.w.abs(), proj.y / proj.w.abs());
-                                mouse.distance(actor)
-                            })
-                            .enumerate()
-                            // get closest pick
-                            .min_by(|(_, x), (_, y)| x.total_cmp(y))
+        // THE HACKIEST MOUSE PICKING EVER CONCEIVED
+        let pick = self
+            .map
+            .as_mut()
+            .and_then(|map| {
+                // normalise mouse coordinates to NDC
+                let (width, height) = ctx.screen_size();
+                let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
+                let proj = rendering::PROJECTION * self.camera.view_matrix();
+                self.actors
+                    .iter()
+                    .map(|actor| {
+                        let proj = proj * actor.location(map).extend(1.0);
+                        // get NDC coordinates of actor
+                        let actor = glam::vec2(proj.x / proj.w.abs(), proj.y / proj.w.abs());
+                        mouse.distance(actor)
                     })
-                    .and_then(|(pos, distance)| (distance < 0.05).then_some(pos))
+                    .enumerate()
+                    // get closest pick
+                    .min_by(|(_, x), (_, y)| x.total_cmp(y))
+            })
+            .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
+        match self.selected == pick {
+            // grabby time
+            true => {
+                if let Some(selected) = self.selected {
+                    self.grab = match mb {
+                        MouseButton::Left => Grab::Location(
+                            self.actors[selected]
+                                .location(self.map.as_ref().unwrap())
+                                .distance(self.camera.position),
+                        ),
+                        MouseButton::Right => Grab::Rotation,
+                        MouseButton::Middle => Grab::Scale3D({
+                            // convert to mouse coordinates
+                            let proj = rendering::PROJECTION
+                                * self.camera.view_matrix()
+                                * self.actors[selected]
+                                    .location(self.map.as_ref().unwrap())
+                                    .extend(1.0);
+                            let (width, height) = ctx.screen_size();
+                            glam::vec2(
+                                (proj.x / proj.w.abs() + 1.0) * width * 0.5,
+                                (1.0 - proj.y / proj.w.abs()) * height * 0.5,
+                            )
+                        }),
+                        MouseButton::Unknown => Grab::None,
+                    }
+                }
             }
-            MouseButton::Right => self.camera.enable_move(),
-            _ => (),
-        };
-        // grabby time
-        if let Some(selected) = self.selected {
-            self.grab = match mb {
-                MouseButton::Left => Grab::Location(
-                    self.actors[selected]
-                        .location(self.map.as_ref().unwrap())
-                        .distance(self.camera.position),
-                ),
-                MouseButton::Right => Grab::Rotation,
-                MouseButton::Middle => Grab::Scale3D({
-                    // convert to mouse coordinates
-                    let proj = rendering::PROJECTION
-                        * self.camera.view_matrix()
-                        * self.actors[selected]
-                            .location(self.map.as_ref().unwrap())
-                            .extend(1.0);
-                    let (width, height) = ctx.screen_size();
-                    glam::vec2(
-                        (proj.x / proj.w.abs() + 1.0) * width * 0.5,
-                        (1.0 - proj.y / proj.w.abs()) * height * 0.5,
-                    )
-                }),
-                MouseButton::Unknown => Grab::None,
+            false => {
+                if mb == MouseButton::Right {
+                    self.camera.enable_move()
+                }
             }
+        }
+        if mb == MouseButton::Left {
+            self.selected = pick;
         }
     }
 
