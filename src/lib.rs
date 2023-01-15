@@ -178,6 +178,7 @@ impl Stove {
             client,
         };
         update_actors!(stove);
+        stove.open_dialog.open();
         stove
     }
 }
@@ -553,26 +554,28 @@ impl EventHandler for Stove {
         match mb {
             // THE HACKIEST MOUSE PICKING TO EVER EXIST
             MouseButton::Left => {
-                if let Some(map) = self.map.as_mut() {
-                    // normalise mouse coordinates to NDC
-                    let (width, height) = ctx.screen_size();
-                    let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                    let proj = rendering::PROJECTION * self.camera.view_matrix();
-                    if let Some((pos, distance)) = self
-                        .actors
-                        .iter()
-                        .map(|actor| {
-                            let proj = proj * actor.location(map).extend(1.0);
-                            // get NDC coordinates of actor
-                            let actor = glam::vec2(proj.x / proj.w.abs(), proj.y / proj.w.abs());
-                            mouse.distance(actor)
-                        })
-                        .enumerate()
-                        .min_by(|(_, x), (_, y)| x.total_cmp(y))
-                    {
-                        self.selected = (distance < 0.05).then_some(pos)
-                    }
-                }
+                self.selected = self
+                    .map
+                    .as_mut()
+                    .and_then(|map| {
+                        // normalise mouse coordinates to NDC
+                        let (width, height) = ctx.screen_size();
+                        let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
+                        let proj = rendering::PROJECTION * self.camera.view_matrix();
+                        self.actors
+                            .iter()
+                            .map(|actor| {
+                                let proj = proj * actor.location(map).extend(1.0);
+                                // get NDC coordinates of actor
+                                let actor =
+                                    glam::vec2(proj.x / proj.w.abs(), proj.y / proj.w.abs());
+                                mouse.distance(actor)
+                            })
+                            .enumerate()
+                            // get closest pick
+                            .min_by(|(_, x), (_, y)| x.total_cmp(y))
+                    })
+                    .and_then(|(pos, distance)| (distance < 0.05).then_some(pos))
             }
             MouseButton::Right => self.camera.enable_move(),
             _ => (),
