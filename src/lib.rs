@@ -495,7 +495,7 @@ impl EventHandler for Stove {
         ctx.commit_frame();
     }
 
-    fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
+    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32) {
         self.egui.mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
         self.camera.handle_mouse_motion(delta);
@@ -509,14 +509,24 @@ impl EventHandler for Stove {
                     // scale by consistent distance
                     * dist
                     // scale to match mouse cursor
-                    * 0.1,
+                    * ctx.screen_size().1
+                    * 0.00005,
             ),
-            Grab::Rotation => (),
+            Grab::Rotation => self.actors[self.selected.unwrap()].combine_rotation(
+                self.map.as_mut().unwrap(),
+                glam::Quat::from_axis_angle(
+                    self.camera.front,
+                    match delta.x.abs() > delta.y.abs() {
+                        true => -delta.x,
+                        false => delta.y,
+                    } * 0.01,
+                ),
+            ),
             Grab::Scale3D(coords) => self.actors[self.selected.unwrap()].mul_scale(
                 self.map.as_mut().unwrap(),
                 glam::Vec3::ONE
                     + (coords.distance(glam::vec2(x, y)) - coords.distance(self.last_mouse_pos))
-                        * 0.01,
+                        * 0.005,
             ),
         }
         self.last_mouse_pos = glam::vec2(x, y);
@@ -570,12 +580,12 @@ impl EventHandler for Stove {
         // grabby time
         if let Some(selected) = self.selected {
             self.grab = match mb {
-                MouseButton::Right => Grab::Rotation,
                 MouseButton::Left => Grab::Location(
                     self.actors[selected]
                         .location(self.map.as_ref().unwrap())
                         .distance(self.camera.position),
                 ),
+                MouseButton::Right => Grab::Rotation,
                 MouseButton::Middle => Grab::Scale3D({
                     // convert to mouse coordinates
                     let proj = rendering::PROJECTION

@@ -2,8 +2,9 @@ use unreal_asset::{
     cast,
     exports::ExportNormalTrait,
     properties::{
-        struct_property::StructProperty, vector_property::VectorProperty, Property,
-        PropertyDataTrait,
+        struct_property::StructProperty,
+        vector_property::{RotatorProperty, VectorProperty},
+        Property, PropertyDataTrait,
     },
     types::{vector::Vector, FName},
     Asset,
@@ -88,6 +89,54 @@ impl super::Actor {
                     .unwrap_or_default()
             })
             .unwrap_or_default()
+    }
+
+    pub fn combine_rotation(&self, map: &mut Asset, offset: glam::Quat) {
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut()
+        else {
+            return;
+        };
+        match norm
+            .properties
+            .iter_mut()
+            .find(|prop| prop.get_name().content == "RelativeRotation")
+        {
+            Some(scale) => {
+                if let Property::StructProperty(struc) = scale {
+                    if let Property::RotatorProperty(vec) = &mut struc.value[0] {
+                        (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (offset
+                            * glam::Quat::from_euler(
+                                glam::EulerRot::XYZ,
+                                vec.value.x.0.to_radians(),
+                                vec.value.y.0.to_radians(),
+                                vec.value.z.0.to_radians(),
+                            ))
+                        .to_euler(glam::EulerRot::XYZ);
+                        (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (
+                            vec.value.x.0.to_degrees(),
+                            vec.value.y.0.to_degrees(),
+                            vec.value.z.0.to_degrees(),
+                        );
+                    }
+                }
+            }
+            None => norm
+                .properties
+                .push(Property::StructProperty(StructProperty {
+                    name: FName::from_slice("RelativeRotation"),
+                    struct_type: Some(FName::from_slice("Rotator")),
+                    struct_guid: None,
+                    property_guid: None,
+                    duplication_index: 0,
+                    serialize_none: true,
+                    value: vec![Property::RotatorProperty(RotatorProperty {
+                        name: FName::from_slice("RelativeRotation"),
+                        property_guid: None,
+                        duplication_index: 0,
+                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
+                    })],
+                })),
+        }
     }
 
     pub fn scale(&self, map: &Asset) -> glam::Vec3 {

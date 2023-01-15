@@ -4,31 +4,14 @@
 
 <h1 align="center"><img width="700" src="https://user-images.githubusercontent.com/71292624/208417568-840bb37d-57db-4273-84e9-b069a78964e1.png"></h1>
 
-<details>
-<summary><h1>use cases</h1></summary>
-
-<details>
-<summary><h2>general map edits</h2></summary>
-
-stove is already a versatile tool because you can:
+with stove you can:
 - visualise actors relative to each other
+- edit actor properties
 - see your transform edits as they happen
-- duplicate, delete and transplant actors
-- edit the vast majority of actor properties
-</details>
+- duplicate and delete actors
+- transplant existing and custom actors from other maps
 
-<details>
-<summary><h2>custom actor spawning</h2></summary>
-
-stove allows transplanting (`ctrl + T`) of actors from other maps
-- this includes maps you have cooked yourself
-- this includes actors you have made yourself
-
-therefore you can add your own actors to the map *provided you package them with the mod*
 <a href="https://www.youtube.com/watch?v=gnl3OSftqno"><img width="700" src="https://user-images.githubusercontent.com/71292624/208414853-0a17badc-a4f0-4ddb-a157-677fe2fc88f4.png"></a>
-</details>
-
-</details>
 
 <details>
 <summary><h1>roadmap</h1></summary>
@@ -46,18 +29,16 @@ therefore you can add your own actors to the map *provided you package them with
 ### convenience
 - [ ] undo and redo any action
 - [x] actor deletion
-- [ ] can move actors in the viewport instead of in the properties
+- [ ] can move actors in the viewport instead of just in the properties
 - [ ] multiple selection (requires above to be useful)
-- [ ] searching functionality
+- [ ] searching
 ### low priority
 - [ ] display the mesh/sprite of an actor and their components rather than a cube
 - [x] discord RPC (show your internet friends what you're doing)
 </details>
 
-<details>
-<summary><h1>credits</h1></summary>
+# credits
 
 - [localcc](https://github.com/localcc) for their [rust rewrite](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset) of [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [atenfyr](https://github.com/atenfyr) for creating [UAssetAPI](https://github.com/atenfyr/UAssetAPI) in the first place
 - [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their minimal yet easy-to-use [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates
 - [LongerWarrior](https://github.com/LongerWarrior) for pointing out everything I was missing in the actor duplication code
-</details>
