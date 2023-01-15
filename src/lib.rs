@@ -106,7 +106,7 @@ impl Stove {
         let mut notifs = egui_notify::Toasts::new();
         let config = config();
         let version = EngineVersion::try_from(match config {
-            Some(cfg) => {
+            Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
@@ -119,19 +119,19 @@ impl Stove {
         })
         .unwrap_or(EngineVersion::UNKNOWN);
         let mut filepath = String::new();
-        let map = match std::env::args().nth(1) {
-            Some(path) => match asset::open(path.clone(), version) {
-                Ok(asset) => {
-                    filepath = path;
-                    Some(asset)
-                }
-                Err(e) => {
-                    notifs.error(e.to_string());
-                    None
-                }
-            },
-            None => None,
-        };
+        let map =
+            std::env::args()
+                .nth(1)
+                .and_then(|path| match asset::open(path.clone(), version) {
+                    Ok(asset) => {
+                        filepath = path;
+                        Some(asset)
+                    }
+                    Err(e) => {
+                        notifs.error(e.to_string());
+                        None
+                    }
+                });
         #[cfg(not(target_family = "wasm"))]
         let mut client = None;
         #[cfg(not(target_family = "wasm"))]
@@ -347,11 +347,7 @@ impl EventHandler for Stove {
                         .selected_text(*VERSIONS.iter().find_map(|(version,name)|(version==&self.version).then_some(name)).unwrap_or(&"unknown"))
                         .show_ui(ui, |ui| {
                             for (version,name) in VERSIONS {
-                                if ui.selectable_value(&mut self.version, version, name).clicked(){
-                                    if let Some(path) = config() {
-                                        std::fs::write(path.join("VERSION"), (self.version as u8).to_string()).unwrap();
-                                    }
-                                }
+                                ui.selectable_value(&mut self.version, version, name);
                             }
                         });
                 });
@@ -715,11 +711,16 @@ impl EventHandler for Stove {
             _ => (),
         }
     }
+}
 
-    #[cfg(not(target_family = "wasm"))]
-    fn quit_requested_event(&mut self, _ctx: &mut Context) {
+impl Drop for Stove {
+    fn drop(&mut self) {
+        #[cfg(not(target_family = "wasm"))]
         if let Some(client) = &mut self.client {
             client.close().unwrap_or_default();
+        }
+        if let Some(path) = config() {
+            std::fs::write(path.join("VERSION"), (self.version as u8).to_string()).unwrap();
         }
     }
 }

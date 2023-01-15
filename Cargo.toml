@@ -9,6 +9,7 @@ edition = "2021"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
+unpak = { git = "https://github.com/bananaturtlesandwich/unpak" }
 glam = { version = "*", features = ["fast-math"] }
 miniquad = "*"
 egui = "*"
