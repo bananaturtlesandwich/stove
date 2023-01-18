@@ -52,22 +52,19 @@ fn home_dir() -> Option<std::path::PathBuf> {
         #[cfg(target_family = "unix")]
         "HOME",
     )
-    .and_then(|home| (!home.is_empty()).then_some(home))
+    .filter(|home| !home.is_empty())
     .map(std::path::PathBuf::from)
 }
 
 fn config() -> Option<std::path::PathBuf> {
-    home_dir().map(convert).map(|path| path.join("stove"))
-}
-
-#[cfg(target_family = "windows")]
-fn convert(path: std::path::PathBuf) -> std::path::PathBuf {
-    path.join("AppData").join("Local")
-}
-
-#[cfg(target_family = "unix")]
-fn convert(path: std::path::PathBuf) -> std::path::PathBuf {
-    path.join(".config")
+    home_dir().map(|path| {
+        path.join(
+            #[cfg(target_family = "windows")]
+            "AppData/Local/stove",
+            #[cfg(target_family = "unix")]
+            ".config/stove",
+        )
+    })
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -81,7 +78,6 @@ fn default_activity() -> Activity<'static> {
         )])
 }
 
-// the only way i could get it to compile and look nice :p
 macro_rules! update_actors {
     ($self: expr) => {
         $self.actors.clear();
@@ -133,22 +129,20 @@ impl Stove {
                     }
                 });
         #[cfg(not(target_family = "wasm"))]
-        let mut client = None;
-        #[cfg(not(target_family = "wasm"))]
-        if let Ok(mut cl) = discord_rich_presence::DiscordIpcClient::new("1059578289737433249") {
-            if cl.connect().is_ok()
-                && cl
-                    .set_activity(match filepath.as_str() {
-                        "" => default_activity(),
-                        name => default_activity()
-                            .details("currently editing:")
-                            .state(name.split('\\').last().unwrap_or_default()),
-                    })
-                    .is_ok()
-            {
-                client = Some(cl);
-            }
-        }
+        let client = discord_rich_presence::DiscordIpcClient::new("1059578289737433249")
+            .ok()
+            .and_then(|mut cl| {
+                (cl.connect().is_ok()
+                    && cl
+                        .set_activity(match filepath.as_str() {
+                            "" => default_activity(),
+                            name => default_activity()
+                                .details("currently editing:")
+                                .state(name.split('\\').last().unwrap_or_default()),
+                        })
+                        .is_ok())
+                .then_some(cl)
+            });
         let home = home_dir();
 
         let mut stove = Self {
@@ -179,13 +173,15 @@ impl Stove {
             client,
         };
         update_actors!(stove);
-        stove.open_dialog.open();
+        if stove.map.is_none() {
+            stove.open_dialog.open()
+        }
         stove
     }
 }
 
 fn filter(path: &std::path::Path) -> bool {
-    path.extension().map(|ext| ext.to_str()) == Some(Some("umap"))
+    path.extension().and_then(std::ffi::OsStr::to_str) == Some("umap")
 }
 
 impl EventHandler for Stove {
@@ -572,7 +568,7 @@ impl EventHandler for Stove {
                     .min_by(|(_, x), (_, y)| x.total_cmp(y))
             })
             .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
-        match self.selected == pick {
+        match self.selected == pick && pick.is_some() {
             // grabby time
             true => {
                 if let Some(selected) = self.selected {
