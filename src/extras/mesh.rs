@@ -13,8 +13,8 @@ use unreal_asset::{
 #[test]
 fn parse_mesh() {
     let mut asset = Asset::new(
-        include_bytes!("A02_Tutorial_Fog.uasset").to_vec(),
-        Some(include_bytes!("A02_Tutorial_Fog.uexp").to_vec()),
+        include_bytes!("A02_Outside_Castle.uasset").to_vec(),
+        Some(include_bytes!("A02_Outside_Castle.uexp").to_vec()),
     );
     asset.set_engine_version(EngineVersion::VER_UE4_25);
     asset.parse_data().unwrap();
@@ -33,12 +33,22 @@ pub fn get_mesh_verts(asset: Asset) -> Result<Vec<Vector<f32>>, io::Error> {
                 .unwrap_or(false)
         })
         else {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "failed to find mesh export"));
+            return Err(
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                     "failed to find mesh export"
+                    )
+                );
         };
     // get the normal export
     let Some(mesh) = mesh.get_normal_export()
         else {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "failed to cast mesh data"));
+            return Err(
+                io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "failed to cast mesh data"
+                )
+            );
         };
     let mut data = io::Cursor::new(&mesh.extras);
     // padding
@@ -68,12 +78,11 @@ pub fn get_mesh_verts(asset: Asset) -> Result<Vec<Vector<f32>>, io::Error> {
         data.read_i32::<LE>()?;
     }
     // array of lod resources
-    // discard len because just first entry
+    // discard len because we'll just read the first entry
     data.read_i32::<LE>()?;
     let flags = super::StripDataFlags::read(&mut data)?;
     // array of sections
-    let length = data.read_i32::<LE>()?;
-    for _ in 0..length {
+    for _ in 0..data.read_i32::<LE>()? {
         // mat index
         data.read_i32::<LE>()?;
         // first index
@@ -93,18 +102,16 @@ pub fn get_mesh_verts(asset: Asset) -> Result<Vec<Vector<f32>>, io::Error> {
             data.read_i32::<LE>()?;
         }
         //visible in ray tracing
-        if asset.get_engine_version() >= EngineVersion::VER_UE4_26 {
-            data.read_i32::<LE>()?;
-        }
+        data.read_i32::<LE>()?;
     }
     // max deviation
     data.read_f32::<LE>()?;
     match asset.get_engine_version() >= EngineVersion::VER_UE4_23 {
         true if !flags.data_stripped_for_server()
         // lod isn't cooked out
-        && data.read_i32::<LE>()? == 0 
+        && data.read_i32::<LE>()? == 0
         // data is inlined
-        && data.read_i32::<LE>()? != 0 =>
+        && data.read_i32::<LE>()? == 1 =>
         {
             super::StripDataFlags::read(&mut data)?;
         }
