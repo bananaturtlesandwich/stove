@@ -6,23 +6,23 @@ use unreal_asset::{
     exports::{ExportBaseTrait, ExportNormalTrait},
     object_version::ObjectVersion,
     reader::asset_trait::AssetTrait,
-    types::vector::Vector,
     Asset,
 };
 
 #[test]
-fn parse_mesh() {
+fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     let mut asset = Asset::new(
         include_bytes!("A02_Outside_Castle.uasset").to_vec(),
         Some(include_bytes!("A02_Outside_Castle.uexp").to_vec()),
     );
     asset.set_engine_version(EngineVersion::VER_UE4_25);
-    asset.parse_data().unwrap();
-    get_mesh_verts(asset).unwrap();
+    asset.parse_data()?;
+    get_mesh_verts(asset)?;
+    Ok(())
 }
 
-/// parses the extra data of the static mesh export to get vertices
-pub fn get_mesh_verts(asset: Asset) -> Result<Vec<Vector<f32>>, io::Error> {
+/// parses the extra data of the static mesh export to get vertex positions
+pub fn get_mesh_verts(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     // get the static mesh
     let Some(mesh) = asset
         .exports
@@ -102,7 +102,9 @@ pub fn get_mesh_verts(asset: Asset) -> Result<Vec<Vector<f32>>, io::Error> {
             data.read_i32::<LE>()?;
         }
         //visible in ray tracing
-        data.read_i32::<LE>()?;
+        if asset.get_engine_version() <= EngineVersion::VER_UE4_26 {
+            data.read_i32::<LE>()?;
+        }
     }
     // max deviation
     data.read_f32::<LE>()?;
@@ -132,7 +134,7 @@ pub fn get_mesh_verts(asset: Asset) -> Result<Vec<Vector<f32>>, io::Error> {
     // finally the vertex positions!
     let mut buf = Vec::with_capacity(data.read_i32::<LE>()? as usize);
     for _ in 0..buf.capacity() {
-        buf.push(Vector::new(
+        buf.push(glam::vec3(
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
