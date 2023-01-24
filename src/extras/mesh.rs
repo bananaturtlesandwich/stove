@@ -17,12 +17,15 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     );
     asset.set_engine_version(EngineVersion::VER_UE4_25);
     asset.parse_data()?;
-    get_mesh_verts(asset)?;
+    let (positions, colours, indices) = get_mesh_info(asset)?;
+    std::fs::write("positions.txt", format!("{positions:#?}"))?;
+    std::fs::write("colours.txt", format!("{colours:#?}"))?;
+    std::fs::write("indices.txt", format!("{indices:#?}"))?;
     Ok(())
 }
 
-/// parses the extra data of the static mesh export to get vertex positions
-pub fn get_mesh_verts(
+/// parses the extra data of the static mesh export to get render data
+pub fn get_mesh_info(
     asset: Asset,
 ) -> Result<(Vec<glam::Vec3>, Vec<glam::Vec4>, Indices), io::Error> {
     // get the static mesh
@@ -166,6 +169,46 @@ pub fn get_mesh_verts(
     let full_precision_uvs = data.read_i32::<LE>()? != 0;
     let high_precision_tangent =
         asset.get_engine_version() >= EngineVersion::VER_UE4_12 && data.read_i32::<LE>()? != 0;
+    fn read_tangents(
+        data: &mut io::Cursor<&Vec<u8>>,
+        high_precision_tangent: bool,
+    ) -> Result<(), io::Error> {
+        match high_precision_tangent {
+            true => {
+                for _ in 0..2 {
+                    for _ in 0..4 {
+                        data.read_u16::<LE>()?;
+                    }
+                }
+            }
+            false => {
+                for _ in 0..2 {
+                    data.read_u32::<LE>()?;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn read_tex_coords(
+        data: &mut io::Cursor<&Vec<u8>>,
+        num_tex_coords: i32,
+        full_precision_uvs: bool,
+    ) -> Result<(), io::Error> {
+        for _ in 0..num_tex_coords {
+            for _ in 0..2 {
+                match full_precision_uvs {
+                    true => {
+                        data.read_f32::<LE>()?;
+                    }
+
+                    false => {
+                        data.read_u16::<LE>()?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
     match asset.get_engine_version() >= EngineVersion::VER_UE4_20 {
         true => {
             // item size
@@ -174,20 +217,7 @@ pub fn get_mesh_verts(
             data.read_i32::<LE>()?;
             // packed normals
             for _ in 0..num_verts {
-                match high_precision_tangent {
-                    true => {
-                        for _ in 0..2 {
-                            for _ in 0..4 {
-                                data.read_u16::<LE>()?;
-                            }
-                        }
-                    }
-                    false => {
-                        for _ in 0..2 {
-                            data.read_u32::<LE>()?;
-                        }
-                    }
-                }
+                read_tangents(&mut data, high_precision_tangent)?;
             }
             // item size
             data.read_i32::<LE>()?;
@@ -195,22 +225,17 @@ pub fn get_mesh_verts(
             data.read_i32::<LE>()?;
             // mesh uv
             for _ in 0..num_verts {
-                for _ in 0..num_tex_coords {
-                    for _ in 0..2 {
-                        match full_precision_uvs {
-                            true => {
-                                data.read_f32::<LE>()?;
-                            }
-
-                            false => {
-                                data.read_u16::<LE>()?;
-                            }
-                        }
-                    }
-                }
+                read_tex_coords(&mut data, num_tex_coords, full_precision_uvs)?;
             }
         }
-        false => todo!("read bulk array of uvs"),
+        false => {
+            //size
+            data.read_i32::<LE>()?;
+            for _ in 0..data.read_i32::<LE>()? {
+                read_tangents(&mut data, high_precision_tangent)?;
+                read_tex_coords(&mut data, num_tex_coords, full_precision_uvs)?;
+            }
+        }
     }
     // color vertex buffer
     if super::StripDataFlags::read(&mut data)?.data_stripped_for_server() {
@@ -276,6 +301,7 @@ pub fn get_mesh_verts(
     Ok((positions, colours, indices))
 }
 
+#[derive(Debug)]
 pub enum Indices {
     U16(Vec<u16>),
     U32(Vec<u32>),
