@@ -24,7 +24,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 /// parses the extra data of the static mesh export to get vertex positions
 pub fn get_mesh_verts(
     asset: Asset,
-) -> Result<(Vec<glam::Vec3>, Vec<glam::Vec4>, Vec<Index>), io::Error> {
+) -> Result<(Vec<glam::Vec3>, Vec<glam::Vec4>, Indices), io::Error> {
     // get the static mesh
     let Some(mesh) = asset
         .exports
@@ -156,7 +156,6 @@ pub fn get_mesh_verts(
             "vertex data is stripped",
         ));
     }
-    // num tex coords
     let num_tex_coords = data.read_i32::<LE>()?;
     // strides
     if asset.get_engine_version() < EngineVersion::VER_UE4_19 {
@@ -177,14 +176,14 @@ pub fn get_mesh_verts(
             for _ in 0..num_verts {
                 match high_precision_tangent {
                     true => {
-                        for _ in 0..3 {
+                        for _ in 0..2 {
                             for _ in 0..4 {
                                 data.read_u16::<LE>()?;
                             }
                         }
                     }
                     false => {
-                        for _ in 0..3 {
+                        for _ in 0..2 {
                             data.read_u32::<LE>()?;
                         }
                     }
@@ -251,16 +250,16 @@ pub fn get_mesh_verts(
                 true => {
                     let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize / 4);
                     for _ in 0..indices.capacity() {
-                        indices.push(Index::U32(data.read_u32::<LE>()?));
+                        indices.push(data.read_u32::<LE>()?);
                     }
-                    indices
+                    Indices::U32(indices)
                 }
                 false => {
                     let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize / 2);
                     for _ in 0..indices.capacity() {
-                        indices.push(Index::U16(data.read_u16::<LE>()?));
+                        indices.push(data.read_u16::<LE>()?);
                     }
-                    indices
+                    Indices::U16(indices)
                 }
             }
         }
@@ -269,15 +268,15 @@ pub fn get_mesh_verts(
             data.read_i32::<LE>()?;
             let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize);
             for _ in 0..indices.capacity() {
-                indices.push(Index::U16(data.read_u16::<LE>()?));
+                indices.push(data.read_u16::<LE>()?);
             }
-            indices
+            Indices::U16(indices)
         }
     };
     Ok((positions, colours, indices))
 }
 
-pub enum Index {
-    U16(u16),
-    U32(u32),
+pub enum Indices {
+    U16(Vec<u16>),
+    U32(Vec<u32>),
 }
