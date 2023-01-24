@@ -7,6 +7,7 @@ use std::io;
 use byteorder::ReadBytesExt;
 pub use mesh::*;
 
+#[derive(Default)]
 pub struct StripDataFlags {
     pub global: u8,
     pub class: u8,
