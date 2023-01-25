@@ -13,9 +13,8 @@ impl Cube {
             ShaderMeta {
                 uniforms: UniformBlockLayout {
                     uniforms: vec![
-                        UniformDesc::new("model", UniformType::Mat4),
-                        UniformDesc::new("view", UniformType::Mat4),
-                        UniformDesc::new("tint", UniformType::Float3),
+                        UniformDesc::new("mvp", UniformType::Mat4),
+                        UniformDesc::new("selected", UniformType::Int1),
                     ],
                 },
                 images: vec![],
@@ -67,15 +66,8 @@ impl Cube {
         ctx.apply_pipeline(&self.block);
         ctx.apply_bindings(&self.bindings);
     }
-    pub fn draw(&self, ctx: &mut Context, model: glam::Mat4, view: glam::Mat4, tint: glam::Vec3) {
-        ctx.apply_uniforms(&Uniforms { model, view, tint });
+    pub fn draw(&self, ctx: &mut Context, mvp: glam::Mat4, selected: i32) {
+        ctx.apply_uniforms(&(mvp, selected));
         ctx.draw(0, 24, 1);
     }
-}
-
-#[repr(C)]
-struct Uniforms {
-    model: glam::Mat4,
-    view: glam::Mat4,
-    tint: glam::Vec3,
 }

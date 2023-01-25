@@ -214,12 +214,8 @@ impl EventHandler for Stove {
             for (i, actor) in self.actors.iter().enumerate() {
                 self.cube.draw(
                     ctx,
-                    actor.model_matrix(map),
-                    self.camera.view_matrix(),
-                    match self.selected == Some(i) {
-                        true => glam::vec3(1.0, 1.0, 0.5),
-                        false => glam::vec3(0.0, 1.0, 0.5),
-                    },
+                    rendering::PROJECTION * self.camera.view_matrix() * actor.model_matrix(map),
+                    (self.selected == Some(i)) as i32,
                 );
             }
         }
@@ -247,7 +243,7 @@ impl EventHandler for Stove {
                             };
                         }
                         if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift+ S")).clicked(){
-                            match self.map.is_some(){
+                            match self.map.is_some() {
                                 true => self.save_dialog.open(),
                                 false => {
                                     self.notifs.error("no map to save");
@@ -265,7 +261,7 @@ impl EventHandler for Stove {
                                 ui.horizontal(|ui| {
                                     ui.label(&self.paks[i]);
                                     if ui.button("x").clicked(){
-                                        remove_at=Some(i);
+                                        remove_at = Some(i);
                                     }
                                 });
                             }

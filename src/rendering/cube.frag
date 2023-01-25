@@ -2,8 +2,8 @@
 
 precision lowp float;
 
-uniform vec3 tint;
+uniform bool selected;
 
 void main() {
-    gl_FragColor = vec4(tint, 1);
+    gl_FragColor = vec4(selected ? 1 : 0, 1, 0.5, 1);
 }
