@@ -1,5 +1,6 @@
 use std::io;
 
+use super::*;
 use byteorder::{ReadBytesExt, LE};
 use unreal_asset::{
     engine_version::EngineVersion,
@@ -27,7 +28,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 /// parses the extra data of the static mesh export to get render data
 pub fn get_mesh_info(
     asset: Asset,
-) -> Result<(Vec<glam::Vec3>, Vec<glam::Vec4>, Indices), io::Error> {
+) -> Result<(Vec<glam::Vec3>, Vec<glam::Vec4>, Vec<u32>), io::Error> {
     // get the static mesh
     let Some(mesh) = asset
         .exports
@@ -58,7 +59,7 @@ pub fn get_mesh_info(
     let mut data = io::Cursor::new(&mesh.extras);
     // padding
     data.read_i32::<LE>()?;
-    if !super::StripDataFlags::read(&mut data)?.editor_data_stripped()
+    if !StripDataFlags::read(&mut data)?.editor_data_stripped()
         // data isn't cooked
         || data.read_i32::<LE>()? == 0
     {
@@ -85,7 +86,7 @@ pub fn get_mesh_info(
     // array of lod resources
     // discard len because we'll just read the first entry
     data.read_i32::<LE>()?;
-    let flags = super::StripDataFlags::read(&mut data)?;
+    let flags = StripDataFlags::read(&mut data)?;
     // array of sections
     for _ in 0..data.read_i32::<LE>()? {
         // mat index
@@ -120,7 +121,7 @@ pub fn get_mesh_info(
         // data is inlined
         && data.read_i32::<LE>()? == 1 =>
         {
-            super::StripDataFlags::read(&mut data)?;
+            StripDataFlags::read(&mut data)?;
         }
         false if !flags.data_stripped_for_server() && !flags.class_data_stripped(2) => (),
         _ => {
@@ -149,8 +150,8 @@ pub fn get_mesh_info(
     if match asset.get_object_version()
         >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX
     {
-        true => super::StripDataFlags::read(&mut data)?,
-        false => super::StripDataFlags::default(),
+        true => StripDataFlags::read(&mut data)?,
+        false => StripDataFlags::default(),
     }
     .data_stripped_for_server()
     {
@@ -238,7 +239,7 @@ pub fn get_mesh_info(
         }
     }
     // color vertex buffer
-    if super::StripDataFlags::read(&mut data)?.data_stripped_for_server() {
+    if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "colour data is stripped",
@@ -277,14 +278,14 @@ pub fn get_mesh_info(
                     for _ in 0..indices.capacity() {
                         indices.push(data.read_u32::<LE>()?);
                     }
-                    Indices::U32(indices)
+                    indices
                 }
                 false => {
                     let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize / 2);
                     for _ in 0..indices.capacity() {
-                        indices.push(data.read_u16::<LE>()?);
+                        indices.push(data.read_u16::<LE>()? as u32);
                     }
-                    Indices::U16(indices)
+                    indices
                 }
             }
         }
@@ -293,16 +294,10 @@ pub fn get_mesh_info(
             data.read_i32::<LE>()?;
             let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize);
             for _ in 0..indices.capacity() {
-                indices.push(data.read_u16::<LE>()?);
+                indices.push(data.read_u16::<LE>()? as u32);
             }
-            Indices::U16(indices)
+            indices
         }
     };
     Ok((positions, colours, indices))
-}
-
-#[derive(Debug)]
-pub enum Indices {
-    U16(Vec<u16>),
-    U32(Vec<u32>),
 }

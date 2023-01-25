@@ -17,6 +17,7 @@ egui-miniquad = "*"
 egui-notify = "*"
 egui_file = "*"
 byteorder = "*"
+hashbrown = "*"
 
 [build-dependencies]
 winres = "*"

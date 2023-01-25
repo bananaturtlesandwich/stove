@@ -1,6 +1,7 @@
 mod camera;
 mod cube;
-pub use {camera::*, cube::*};
+mod mesh;
+pub use {camera::*, cube::*, mesh::*};
 
 // this isn't going to change so might as well just make it a constant
 pub const PROJECTION: glam::Mat4 = glam::mat4(

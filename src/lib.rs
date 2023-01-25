@@ -29,6 +29,7 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cube: rendering::Cube,
+    meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
     donor: Option<(unreal_asset::Asset, Vec<actor::Actor>)>,
     filepath: String,
@@ -163,6 +164,7 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cube: rendering::Cube::new(ctx),
+            meshes: hashbrown::HashMap::new(),
             ui: true,
             donor: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
