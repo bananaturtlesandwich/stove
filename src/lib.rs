@@ -35,9 +35,11 @@ pub struct Stove {
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
+    pak_dialog: egui_file::FileDialog,
     held: Vec<KeyCode>,
     last_mouse_pos: glam::Vec2,
     grab: Grab,
+    paks: Vec<String>,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -101,19 +103,26 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         let config = config();
-        let version = EngineVersion::try_from(match config {
+        let (version, paks) = match config {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
-                std::fs::read_to_string(cfg.join("VERSION"))
-                    .unwrap_or_else(|_| "0".to_string())
-                    .parse()
-                    .unwrap_or_default()
+                (
+                    EngineVersion::try_from(
+                        std::fs::read_to_string(cfg.join("VERSION"))
+                            .unwrap_or_else(|_| "0".to_string())
+                            .parse::<i32>()
+                            .unwrap_or_default(),
+                    )
+                    .unwrap_or(EngineVersion::UNKNOWN),
+                    // for some reason doing lines and collect here gives the compiler a seizure
+                    std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
+                )
             }
-            None => 0,
-        })
-        .unwrap_or(EngineVersion::UNKNOWN);
+            None => (EngineVersion::UNKNOWN, String::new()),
+        };
+        let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
         let map =
             std::env::args()
@@ -162,13 +171,17 @@ impl Stove {
             transplant_dialog: egui_file::FileDialog::open_file(home.clone())
                 .resizable(false)
                 .filter(Box::new(filter)),
-            save_dialog: egui_file::FileDialog::save_file(home)
+            save_dialog: egui_file::FileDialog::save_file(home.clone())
+                .resizable(false)
+                .filter(Box::new(filter)),
+            pak_dialog: egui_file::FileDialog::select_folder(home)
                 .resizable(false)
                 .filter(Box::new(filter)),
             filepath,
             held: Vec::new(),
             last_mouse_pos: glam::Vec2::ZERO,
             grab: Grab::None,
+            paks,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -242,6 +255,28 @@ impl EventHandler for Stove {
                             }
                         }
                     });
+                    ui.menu_button("paks", |ui| {
+                        let mut remove_at = None;
+                        egui::ScrollArea::vertical().show_rows(
+                            ui,
+                            ui.text_style_height(&egui::TextStyle::Body),
+                            self.paks.len(),
+                            |ui, range| for i in range {
+                                ui.horizontal(|ui| {
+                                    ui.label(&self.paks[i]);
+                                    if ui.button("x").clicked(){
+                                        remove_at=Some(i);
+                                    }
+                                });
+                            }
+                        );
+                        if let Some(i) = remove_at {
+                            self.paks.remove(i);
+                        }
+                        if ui.add(egui::Button::new("select folder").shortcut_text("alt + O")).clicked() {
+                            self.pak_dialog.open();
+                        }
+                    });
                     ui.menu_button("options", |ui| {
                         ui.horizontal(|ui| {
                             ui.label("theme:");
@@ -259,6 +294,7 @@ impl EventHandler for Stove {
                                 binding(ui,"open map","ctrl + O");
                                 binding(ui,"save map","ctrl + S");
                                 binding(ui,"save map as","ctrl + shift + S");
+                                binding(ui,"add folder","alt + O");
                                 ui.heading("camera");
                                 ui.end_row();
                                 binding(ui,"move","wasd");
@@ -475,9 +511,15 @@ impl EventHandler for Stove {
                     }
                 }
             }
+            self.pak_dialog.show(ctx);
+            if self.pak_dialog.selected() {
+                if let Some(path) = self.pak_dialog.path().and_then(|path|path.to_str().map(str::to_string)) {
+                    self.paks.push(path.to_string());
+                }
+            }
             self.save_dialog.show(ctx);
-            if self.save_dialog.selected(){
-                if let Some(path) = self.save_dialog.path(){
+            if self.save_dialog.selected() {
+                if let Some(path) = self.save_dialog.path() {
                     match asset::save(self.map.as_mut().unwrap(), path.clone()){
                         Ok(_) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
@@ -682,6 +724,7 @@ impl EventHandler for Stove {
                 }
             },
             KeyCode::O if keymods.ctrl => self.open_dialog.open(),
+            KeyCode::O if keymods.alt => self.pak_dialog.open(),
             KeyCode::S if keymods.ctrl => match keymods.shift {
                 true => match self.map.is_some() {
                     true => self.save_dialog.open(),
@@ -716,7 +759,9 @@ impl Drop for Stove {
             client.close().unwrap_or_default();
         }
         if let Some(path) = config() {
-            std::fs::write(path.join("VERSION"), (self.version as u8).to_string()).unwrap();
+            std::fs::write(path.join("VERSION"), (self.version as u8).to_string())
+                .unwrap_or_default();
+            std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
         }
     }
 }
