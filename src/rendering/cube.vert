@@ -1,9 +1,16 @@
-#version 100
+#version 330
 
-attribute vec3 pos;
+in vec3 pos;
+in mat4 inst_pos;
 
-uniform mat4 mvp;
+flat out ivec2 selected;
+flat out int id;
+
+uniform mat4 vp;
+uniform ivec2 uselected;
 
 void main() {
-    gl_Position = mvp * vec4(pos, 1.0);
+    id = gl_InstanceID;
+    selected = uselected;
+    gl_Position = vp * inst_pos * vec4(pos, 1.0);
 }

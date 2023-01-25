@@ -209,15 +209,23 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
-        if let Some(map) = &mut self.map {
-            self.cube.apply(ctx);
-            for (i, actor) in self.actors.iter().enumerate() {
-                self.cube.draw(
-                    ctx,
-                    rendering::PROJECTION * self.camera.view_matrix() * actor.model_matrix(map),
-                    (self.selected == Some(i)) as i32,
-                );
-            }
+        if let Some(map) = &self.map {
+            let transforms = self
+                .actors
+                .iter()
+                .map(|actor| actor.model_matrix(map))
+                .collect::<Vec<_>>();
+            self.cube.bindings.vertex_buffers[1].update(ctx, &transforms);
+            ctx.apply_pipeline(&self.cube.pipeline);
+            ctx.apply_bindings(&self.cube.bindings);
+            ctx.apply_uniforms(&(
+                rendering::PROJECTION * self.camera.view_matrix(),
+                match self.selected {
+                    Some(i) => [1, i as i32],
+                    None => [0, 0],
+                },
+            ));
+            ctx.draw(0, 24, transforms.len() as i32);
         }
         ctx.end_render_pass();
         if !self.ui {

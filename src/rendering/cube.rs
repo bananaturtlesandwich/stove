@@ -1,7 +1,7 @@
 use miniquad::*;
 pub struct Cube {
-    block: Pipeline,
-    bindings: Bindings,
+    pub pipeline: Pipeline,
+    pub bindings: Bindings,
 }
 
 impl Cube {
@@ -13,8 +13,8 @@ impl Cube {
             ShaderMeta {
                 uniforms: UniformBlockLayout {
                     uniforms: vec![
-                        UniformDesc::new("mvp", UniformType::Mat4),
-                        UniformDesc::new("selected", UniformType::Int1),
+                        UniformDesc::new("vp", UniformType::Mat4),
+                        UniformDesc::new("uselected", UniformType::Int2),
                     ],
                 },
                 images: vec![],
@@ -22,10 +22,19 @@ impl Cube {
         )
         .unwrap();
         Self {
-            block: Pipeline::with_params(
+            pipeline: Pipeline::with_params(
                 ctx,
-                &[BufferLayout::default()],
-                &[VertexAttribute::new("pos", VertexFormat::Float3)],
+                &[
+                    BufferLayout::default(),
+                    BufferLayout {
+                        step_func: VertexStep::PerInstance,
+                        ..Default::default()
+                    },
+                ],
+                &[
+                    VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
+                    VertexAttribute::with_buffer("inst_pos", VertexFormat::Mat4, 1),
+                ],
                 shader,
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
@@ -35,22 +44,29 @@ impl Cube {
                 },
             ),
             bindings: Bindings {
-                vertex_buffers: vec![Buffer::immutable(
-                    ctx,
-                    BufferType::VertexBuffer,
-                    &[
-                        // front verts
-                        glam::vec3(-0.5, -0.5, -0.5),
-                        glam::vec3(-0.5, 0.5, -0.5),
-                        glam::vec3(0.5, -0.5, -0.5),
-                        glam::vec3(0.5, 0.5, -0.5),
-                        // back verts
-                        glam::vec3(-0.5, -0.5, 0.5),
-                        glam::vec3(-0.5, 0.5, 0.5),
-                        glam::vec3(0.5, -0.5, 0.5),
-                        glam::vec3(0.5, 0.5, 0.5),
-                    ],
-                )],
+                vertex_buffers: vec![
+                    Buffer::immutable(
+                        ctx,
+                        BufferType::VertexBuffer,
+                        &[
+                            // front verts
+                            glam::vec3(-0.5, -0.5, -0.5),
+                            glam::vec3(-0.5, 0.5, -0.5),
+                            glam::vec3(0.5, -0.5, -0.5),
+                            glam::vec3(0.5, 0.5, -0.5),
+                            // back verts
+                            glam::vec3(-0.5, -0.5, 0.5),
+                            glam::vec3(-0.5, 0.5, 0.5),
+                            glam::vec3(0.5, -0.5, 0.5),
+                            glam::vec3(0.5, 0.5, 0.5),
+                        ],
+                    ),
+                    Buffer::stream(
+                        ctx,
+                        BufferType::VertexBuffer,
+                        512 * 1024 * std::mem::size_of::<glam::Vec3>(),
+                    ),
+                ],
                 index_buffer: Buffer::immutable(
                     ctx,
                     BufferType::IndexBuffer,
@@ -61,13 +77,5 @@ impl Cube {
                 images: vec![],
             },
         }
-    }
-    pub fn apply(&self, ctx: &mut Context) {
-        ctx.apply_pipeline(&self.block);
-        ctx.apply_bindings(&self.bindings);
-    }
-    pub fn draw(&self, ctx: &mut Context, mvp: glam::Mat4, selected: i32) {
-        ctx.apply_uniforms(&(mvp, selected));
-        ctx.draw(0, 24, 1);
     }
 }
