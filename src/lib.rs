@@ -81,9 +81,10 @@ fn default_activity() -> Activity<'static> {
         )])
 }
 
-macro_rules! update_actors {
+macro_rules! refresh {
     ($self: expr) => {
         $self.actors.clear();
+        $self.meshes.clear();
         $self.selected = None;
         if let Some(map) = &$self.map {
             for index in actor::get_actors(map) {
@@ -103,8 +104,7 @@ macro_rules! update_actors {
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
-        let config = config();
-        let (version, paks) = match config {
+        let (version, paks) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
                     notifs.error("failed to create config directory");
@@ -121,7 +121,7 @@ impl Stove {
                     std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
                 )
             }
-            None => (EngineVersion::UNKNOWN, String::new()),
+            None => (EngineVersion::UNKNOWN, String::default()),
         };
         let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
@@ -187,7 +187,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             client,
         };
-        update_actors!(stove);
+        refresh!(stove);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -491,7 +491,7 @@ impl EventHandler for Stove {
                                     }
                             }
                             self.map = Some(asset);
-                            update_actors!(self);
+                            refresh!(self);
                         }
                         Err(e) => {
                             self.notifs.error(e.to_string());

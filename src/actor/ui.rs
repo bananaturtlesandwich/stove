@@ -23,12 +23,20 @@ impl super::Actor {
             .iter()
         {
             if let Some(ex) = asset.get_export_mut(*i) {
-                let name = &ex.get_base_export().object_name.content.clone();
-                ui.push_id(ex.get_base_export().serial_offset, |ui| {
-                    ui.collapsing(name, |ui| {
-                        show_export(ui, ex);
-                    });
-                });
+                let (name, id, index) = {
+                    let ex = ex.get_base_export();
+                    (
+                        ex.object_name.content.clone(),
+                        ex.serial_offset,
+                        -ex.class_index.index - 1,
+                    )
+                };
+                let response = ui
+                    .push_id(id, |ui| ui.collapsing(name, |ui| show_export(ui, ex)))
+                    .response;
+                // first time i've ever used drop!
+                drop(ex);
+                response.on_hover_text(&asset.imports[index as usize].object_name.content);
             }
         }
     }
