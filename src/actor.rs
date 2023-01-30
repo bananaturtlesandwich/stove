@@ -14,11 +14,17 @@ mod transform;
 mod transplant;
 mod ui;
 
+pub enum DrawType {
+    Cube,
+    Mesh(String),
+}
+
 pub struct Actor {
     export: usize,
     transform: usize,
     pub name: String,
     pub class: String,
+    pub draw_type: DrawType,
 }
 
 impl Actor {
@@ -32,7 +38,7 @@ impl Actor {
             ));
         }
         let export = package.index as usize - 1;
-        let Some(ex) = asset.get_export(package) else{
+        let Some(ex) = asset.get_export(package) else {
             return Err(Error::invalid_package_index(format!(
                 "failed to find actor at index {}",
                 package.index
@@ -46,6 +52,32 @@ impl Actor {
             .get_import(norm.base_export.class_index)
             .map(|import| import.object_name.content.clone())
             .unwrap_or_default();
+        let draw_type = match norm
+            .base_export
+            .create_before_serialization_dependencies
+            .iter()
+            .filter_map(|i| asset.get_export(*i))
+            .filter_map(Export::get_normal_export)
+            .find(|i| {
+                asset
+                    .get_import(i.get_base_export().class_index)
+                    .filter(|import| import.object_name.content == "StaticMeshComponent")
+                    .is_some()
+            }) {
+            Some(norm) => norm
+                .properties
+                .iter()
+                .find_map(|prop| {
+                    cast!(Property, ObjectProperty, prop)
+                        .filter(|prop| prop.get_name().content == "StaticMesh")
+                })
+                .and_then(|obj| asset.get_import(obj.value))
+                .and_then(|import| asset.get_import(import.outer_index))
+                .map_or(DrawType::Cube, |path| {
+                    DrawType::Mesh(path.object_name.content.clone())
+                }),
+            None => DrawType::Cube,
+        };
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
             match prop.get_name().content.as_str() {
@@ -56,6 +88,7 @@ impl Actor {
                         transform: export,
                         name,
                         class,
+                        draw_type,
                     })
                 }
                 "RootComponent" => {
@@ -66,6 +99,7 @@ impl Actor {
                                 transform: obj.value.index as usize - 1,
                                 name,
                                 class,
+                                draw_type,
                             });
                         }
                     }
