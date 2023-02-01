@@ -3,6 +3,7 @@ use miniquad::*;
 pub struct Mesh {
     pub pipeline: Pipeline,
     pub bindings: Bindings,
+    len: i32,
 }
 
 impl Mesh {
@@ -27,18 +28,10 @@ impl Mesh {
         Self {
             pipeline: Pipeline::with_params(
                 ctx,
-                &[
-                    BufferLayout::default(),
-                    BufferLayout::default(),
-                    BufferLayout {
-                        step_func: VertexStep::PerInstance,
-                        ..Default::default()
-                    },
-                ],
+                &[BufferLayout::default(), BufferLayout::default()],
                 &[
                     VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
                     VertexAttribute::with_buffer("colour", VertexFormat::Float3, 1),
-                    VertexAttribute::with_buffer("inst_pos", VertexFormat::Mat4, 2),
                 ],
                 shader,
                 PipelineParams {
@@ -52,15 +45,18 @@ impl Mesh {
                 vertex_buffers: vec![
                     Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices),
                     Buffer::immutable(ctx, BufferType::VertexBuffer, &colours),
-                    Buffer::stream(
-                        ctx,
-                        BufferType::VertexBuffer,
-                        512 * 1024 * std::mem::size_of::<glam::Vec3>(),
-                    ),
                 ],
                 index_buffer: Buffer::immutable(ctx, BufferType::IndexBuffer, &indices),
                 images: vec![],
             },
+            len: vertices.len() as i32,
         }
+    }
+
+    pub fn draw(&self, ctx: &mut Context, uniform: &glam::Mat4) {
+        ctx.apply_pipeline(&self.pipeline);
+        ctx.apply_bindings(&self.bindings);
+        ctx.apply_uniforms(uniform);
+        ctx.draw(0, self.len, 1);
     }
 }

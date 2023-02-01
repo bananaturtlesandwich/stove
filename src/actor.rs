@@ -15,8 +15,8 @@ mod transplant;
 mod ui;
 
 pub enum DrawType {
-    Cube,
     Mesh(String),
+    Cube,
 }
 
 pub struct Actor {

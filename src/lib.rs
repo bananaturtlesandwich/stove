@@ -28,7 +28,7 @@ pub struct Stove {
     egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
-    cube: rendering::Cube,
+    cubes: rendering::Cube,
     meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
     donor: Option<(unreal_asset::Asset, Vec<actor::Actor>)>,
@@ -189,7 +189,7 @@ impl Stove {
             egui: egui_miniquad::EguiMq::new(ctx),
             actors: Vec::new(),
             selected: None,
-            cube: rendering::Cube::new(ctx),
+            cubes: rendering::Cube::new(ctx),
             meshes: hashbrown::HashMap::new(),
             ui: true,
             donor: None,
@@ -237,23 +237,33 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
+        let vp = rendering::PROJECTION * self.camera.view_matrix();
         if let Some(map) = &self.map {
-            let transforms = self
+            self.cubes.draw(
+                mqctx,
+                &self
+                    .actors
+                    .iter()
+                    .map(|actor| actor.model_matrix(map))
+                    .collect::<Vec<_>>(),
+                &(
+                    vp,
+                    match self.selected {
+                        Some(i) => [1, i as i32],
+                        None => [0, 0],
+                    },
+                ),
+            );
+            for mesh in self
                 .actors
                 .iter()
-                .map(|actor| actor.model_matrix(map))
-                .collect::<Vec<_>>();
-            self.cube.bindings.vertex_buffers[1].update(mqctx, &transforms);
-            mqctx.apply_pipeline(&self.cube.pipeline);
-            mqctx.apply_bindings(&self.cube.bindings);
-            mqctx.apply_uniforms(&(
-                rendering::PROJECTION * self.camera.view_matrix(),
-                match self.selected {
-                    Some(i) => [1, i as i32],
-                    None => [0, 0],
-                },
-            ));
-            mqctx.draw(0, 24, transforms.len() as i32);
+                .filter_map(|actor| match &actor.draw_type {
+                    actor::DrawType::Mesh(key) => self.meshes.get(key),
+                    actor::DrawType::Cube => None,
+                })
+            {
+                mesh.draw(mqctx, &vp);
+            }
         }
         mqctx.end_render_pass();
         if !self.ui {

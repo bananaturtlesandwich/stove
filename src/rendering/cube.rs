@@ -78,4 +78,12 @@ impl Cube {
             },
         }
     }
+
+    pub fn draw(&self, ctx: &mut Context, cubes: &[glam::Mat4], uniforms: &(glam::Mat4, [i32; 2])) {
+        self.bindings.vertex_buffers[1].update(ctx, cubes);
+        ctx.apply_pipeline(&self.pipeline);
+        ctx.apply_bindings(&self.bindings);
+        ctx.apply_uniforms(uniforms);
+        ctx.draw(0, 24, cubes.len() as i32);
+    }
 }
