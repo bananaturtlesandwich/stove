@@ -88,7 +88,10 @@ macro_rules! refresh {
         let mut paks: Vec<_> = $self
             .paks
             .iter()
-            .filter_map(|path| std::fs::OpenOptions::new().read(true).open(&path).ok())
+            .filter_map(|dir| std::fs::read_dir(dir).ok())
+            .flatten()
+            .filter_map(Result::ok)
+            .filter_map(|path| std::fs::OpenOptions::new().read(true).open(&path.path()).ok())
             .filter_map(|file| {
                 unpak::Pak::new(
                     std::io::BufReader::new(file),
@@ -111,8 +114,14 @@ macro_rules! refresh {
                                     let mut mesh = unreal_asset::Asset::new(mesh, mesh_bulk);
                                     mesh.set_engine_version($self.version);
                                     let Ok(()) = mesh.parse_data() else {continue};
-                                    let Ok((positions, colours, indices)) = extras::get_mesh_info(mesh) else {continue};
-                                    $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions,colours,indices));
+                                    match extras::get_mesh_info(mesh) {
+                                        Ok((positions, colours, indices)) => {
+                                            $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions,colours,indices));
+                                        },
+                                        Err(e)=>{
+                                            $self.notifs.error(format!("{path}: {e}"));
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -254,15 +263,15 @@ impl EventHandler for Stove {
                     },
                 ),
             );
-            for mesh in self
+            for (actor, mesh) in self
                 .actors
                 .iter()
                 .filter_map(|actor| match &actor.draw_type {
-                    actor::DrawType::Mesh(key) => self.meshes.get(key),
+                    actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
                     actor::DrawType::Cube => None,
                 })
             {
-                mesh.draw(mqctx, &vp);
+                mesh.draw(mqctx, &(vp * actor.model_matrix(map)));
             }
         }
         mqctx.end_render_pass();
@@ -451,7 +460,7 @@ impl EventHandler for Stove {
                     if let Some(selected) = self.selected{
                         ui.add_space(10.0);
                         ui.push_id("properties", |ui| egui::ScrollArea::vertical()
-                            .auto_shrink([false;2])
+                            .auto_shrink([false; 2])
                             .show(ui,|ui|{
                                 self.actors[selected].show(map,ui);
                                 // otherwise the scroll area bugs out at the bottom
@@ -621,7 +630,7 @@ impl EventHandler for Stove {
                     true => 100.0 / -dy,
                     false => dy / 100.0,
                 })
-            .clamp(5.0, 25000.0) as u16;
+            .clamp(5.0, 50000.0) as u16;
         }
     }
 

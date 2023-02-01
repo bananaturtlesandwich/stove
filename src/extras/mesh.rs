@@ -140,11 +140,12 @@ pub fn get_mesh_info(
     // vertex positions!
     let mut positions = Vec::with_capacity(data.read_i32::<LE>()? as usize);
     for _ in 0..positions.capacity() {
-        positions.push(glam::vec3(
+        let (x, z, y) = (
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
-        ));
+        );
+        positions.push(glam::vec3(x, y, z) * 0.01);
     }
     // static mesh vertex buffer
     if match asset.get_object_version()
