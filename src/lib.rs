@@ -82,14 +82,40 @@ fn default_activity() -> Activity<'static> {
 }
 
 macro_rules! refresh {
-    ($self: expr) => {
+    ($self: expr, $ctx: expr) => {
         $self.actors.clear();
         $self.meshes.clear();
+        let mut paks: Vec<_> = $self
+            .paks
+            .iter()
+            .filter_map(|path| std::fs::OpenOptions::new().read(true).open(&path).ok())
+            .filter_map(|file| {
+                unpak::Pak::new(
+                    std::io::BufReader::new(file),
+                    unpak::Version::FrozenIndex,
+                    None,
+                )
+                .ok()
+            })
+            .collect();
         $self.selected = None;
         if let Some(map) = &$self.map {
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
+                        if let actor::DrawType::Mesh(path) = &actor.draw_type {
+                            if !$self.meshes.contains_key(path) {
+                                for pak in paks.iter_mut() {
+                                    let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
+                                    let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
+                                    let mut mesh = unreal_asset::Asset::new(mesh, mesh_bulk);
+                                    mesh.set_engine_version($self.version);
+                                    let Ok(()) = mesh.parse_data() else {continue};
+                                    let Ok((positions, colours, indices)) = extras::get_mesh_info(mesh) else {continue};
+                                    $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions,colours,indices));
+                                }
+                            }
+                        }
                         $self.actors.push(actor);
                     }
                     Err(e) => {
@@ -187,7 +213,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             client,
         };
-        refresh!(stove);
+        refresh!(stove, ctx);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -205,8 +231,8 @@ impl EventHandler for Stove {
         self.camera.move_cam(&self.held)
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
-        ctx.begin_default_pass(PassAction::Clear {
+    fn draw(&mut self, mqctx: &mut Context) {
+        mqctx.begin_default_pass(PassAction::Clear {
             color: Some((0.15, 0.15, 0.15, 1.0)),
             depth: Some(1.0),
             stencil: None,
@@ -217,24 +243,24 @@ impl EventHandler for Stove {
                 .iter()
                 .map(|actor| actor.model_matrix(map))
                 .collect::<Vec<_>>();
-            self.cube.bindings.vertex_buffers[1].update(ctx, &transforms);
-            ctx.apply_pipeline(&self.cube.pipeline);
-            ctx.apply_bindings(&self.cube.bindings);
-            ctx.apply_uniforms(&(
+            self.cube.bindings.vertex_buffers[1].update(mqctx, &transforms);
+            mqctx.apply_pipeline(&self.cube.pipeline);
+            mqctx.apply_bindings(&self.cube.bindings);
+            mqctx.apply_uniforms(&(
                 rendering::PROJECTION * self.camera.view_matrix(),
                 match self.selected {
                     Some(i) => [1, i as i32],
                     None => [0, 0],
                 },
             ));
-            ctx.draw(0, 24, transforms.len() as i32);
+            mqctx.draw(0, 24, transforms.len() as i32);
         }
-        ctx.end_render_pass();
+        mqctx.end_render_pass();
         if !self.ui {
-            ctx.commit_frame();
+            mqctx.commit_frame();
             return;
         }
-        self.egui.run(ctx, |mqctx, ctx| {
+        self.egui.run(mqctx, |mqctx, ctx| {
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -491,7 +517,7 @@ impl EventHandler for Stove {
                                     }
                             }
                             self.map = Some(asset);
-                            refresh!(self);
+                            refresh!(self, mqctx);
                         }
                         Err(e) => {
                             self.notifs.error(e.to_string());
@@ -536,8 +562,8 @@ impl EventHandler for Stove {
                 }
             }
         });
-        self.egui.draw(ctx);
-        ctx.commit_frame();
+        self.egui.draw(mqctx);
+        mqctx.commit_frame();
     }
 
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
