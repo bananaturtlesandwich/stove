@@ -115,8 +115,8 @@ macro_rules! refresh {
                                     mesh.set_engine_version($self.version);
                                     let Ok(()) = mesh.parse_data() else {continue};
                                     match extras::get_mesh_info(mesh) {
-                                        Ok((positions, colours, indices)) => {
-                                            $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions,colours,indices));
+                                        Ok(positions) => {
+                                            $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions));
                                         },
                                         Err(e)=>{
                                             $self.notifs.error(format!("{path}: {e}"));
@@ -138,6 +138,9 @@ macro_rules! refresh {
 
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
+        unsafe {
+            gl::glEnable(gl::GL_PROGRAM_POINT_SIZE);
+        }
         let mut notifs = egui_notify::Toasts::new();
         let (version, paks) = match config() {
             Some(ref cfg) => {

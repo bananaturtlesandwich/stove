@@ -7,12 +7,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn new(
-        ctx: &mut Context,
-        vertices: Vec<glam::Vec3>,
-        colours: Vec<glam::Vec4>,
-        indices: Vec<u32>,
-    ) -> Self {
+    pub fn new(ctx: &mut Context, vertices: Vec<glam::Vec3>) -> Self {
         let shader = Shader::new(
             ctx,
             include_str!("mesh.vert"),
@@ -25,35 +20,37 @@ impl Mesh {
             },
         )
         .unwrap();
+        let len = vertices.len() as i32;
         Self {
             pipeline: Pipeline::with_params(
                 ctx,
-                &[BufferLayout::default(), BufferLayout::default()],
-                &[
-                    VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
-                    VertexAttribute::with_buffer("colour", VertexFormat::Float3, 1),
-                ],
+                &[BufferLayout::default()],
+                &[VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0)],
                 shader,
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
                     depth_write: true,
-                    primitive_type: PrimitiveType::Triangles,
+                    primitive_type: PrimitiveType::Points,
                     ..Default::default()
                 },
             ),
             bindings: Bindings {
-                vertex_buffers: vec![
-                    Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices),
-                    Buffer::immutable(ctx, BufferType::VertexBuffer, &colours),
-                ],
-                index_buffer: Buffer::immutable(ctx, BufferType::IndexBuffer, &indices),
+                vertex_buffers: vec![Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices)],
+                index_buffer: Buffer::immutable(
+                    ctx,
+                    BufferType::IndexBuffer,
+                    &(0..len).collect::<Vec<_>>(),
+                ),
                 images: vec![],
             },
-            len: vertices.len() as i32,
+            len,
         }
     }
 
     pub fn draw(&self, ctx: &mut Context, uniform: &glam::Mat4) {
+        unsafe {
+            gl::glEnable(gl::GL_PROGRAM_POINT_SIZE);
+        }
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);
         ctx.apply_uniforms(uniform);
