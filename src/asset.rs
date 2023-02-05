@@ -10,6 +10,24 @@ use unreal_asset::{
     Asset,
 };
 
+pub fn try_load(
+    file: impl AsRef<Path>,
+) -> Result<unpak::Pak<io::BufReader<fs::File>>, unpak::Error> {
+    for ver in unpak::Version::iter().rev() {
+        match unpak::Pak::new(
+            io::BufReader::new(fs::OpenOptions::new().read(true).open(&file)?),
+            ver,
+            None,
+        ) {
+            Ok(pak) => {
+                return Ok(pak);
+            }
+            _ => continue,
+        }
+    }
+    Err(unpak::Error::Other("version unsupported"))
+}
+
 /// creates an asset from the specified path and version
 pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<Asset, Error> {
     let uasset = fs::read(&file)?;

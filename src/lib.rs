@@ -91,15 +91,7 @@ macro_rules! refresh {
             .filter_map(|dir| std::fs::read_dir(dir).ok())
             .flatten()
             .filter_map(Result::ok)
-            .filter_map(|path| std::fs::OpenOptions::new().read(true).open(&path.path()).ok())
-            .filter_map(|file| {
-                unpak::Pak::new(
-                    std::io::BufReader::new(file),
-                    unpak::Version::FrozenIndex,
-                    None,
-                )
-                .ok()
-            })
+            .filter_map(|path| asset::try_load(path.path()).ok())
             .collect();
         $self.selected = None;
         if let Some(map) = &$self.map {
