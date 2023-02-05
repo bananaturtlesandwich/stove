@@ -7,7 +7,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn new(ctx: &mut Context, vertices: Vec<glam::Vec3>) -> Self {
+    pub fn new(ctx: &mut Context, vertices: Vec<glam::Vec3>, indices: Vec<u32>) -> Self {
         let shader = Shader::new(
             ctx,
             include_str!("mesh.vert"),
@@ -30,17 +30,13 @@ impl Mesh {
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
                     depth_write: true,
-                    primitive_type: PrimitiveType::Points,
+                    primitive_type: PrimitiveType::Triangles,
                     ..Default::default()
                 },
             ),
             bindings: Bindings {
                 vertex_buffers: vec![Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices)],
-                index_buffer: Buffer::immutable(
-                    ctx,
-                    BufferType::IndexBuffer,
-                    &(0..len).collect::<Vec<_>>(),
-                ),
+                index_buffer: Buffer::immutable(ctx, BufferType::IndexBuffer, &indices),
                 images: vec![],
             },
             len,

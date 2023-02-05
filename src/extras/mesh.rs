@@ -27,7 +27,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 // cue4parse: https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Assets/Exports/StaticMesh/UStaticMesh.cs#L13
 // CAS UAssetAPI: https://github.com/LongerWarrior/UEAssetToolkitGenerator/blob/master/UAssetApi/ExportTypes/StaticMeshExport.cs#L6
 /// parses the extra data of the static mesh export to get render data
-pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
+pub fn get_mesh_info(asset: Asset) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
     // get the static mesh
     let Some(mesh) = asset
         .exports
@@ -152,149 +152,150 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
         positions.push(glam::vec3(x, y, z) * 0.01);
     }
 
-    // // vertex buffer
-    // if match asset.get_object_version()
-    //     >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX
-    // {
-    //     true => StripDataFlags::read(&mut data)?,
-    //     false => StripDataFlags::default(),
-    // }
-    // .data_stripped_for_server()
-    // {
-    //     return Err(io::Error::new(
-    //         io::ErrorKind::InvalidInput,
-    //         "vertex buffer is stripped",
-    //     ));
-    // }
-    // let num_tex_coords = data.read_u32::<LE>()?;
-    // // strides
-    // if asset.get_engine_version() < EngineVersion::VER_UE4_19 {
-    //     data.read_u32::<LE>()?;
-    // }
-    // // num verts
-    // let num_verts = data.read_u32::<LE>()?;
-    // let precise_uvs = data.read_u32::<LE>()? != 0;
-    // let precise_tangents =
-    //     asset.get_engine_version() >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? != 0;
-    // fn read_tangents(
-    //     data: &mut io::Cursor<&Vec<u8>>,
-    //     precise_tangents: bool,
-    // ) -> Result<(), io::Error> {
-    //     match precise_tangents {
-    //         true => {
-    //             for _ in 0..2 {
-    //                 for _ in 0..4 {
-    //                     data.read_u16::<LE>()?;
-    //                 }
-    //             }
-    //         }
-    //         false => {
-    //             for _ in 0..2 {
-    //                 data.read_u32::<LE>()?;
-    //             }
-    //         }
-    //     }
-    //     Ok(())
-    // }
-    // fn read_tex_coords(
-    //     data: &mut io::Cursor<&Vec<u8>>,
-    //     num_tex_coords: u32,
-    //     precise_uvs: bool,
-    // ) -> Result<(), io::Error> {
-    //     for _ in 0..num_tex_coords {
-    //         for _ in 0..2 {
-    //             match precise_uvs {
-    //                 true => {
-    //                     data.read_f32::<LE>()?;
-    //                 }
-    //                 false => {
-    //                     data.read_u16::<LE>()?;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Ok(())
-    // }
-    // match asset.get_engine_version() >= EngineVersion::VER_UE4_20 {
-    //     true => {
-    //         // item size
-    //         data.read_u32::<LE>()?;
-    //         // item count
-    //         data.read_u32::<LE>()?;
-    //         // packed normals
-    //         for _ in 0..num_verts {
-    //             read_tangents(&mut data, precise_tangents)?;
-    //         }
-    //         // item size
-    //         data.read_u32::<LE>()?;
-    //         // item count
-    //         data.read_u32::<LE>()?;
-    //         // mesh uv
-    //         for _ in 0..num_verts {
-    //             read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
-    //         }
-    //     }
-    //     false => {
-    //         //size
-    //         data.read_u32::<LE>()?;
-    //         for _ in 0..data.read_u32::<LE>()? {
-    //             read_tangents(&mut data, precise_tangents)?;
-    //             read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
-    //         }
-    //     }
-    // }
+    // vertex buffer
+    if match asset.get_object_version()
+        >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX
+    {
+        true => StripDataFlags::read(&mut data)?,
+        false => StripDataFlags::default(),
+    }
+    .data_stripped_for_server()
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "vertex buffer is stripped",
+        ));
+    }
+    let num_tex_coords = data.read_u32::<LE>()?;
+    // strides
+    if asset.get_engine_version() < EngineVersion::VER_UE4_19 {
+        data.read_u32::<LE>()?;
+    }
+    // num verts
+    let num_verts = data.read_u32::<LE>()?;
+    let precise_uvs = data.read_u32::<LE>()? != 0;
+    let precise_tangents =
+        asset.get_engine_version() >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? != 0;
+    fn read_tangents(
+        data: &mut io::Cursor<&Vec<u8>>,
+        precise_tangents: bool,
+    ) -> Result<(), io::Error> {
+        match precise_tangents {
+            true => {
+                for _ in 0..2 {
+                    for _ in 0..4 {
+                        data.read_u16::<LE>()?;
+                    }
+                }
+            }
+            false => {
+                for _ in 0..2 {
+                    data.read_u32::<LE>()?;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn read_tex_coords(
+        data: &mut io::Cursor<&Vec<u8>>,
+        num_tex_coords: u32,
+        precise_uvs: bool,
+    ) -> Result<(), io::Error> {
+        for _ in 0..num_tex_coords {
+            for _ in 0..2 {
+                match precise_uvs {
+                    true => {
+                        data.read_f32::<LE>()?;
+                    }
+                    false => {
+                        data.read_u16::<LE>()?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    match asset.get_engine_version() >= EngineVersion::VER_UE4_20 {
+        true => {
+            // item size
+            data.read_u32::<LE>()?;
+            // item count
+            data.read_u32::<LE>()?;
+            // packed normals
+            for _ in 0..num_verts {
+                read_tangents(&mut data, precise_tangents)?;
+            }
+            // item size
+            data.read_u32::<LE>()?;
+            // item count
+            data.read_u32::<LE>()?;
+            // mesh uv
+            for _ in 0..num_verts {
+                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
+            }
+        }
+        false => {
+            //size
+            data.read_u32::<LE>()?;
+            for _ in 0..data.read_u32::<LE>()? {
+                read_tangents(&mut data, precise_tangents)?;
+                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
+            }
+        }
+    }
 
-    // // color vertex buffer
-    // if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
-    //     return Err(io::Error::new(
-    //         io::ErrorKind::InvalidInput,
-    //         "colour data is stripped",
-    //     ));
-    // }
-    // // stride
-    // data.read_u32::<LE>()?;
-    // // num verts
-    // data.read_u32::<LE>()?;
-    // // size
-    // data.read_u32::<LE>()?;
-    // // vertex colours
-    // for _ in 0..data.read_u32::<LE>()? {
-    //     dbg!(data.read_i32::<LE>()?);
-    // }
+    // color vertex buffer
+    if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "colour data is stripped",
+        ));
+    }
+    // stride
+    data.read_u32::<LE>()?;
+    // when num verts is 0 array isn't serialised
+    if data.read_u32::<LE>()? > 0 {
+        // size
+        data.read_u32::<LE>()?;
+        // vertex colours
+        for _ in 0..data.read_u32::<LE>()? {
+            data.read_i32::<LE>()?;
+        }
+    }
 
-    // let indices = match asset.get_object_version()
-    //     >= ObjectVersion::VER_UE4_SUPPORT_32BIT_STATIC_MESH_INDICES
-    // {
-    //     true => {
-    //         let x32 = data.read_u32::<LE>()? != 0;
-    //         // size
-    //         data.read_u32::<LE>()?;
-    //         match x32 {
-    //             true => {
-    //                 let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize / 4);
-    //                 for _ in 0..indices.capacity() {
-    //                     indices.push(data.read_u32::<LE>()?);
-    //                 }
-    //                 indices
-    //             }
-    //             false => {
-    //                 let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize / 2);
-    //                 for _ in 0..indices.capacity() {
-    //                     indices.push(data.read_u16::<LE>()? as u32);
-    //                 }
-    //                 indices
-    //             }
-    //         }
-    //     }
-    //     false => {
-    //         //size
-    //         data.read_u32::<LE>()?;
-    //         let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize);
-    //         for _ in 0..indices.capacity() {
-    //             indices.push(data.read_u16::<LE>()? as u32);
-    //         }
-    //         indices
-    //     }
-    // };
-    Ok(positions)
+    let indices = match asset.get_object_version()
+        >= ObjectVersion::VER_UE4_SUPPORT_32BIT_STATIC_MESH_INDICES
+    {
+        true => {
+            let x32 = data.read_u32::<LE>()? != 0;
+            // size
+            data.read_u32::<LE>()?;
+            match x32 {
+                true => {
+                    let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize / 4);
+                    for _ in 0..indices.capacity() {
+                        indices.push(data.read_u32::<LE>()?);
+                    }
+                    indices
+                }
+                false => {
+                    let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize / 2);
+                    for _ in 0..indices.capacity() {
+                        indices.push(data.read_u16::<LE>()? as u32);
+                    }
+                    indices
+                }
+            }
+        }
+        false => {
+            //size
+            data.read_u32::<LE>()?;
+            let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize);
+            for _ in 0..indices.capacity() {
+                indices.push(data.read_u16::<LE>()? as u32);
+            }
+            indices
+        }
+    };
+    Ok((positions, indices))
 }

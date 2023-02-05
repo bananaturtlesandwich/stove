@@ -107,8 +107,8 @@ macro_rules! refresh {
                                     mesh.set_engine_version($self.version);
                                     let Ok(()) = mesh.parse_data() else {continue};
                                     match extras::get_mesh_info(mesh) {
-                                        Ok(positions) => {
-                                            $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions));
+                                        Ok((positions, indices)) => {
+                                            $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions, indices));
                                         },
                                         Err(e)=>{
                                             $self.notifs.error(format!("{path}: {e}"));
