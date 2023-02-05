@@ -59,23 +59,23 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     data.read_i32::<LE>()?;
     if !StripDataFlags::read(&mut data)?.editor_data_stripped()
         // data isn't cooked
-        || data.read_i32::<LE>()? == 0
+        || data.read_u32::<LE>()? == 0
     {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "mesh is raw"));
     }
     // bodysetup reference
-    data.read_i32::<LE>()?;
+    data.read_u32::<LE>()?;
     // nav collision reference
     if asset.object_version >= ObjectVersion::VER_UE4_STATIC_MESH_STORE_NAV_COLLISION {
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
     }
     // lighting guid
     for _ in 0..16 {
         data.read_u8()?;
     }
     // array of socket references
-    for _ in 0..data.read_i32::<LE>()? {
-        data.read_i32::<LE>()?;
+    for _ in 0..data.read_u32::<LE>()? {
+        data.read_u32::<LE>()?;
     }
     // KeepMobileMinLODSettingOnDesktop
     if asset.get_engine_version() >= EngineVersion::VER_UE4_27 {
@@ -83,7 +83,7 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     }
     // array of lod resources
     // discard len because we'll just read the first LOD
-    data.read_i32::<LE>()?;
+    data.read_u32::<LE>()?;
     let flags = StripDataFlags::read(&mut data)?;
     if flags.data_stripped_for_server() {
         return Err(io::Error::new(
@@ -92,37 +92,37 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
         ));
     }
     // array of sections
-    for _ in 0..data.read_i32::<LE>()? {
+    for _ in 0..data.read_u32::<LE>()? {
         // mat index
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // first index
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // tri count
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // min vertex index
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // max vertex index
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // collides
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // casts shadow
-        data.read_i32::<LE>()?;
+        data.read_u32::<LE>()?;
         // force opaque
         if asset.get_engine_version() >= EngineVersion::VER_UE4_25 {
-            data.read_i32::<LE>()?;
+            data.read_u32::<LE>()?;
         }
         //visible in ray tracing
         if asset.get_engine_version() <= EngineVersion::VER_UE4_26 {
-            data.read_i32::<LE>()?;
+            data.read_u32::<LE>()?;
         }
     }
     // max deviation
     data.read_f32::<LE>()?;
     match asset.get_engine_version() >= EngineVersion::VER_UE4_23 {
         // lod isn't cooked out
-        true if data.read_i32::<LE>()? == 0
+        true if data.read_u32::<LE>()? == 0
         // data is inlined
-        && data.read_i32::<LE>()? == 1 =>
+        && data.read_u32::<LE>()? == 1 =>
         {
             StripDataFlags::read(&mut data)?;
         }
@@ -134,14 +134,15 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
             ));
         }
     }
+
+    // position buffer
     // stride
-    data.read_i32::<LE>()?;
+    data.read_u32::<LE>()?;
     // vertex count
-    data.read_i32::<LE>()?;
+    data.read_u32::<LE>()?;
     // size
-    data.read_i32::<LE>()?;
-    // vertex positions!
-    let mut positions = Vec::with_capacity(data.read_i32::<LE>()? as usize);
+    data.read_u32::<LE>()?;
+    let mut positions = Vec::with_capacity(data.read_u32::<LE>()? as usize);
     for _ in 0..positions.capacity() {
         let (x, z, y) = (
             data.read_f32::<LE>()?,
@@ -150,7 +151,8 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
         );
         positions.push(glam::vec3(x, y, z) * 0.01);
     }
-    // static mesh vertex buffer
+
+    // // vertex buffer
     // if match asset.get_object_version()
     //     >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX
     // {
@@ -161,24 +163,24 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     // {
     //     return Err(io::Error::new(
     //         io::ErrorKind::InvalidInput,
-    //         "vertex data is stripped",
+    //         "vertex buffer is stripped",
     //     ));
     // }
-    // let num_tex_coords = data.read_i32::<LE>()?;
+    // let num_tex_coords = data.read_u32::<LE>()?;
     // // strides
     // if asset.get_engine_version() < EngineVersion::VER_UE4_19 {
-    //     data.read_i32::<LE>()?;
+    //     data.read_u32::<LE>()?;
     // }
     // // num verts
-    // let num_verts = data.read_i32::<LE>()?;
-    // let full_precision_uvs = data.read_i32::<LE>()? != 0;
-    // let high_precision_tangent =
-    //     asset.get_engine_version() >= EngineVersion::VER_UE4_12 && data.read_i32::<LE>()? != 0;
+    // let num_verts = data.read_u32::<LE>()?;
+    // let precise_uvs = data.read_u32::<LE>()? != 0;
+    // let precise_tangents =
+    //     asset.get_engine_version() >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? != 0;
     // fn read_tangents(
     //     data: &mut io::Cursor<&Vec<u8>>,
-    //     high_precision_tangent: bool,
+    //     precise_tangents: bool,
     // ) -> Result<(), io::Error> {
-    //     match high_precision_tangent {
+    //     match precise_tangents {
     //         true => {
     //             for _ in 0..2 {
     //                 for _ in 0..4 {
@@ -196,16 +198,15 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     // }
     // fn read_tex_coords(
     //     data: &mut io::Cursor<&Vec<u8>>,
-    //     num_tex_coords: i32,
-    //     full_precision_uvs: bool,
+    //     num_tex_coords: u32,
+    //     precise_uvs: bool,
     // ) -> Result<(), io::Error> {
     //     for _ in 0..num_tex_coords {
     //         for _ in 0..2 {
-    //             match full_precision_uvs {
+    //             match precise_uvs {
     //                 true => {
     //                     data.read_f32::<LE>()?;
     //                 }
-
     //                 false => {
     //                     data.read_u16::<LE>()?;
     //                 }
@@ -217,31 +218,32 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     // match asset.get_engine_version() >= EngineVersion::VER_UE4_20 {
     //     true => {
     //         // item size
-    //         data.read_i32::<LE>()?;
+    //         data.read_u32::<LE>()?;
     //         // item count
-    //         data.read_i32::<LE>()?;
+    //         data.read_u32::<LE>()?;
     //         // packed normals
     //         for _ in 0..num_verts {
-    //             read_tangents(&mut data, high_precision_tangent)?;
+    //             read_tangents(&mut data, precise_tangents)?;
     //         }
     //         // item size
-    //         data.read_i32::<LE>()?;
+    //         data.read_u32::<LE>()?;
     //         // item count
-    //         data.read_i32::<LE>()?;
+    //         data.read_u32::<LE>()?;
     //         // mesh uv
     //         for _ in 0..num_verts {
-    //             read_tex_coords(&mut data, num_tex_coords, full_precision_uvs)?;
+    //             read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
     //         }
     //     }
     //     false => {
     //         //size
-    //         data.read_i32::<LE>()?;
-    //         for _ in 0..data.read_i32::<LE>()? {
-    //             read_tangents(&mut data, high_precision_tangent)?;
-    //             read_tex_coords(&mut data, num_tex_coords, full_precision_uvs)?;
+    //         data.read_u32::<LE>()?;
+    //         for _ in 0..data.read_u32::<LE>()? {
+    //             read_tangents(&mut data, precise_tangents)?;
+    //             read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
     //         }
     //     }
     // }
+
     // // color vertex buffer
     // if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
     //     return Err(io::Error::new(
@@ -250,42 +252,33 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     //     ));
     // }
     // // stride
-    // data.read_i32::<LE>()?;
+    // data.read_u32::<LE>()?;
     // // num verts
-    // data.read_i32::<LE>()?;
+    // data.read_u32::<LE>()?;
     // // size
-    // data.read_i32::<LE>()?;
+    // data.read_u32::<LE>()?;
     // // vertex colours
-    // let mut colours = Vec::with_capacity(data.read_i32::<LE>()? as usize);
-    // for _ in 0..colours.capacity() {
-    //     let argb = data.read_i32::<LE>()? as i64;
-    //     colours.push(
-    //         glam::vec4(
-    //             ((argb & 0xFF000000) >> 24) as f32,
-    //             ((argb & 0x00FF0000) >> 16) as f32,
-    //             ((argb & 0x0000FF00) >> 8) as f32,
-    //             (argb & 0x000000FF) as f32,
-    //         ) / 255.0,
-    //     )
+    // for _ in 0..data.read_u32::<LE>()? {
+    //     dbg!(data.read_i32::<LE>()?);
     // }
 
     // let indices = match asset.get_object_version()
     //     >= ObjectVersion::VER_UE4_SUPPORT_32BIT_STATIC_MESH_INDICES
     // {
     //     true => {
-    //         let use32bits = data.read_i32::<LE>()? != 0;
+    //         let x32 = data.read_u32::<LE>()? != 0;
     //         // size
-    //         data.read_i32::<LE>()?;
-    //         match use32bits {
+    //         data.read_u32::<LE>()?;
+    //         match x32 {
     //             true => {
-    //                 let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize / 4);
+    //                 let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize / 4);
     //                 for _ in 0..indices.capacity() {
     //                     indices.push(data.read_u32::<LE>()?);
     //                 }
     //                 indices
     //             }
     //             false => {
-    //                 let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize / 2);
+    //                 let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize / 2);
     //                 for _ in 0..indices.capacity() {
     //                     indices.push(data.read_u16::<LE>()? as u32);
     //                 }
@@ -295,8 +288,8 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     //     }
     //     false => {
     //         //size
-    //         data.read_i32::<LE>()?;
-    //         let mut indices = Vec::with_capacity(data.read_i32::<LE>()? as usize);
+    //         data.read_u32::<LE>()?;
+    //         let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize);
     //         for _ in 0..indices.capacity() {
     //             indices.push(data.read_u16::<LE>()? as u32);
     //         }
