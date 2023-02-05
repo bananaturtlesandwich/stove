@@ -29,11 +29,15 @@ with stove you can:
 ### convenience
 - [ ] undo and redo any action
 - [x] actor deletion
-- [ ] can move actors in the viewport instead of just in the properties
+- [x] can move actors in the viewport instead of just in the properties
 - [ ] multiple selection (requires above to be useful)
 - [ ] searching
-### low priority
-- [ ] display the mesh/sprite of an actor and their components rather than a cube
+### aesthetic
+- [x] load assets from pak folders
+- [x] retrieve and display static meshes
+- [ ] retrieve and display skeletal meshes
+- [ ] get meshes for all types of actor
+- [ ] retrieve and display textures on meshes
 - [x] discord RPC (show your internet friends what you're doing)
 </details>
 
