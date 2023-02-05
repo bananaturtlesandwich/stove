@@ -22,6 +22,10 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     Ok(())
 }
 
+// reference implementations:
+// umodel: https://github.com/gildor2/UEViewer/blob/master/Unreal/UnrealMesh/UnMesh4.cpp#L2633
+// cue4parse: https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Assets/Exports/StaticMesh/UStaticMesh.cs#L13
+// CAS UAssetAPI: https://github.com/LongerWarrior/UEAssetToolkitGenerator/blob/master/UAssetApi/ExportTypes/StaticMeshExport.cs#L6
 /// parses the extra data of the static mesh export to get render data
 pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     // get the static mesh
@@ -42,17 +46,16 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
                 );
         };
     // get the normal export
-    let Some(mesh) = mesh.get_normal_export()
-        else {
-            return Err(
-                io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "failed to cast mesh data"
-                )
-            );
-        };
+    let Some(mesh) = mesh.get_normal_export() else {
+        return Err(
+            io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "failed to cast mesh data"
+            )
+        );
+    };
     let mut data = io::Cursor::new(&mesh.extras);
-    // padding
+    // if I don't read this it breaks
     data.read_i32::<LE>()?;
     if !StripDataFlags::read(&mut data)?.editor_data_stripped()
         // data isn't cooked
@@ -79,9 +82,15 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
         data.read_i32::<LE>()?;
     }
     // array of lod resources
-    // discard len because we'll just read the first entry
+    // discard len because we'll just read the first LOD
     data.read_i32::<LE>()?;
     let flags = StripDataFlags::read(&mut data)?;
+    if flags.data_stripped_for_server() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "mesh data is stripped for server",
+        ));
+    }
     // array of sections
     for _ in 0..data.read_i32::<LE>()? {
         // mat index
@@ -110,19 +119,18 @@ pub fn get_mesh_info(asset: Asset) -> Result<Vec<glam::Vec3>, io::Error> {
     // max deviation
     data.read_f32::<LE>()?;
     match asset.get_engine_version() >= EngineVersion::VER_UE4_23 {
-        true if !flags.data_stripped_for_server()
         // lod isn't cooked out
-        && data.read_i32::<LE>()? == 0
+        true if data.read_i32::<LE>()? == 0
         // data is inlined
         && data.read_i32::<LE>()? == 1 =>
         {
             StripDataFlags::read(&mut data)?;
         }
-        false if !flags.data_stripped_for_server() && !flags.class_data_stripped(2) => (),
+        false if !flags.class_data_stripped(2) => (),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "vertex position data is stripped",
+                "lod data is cooked out",
             ));
         }
     }
