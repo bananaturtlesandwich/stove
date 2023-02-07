@@ -32,10 +32,47 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
+    pub fn set_location(&self, map: &mut Asset, mut new: glam::Vec3) {
+        new *= 100.0;
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
+            return
+        };
+        match norm
+            .properties
+            .iter_mut()
+            .find(|prop| prop.get_name().content == "RelativeLocation")
+        {
+            Some(scale) => {
+                if let Property::StructProperty(struc) = scale {
+                    if let Property::VectorProperty(vec) = &mut struc.value[0] {
+                        vec.value.x.0 = new.x;
+                        vec.value.y.0 = new.z;
+                        vec.value.z.0 = new.y;
+                    }
+                }
+            }
+            None => norm
+                .properties
+                .push(Property::StructProperty(StructProperty {
+                    name: FName::from_slice("RelativeLocation"),
+                    struct_type: Some(FName::from_slice("Vector")),
+                    struct_guid: None,
+                    property_guid: None,
+                    duplication_index: 0,
+                    serialize_none: true,
+                    value: vec![Property::VectorProperty(VectorProperty {
+                        name: FName::from_slice("RelativeLocation"),
+                        property_guid: None,
+                        duplication_index: 0,
+                        value: Vector::new(new.x.into(), new.z.into(), new.y.into()),
+                    })],
+                })),
+        }
+    }
+
     pub fn add_location(&self, map: &mut Asset, offset: glam::Vec3) {
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut()
-        else {
-            return;
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
+            return
         };
         match norm
             .properties
@@ -92,8 +129,7 @@ impl super::Actor {
     }
 
     pub fn combine_rotation(&self, map: &mut Asset, offset: glam::Quat) {
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut()
-        else {
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
             return;
         };
         match norm
@@ -160,8 +196,7 @@ impl super::Actor {
             .unwrap_or(glam::Vec3::ONE)
     }
     pub fn mul_scale(&self, map: &mut Asset, offset: glam::Vec3) {
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut()
-        else {
+        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
             return;
         };
         match norm

@@ -216,15 +216,19 @@ impl Stove {
             donor: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
                 .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             transplant_dialog: egui_file::FileDialog::open_file(home.clone())
                 .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             save_dialog: egui_file::FileDialog::save_file(home.clone())
                 .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             pak_dialog: egui_file::FileDialog::select_folder(home)
                 .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             filepath,
             held: Vec::new(),
@@ -529,10 +533,8 @@ impl EventHandler for Stove {
                                                 .unwrap(),
                                             );
                                             self.selected = Some(selected);
-                                            self.camera.set_focus(
-                                                self.actors[selected].location(&map),
-                                                self.actors[selected].scale(&map),
-                                            );
+                                            // same distance away from camera as focus
+                                            self.actors[selected].set_location(map, self.camera.position + self.camera.front * self.actors[selected].scale(map).length() * 4.0);
                                             self.notifs.success(format!("transplanted {}", actors[i].name));
                                             transplanted = true;
                                         }
@@ -784,10 +786,11 @@ impl EventHandler for Stove {
                 Some(index) => {
                     let map = self.map.as_mut().unwrap();
                     let insert = map.exports.len() as i32 + 1;
-                    self.selected = Some(self.actors.len());
                     self.actors[index].duplicate(map);
-                    self.actors
-                        .push(actor::Actor::new(map, PackageIndex::new(insert)).unwrap());
+                    self.actors.insert(
+                        index,
+                        actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
+                    );
                     self.notifs
                         .success(format!("duplicated {}", &self.actors[index].name));
                 }

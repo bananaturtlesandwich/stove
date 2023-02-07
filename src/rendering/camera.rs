@@ -55,8 +55,7 @@ impl Camera {
         }
     }
     pub fn set_focus(&mut self, pos: glam::Vec3, sca: glam::Vec3) {
-        let avg = (sca.x + sca.y + sca.z) / 3.0;
-        self.position = pos - self.front * avg * 4.0;
+        self.position = pos - self.front * sca.length() * 4.0;
     }
     pub fn handle_mouse_motion(&mut self, delta: glam::Vec2) {
         if self.can_move {
