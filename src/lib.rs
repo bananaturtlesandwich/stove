@@ -245,7 +245,7 @@ impl Stove {
 }
 
 fn projection(dist: f32) -> glam::Mat4 {
-    glam::Mat4::perspective_lh(45f32.to_radians(), 1920.0 / 1080.0, 10.0, dist)
+    glam::Mat4::perspective_lh(45f32.to_radians(), 1920.0 / 1080.0, 5.0, dist)
 }
 
 fn filter(path: &std::path::Path) -> bool {
@@ -355,7 +355,7 @@ impl EventHandler for Stove {
                             ui.label("render distance:");
                             ui.add(
                                 egui::widgets::DragValue::new(&mut self.distance)
-                                    .clamp_range(0..=10000)
+                                    .clamp_range(0..=100000)
                             )
                         });
                         ui.horizontal(|ui| {
