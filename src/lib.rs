@@ -42,7 +42,7 @@ pub struct Stove {
     grab: Grab,
     paks: Vec<String>,
     colour: [f32; 3],
-    projection: glam::Mat4,
+    distance: f32,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -134,7 +134,7 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         ctx.set_cull_face(CullFace::Back);
         let mut notifs = egui_notify::Toasts::new();
-        let (version, paks, colour) = match config() {
+        let (version, paks, colour, distance) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
                     notifs.error("failed to create config directory");
@@ -157,9 +157,18 @@ impl Stove {
                             .collect::<Vec<f32>>();
                         [rgb[0], rgb[1], rgb[2]]
                     },
+                    std::fs::read_to_string(cfg.join("DISTANCE"))
+                        .unwrap_or_else(|_| "1000.0".to_string())
+                        .parse()
+                        .unwrap_or(1000.0),
                 )
             }
-            None => (EngineVersion::UNKNOWN, String::default(), [1.0, 1.3, 0.0]),
+            None => (
+                EngineVersion::UNKNOWN,
+                String::default(),
+                [1.0, 1.3, 0.0],
+                1000.0,
+            ),
         };
         let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
@@ -223,12 +232,7 @@ impl Stove {
             grab: Grab::None,
             paks,
             colour,
-            projection: glam::Mat4::perspective_lh(
-                45f32.to_radians(),
-                1920.0 / 1080.0,
-                10.0,
-                1000.0,
-            ),
+            distance,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -238,6 +242,10 @@ impl Stove {
         }
         stove
     }
+}
+
+fn projection(dist: f32) -> glam::Mat4 {
+    glam::Mat4::perspective_lh(45f32.to_radians(), 1920.0 / 1080.0, 10.0, dist)
 }
 
 fn filter(path: &std::path::Path) -> bool {
@@ -256,7 +264,7 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
-        let vp = self.projection * self.camera.view_matrix();
+        let vp = projection(self.distance) * self.camera.view_matrix();
         if let Some(map) = &self.map {
             self.cubes.draw(
                 mqctx,
@@ -342,6 +350,13 @@ impl EventHandler for Stove {
                         ui.horizontal(|ui| {
                             ui.label("mesh color:");
                             ui.color_edit_button_rgb(&mut self.colour)
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("render distance:");
+                            ui.add(
+                                egui::widgets::DragValue::new(&mut self.distance)
+                                    .clamp_range(0..=10000)
+                            )
                         });
                         ui.horizontal(|ui| {
                             ui.label("theme:");
@@ -661,7 +676,7 @@ impl EventHandler for Stove {
                 // normalise mouse coordinates to NDC
                 let (width, height) = ctx.screen_size();
                 let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                let proj = self.projection * self.camera.view_matrix();
+                let proj = projection(self.distance) * self.camera.view_matrix();
                 self.actors
                     .iter()
                     .map(|actor| {
@@ -688,7 +703,7 @@ impl EventHandler for Stove {
                         MouseButton::Right => Grab::Rotation,
                         MouseButton::Middle => Grab::Scale3D({
                             // convert to mouse coordinates
-                            let proj = self.projection
+                            let proj = projection(self.distance)
                                 * self.camera.view_matrix()
                                 * self.actors[selected]
                                     .location(self.map.as_ref().unwrap())
@@ -827,6 +842,7 @@ impl Drop for Stove {
             std::fs::write(path.join("VERSION"), (self.version as u8).to_string())
                 .unwrap_or_default();
             std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
+            std::fs::write(path.join("DISTANCE"), self.distance.to_string()).unwrap_or_default();
             let [r, g, b] = self.colour;
             std::fs::write(path.join("COLOUR"), format!("{},{},{}", r, g, b)).unwrap_or_default();
         }
