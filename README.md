@@ -2,7 +2,7 @@
 
 *<h1 align="center">still an extremely heavy work in progress</h1>*
 
-<h1 align="center"><img width="700" src="https://user-images.githubusercontent.com/71292624/208417568-840bb37d-57db-4273-84e9-b069a78964e1.png"></h1>
+<h1 align="center"><img width=700 src=https://user-images.githubusercontent.com/71292624/217354220-8d21f016-7941-44e9-95c6-bce7de373147.png></h1>
 
 with stove you can:
 - visualise actors relative to each other
