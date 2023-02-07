@@ -1,5 +1,7 @@
 #version 330
 
+uniform vec3 tint;
+
 void main() {
-    gl_FragColor = vec4(0.5, 1, 0.5, 1);
+    gl_FragColor = vec4(tint, 1);
 }

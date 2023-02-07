@@ -41,6 +41,8 @@ pub struct Stove {
     last_mouse_pos: glam::Vec2,
     grab: Grab,
     paks: Vec<String>,
+    colour: [f32; 3],
+    projection: glam::Mat4,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -130,11 +132,9 @@ macro_rules! refresh {
 
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
-        unsafe {
-            gl::glEnable(gl::GL_PROGRAM_POINT_SIZE);
-        }
+        ctx.set_cull_face(CullFace::Back);
         let mut notifs = egui_notify::Toasts::new();
-        let (version, paks) = match config() {
+        let (version, paks, colour) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
                     notifs.error("failed to create config directory");
@@ -149,9 +149,17 @@ impl Stove {
                     .unwrap_or(EngineVersion::UNKNOWN),
                     // for some reason doing lines and collect here gives the compiler a seizure
                     std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
+                    {
+                        let rgb = std::fs::read_to_string(cfg.join("COLOUR"))
+                            .unwrap_or_else(|_| "1.0,1.3,0.0".to_string())
+                            .split(',')
+                            .filter_map(|str| str.parse::<f32>().ok())
+                            .collect::<Vec<f32>>();
+                        [rgb[0], rgb[1], rgb[2]]
+                    },
                 )
             }
-            None => (EngineVersion::UNKNOWN, String::default()),
+            None => (EngineVersion::UNKNOWN, String::default(), [1.0, 1.3, 0.0]),
         };
         let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
@@ -214,6 +222,13 @@ impl Stove {
             last_mouse_pos: glam::Vec2::ZERO,
             grab: Grab::None,
             paks,
+            colour,
+            projection: glam::Mat4::perspective_lh(
+                45f32.to_radians(),
+                1920.0 / 1080.0,
+                10.0,
+                1000.0,
+            ),
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -241,7 +256,7 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
-        let vp = rendering::PROJECTION * self.camera.view_matrix();
+        let vp = self.projection * self.camera.view_matrix();
         if let Some(map) = &self.map {
             self.cubes.draw(
                 mqctx,
@@ -266,7 +281,7 @@ impl EventHandler for Stove {
                     actor::DrawType::Cube => None,
                 })
             {
-                mesh.draw(mqctx, &(vp * actor.model_matrix(map)));
+                mesh.draw(mqctx, vp * actor.model_matrix(map), self.colour);
             }
         }
         mqctx.end_render_pass();
@@ -324,6 +339,10 @@ impl EventHandler for Stove {
                         }
                     });
                     ui.menu_button("options", |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("mesh color:");
+                            ui.color_edit_button_rgb(&mut self.colour)
+                        });
                         ui.horizontal(|ui| {
                             ui.label("theme:");
                             egui::global_dark_light_mode_buttons(ui);
@@ -642,7 +661,7 @@ impl EventHandler for Stove {
                 // normalise mouse coordinates to NDC
                 let (width, height) = ctx.screen_size();
                 let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                let proj = rendering::PROJECTION * self.camera.view_matrix();
+                let proj = self.projection * self.camera.view_matrix();
                 self.actors
                     .iter()
                     .map(|actor| {
@@ -669,7 +688,7 @@ impl EventHandler for Stove {
                         MouseButton::Right => Grab::Rotation,
                         MouseButton::Middle => Grab::Scale3D({
                             // convert to mouse coordinates
-                            let proj = rendering::PROJECTION
+                            let proj = self.projection
                                 * self.camera.view_matrix()
                                 * self.actors[selected]
                                     .location(self.map.as_ref().unwrap())
@@ -808,6 +827,8 @@ impl Drop for Stove {
             std::fs::write(path.join("VERSION"), (self.version as u8).to_string())
                 .unwrap_or_default();
             std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
+            let [r, g, b] = self.colour;
+            std::fs::write(path.join("COLOUR"), format!("{},{},{}", r, g, b)).unwrap_or_default();
         }
     }
 }

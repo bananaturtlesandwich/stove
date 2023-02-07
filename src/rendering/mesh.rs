@@ -16,7 +16,10 @@ impl Mesh {
             include_str!("solid.frag"),
             ShaderMeta {
                 uniforms: UniformBlockLayout {
-                    uniforms: vec![UniformDesc::new("vp", UniformType::Mat4)],
+                    uniforms: vec![
+                        UniformDesc::new("vp", UniformType::Mat4),
+                        UniformDesc::new("tint", UniformType::Float3),
+                    ],
                 },
                 images: vec![],
             },
@@ -81,14 +84,14 @@ impl Mesh {
         }
     }
 
-    pub fn draw(&self, ctx: &mut Context, uniform: &glam::Mat4) {
+    pub fn draw(&self, ctx: &mut Context, uniform: glam::Mat4, colour: [f32; 3]) {
         ctx.apply_pipeline(&self.solid_pipeline);
         ctx.apply_bindings(&self.solid_bindings);
-        ctx.apply_uniforms(uniform);
+        ctx.apply_uniforms(&(uniform, colour));
         ctx.draw(0, self.len, 1);
         ctx.apply_pipeline(&self.wire_pipeline);
         ctx.apply_bindings(&self.wire_bindings);
-        ctx.apply_uniforms(uniform);
+        ctx.apply_uniforms(&uniform);
         ctx.draw(0, self.len, 1);
     }
 }
