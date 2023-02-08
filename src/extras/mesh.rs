@@ -18,7 +18,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     );
     asset.set_engine_version(EngineVersion::VER_UE4_25);
     asset.parse_data()?;
-    std::fs::write("positions.txt", format!("{:#?}", get_mesh_info(asset)?))?;
+    get_mesh_info(asset)?;
     Ok(())
 }
 
