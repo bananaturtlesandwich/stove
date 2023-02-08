@@ -248,8 +248,8 @@ impl Stove {
     }
 }
 
-fn projection(dist: f32) -> glam::Mat4 {
-    glam::Mat4::perspective_lh(45f32.to_radians(), 1920.0 / 1080.0, 5.0, dist)
+fn projection(dist: f32, (width, height): (f32, f32)) -> glam::Mat4 {
+    glam::Mat4::perspective_lh(45f32.to_radians(), width / height, 5.0, dist)
 }
 
 fn filter(path: &std::path::Path) -> bool {
@@ -268,7 +268,7 @@ impl EventHandler for Stove {
             depth: Some(1.0),
             stencil: None,
         });
-        let vp = projection(self.distance) * self.camera.view_matrix();
+        let vp = projection(self.distance, mqctx.screen_size()) * self.camera.view_matrix();
         if let Some(map) = &self.map {
             self.cubes.draw(
                 mqctx,
@@ -675,7 +675,7 @@ impl EventHandler for Stove {
                 // normalise mouse coordinates to NDC
                 let (width, height) = ctx.screen_size();
                 let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                let proj = projection(self.distance) * self.camera.view_matrix();
+                let proj = projection(self.distance, ctx.screen_size()) * self.camera.view_matrix();
                 self.actors
                     .iter()
                     .map(|actor| {
@@ -715,7 +715,7 @@ impl EventHandler for Stove {
                         MouseButton::Right => Grab::Rotation,
                         MouseButton::Middle => Grab::Scale3D({
                             // convert to mouse coordinates
-                            let proj = projection(self.distance)
+                            let proj = projection(self.distance, ctx.screen_size())
                                 * self.camera.view_matrix()
                                 * self.actors[selected]
                                     .location(self.map.as_ref().unwrap())
