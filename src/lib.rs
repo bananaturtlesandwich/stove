@@ -329,6 +329,7 @@ impl EventHandler for Stove {
                         }
                     });
                     ui.menu_button("paks", |ui| {
+                        ui.horizontal(|ui| ui.label("here you can add folders containing paks to pull resources from"));
                         let mut remove_at = None;
                         egui::ScrollArea::vertical().show_rows(
                             ui,
@@ -352,6 +353,10 @@ impl EventHandler for Stove {
                     });
                     ui.menu_button("options", |ui| {
                         ui.horizontal(|ui| {
+                            ui.label("theme:");
+                            egui::global_dark_light_mode_buttons(ui);
+                        });
+                        ui.horizontal(|ui| {
                             ui.label("mesh color:");
                             ui.color_edit_button_rgb(&mut self.colour)
                         });
@@ -361,10 +366,6 @@ impl EventHandler for Stove {
                                 egui::widgets::DragValue::new(&mut self.distance)
                                     .clamp_range(0..=100000)
                             )
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("theme:");
-                            egui::global_dark_light_mode_buttons(ui);
                         });
                         fn binding(ui:&mut egui::Ui,action:&str,binding:&str){
                             ui.label(action);
@@ -382,7 +383,7 @@ impl EventHandler for Stove {
                                 ui.heading("camera");
                                 ui.end_row();
                                 binding(ui,"move","wasd");
-                                binding(ui,"rotate","right-click + drag");
+                                binding(ui,"rotate","right-drag");
                                 binding(ui,"change speed","scroll wheel");
                                 ui.heading("viewport");
                                 ui.end_row();
@@ -393,10 +394,10 @@ impl EventHandler for Stove {
                                 ui.heading("actor");
                                 ui.end_row();
                                 binding(ui,"focus","F");
-                                binding(ui,"move","left-click + drag");
-                                binding(ui,"rotate","right-click + drag");
-                                binding(ui,"scale","middle-click + drag");
-                                binding(ui,"duplicate","ctrl + D");
+                                binding(ui,"move","left-drag");
+                                binding(ui,"rotate","right-drag");
+                                binding(ui,"scale","middle-drag");
+                                binding(ui,"duplicate","alt + left-drag");
                                 binding(ui,"delete","delete");
                             });
                         });
@@ -423,19 +424,15 @@ impl EventHandler for Stove {
                                 }
                             }
                         }
-                        if ui.add(egui::Button::new("duplicate").shortcut_text("ctrl + D")).clicked(){
+                        if ui.add(egui::Button::new("duplicate").shortcut_text("alt + left-drag")).clicked(){
                             match self.selected {
                                 Some(index) => {
                                     let map = self.map.as_mut().unwrap();
                                     let insert = map.exports.len() as i32 + 1;
-                                    self.selected = Some(self.actors.len());
                                     self.actors[index].duplicate(map);
-                                    self.actors.push(
-                                        actor::Actor::new(
-                                            map,
-                                            PackageIndex::new(insert),
-                                        )
-                                        .unwrap(),
+                                    self.actors.insert(
+                                        index,
+                                        actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
                                     );
                                     self.notifs
                                         .success(format!("duplicated {}", &self.actors[index].name));
@@ -696,6 +693,19 @@ impl EventHandler for Stove {
             // grabby time
             true => {
                 if let Some(selected) = self.selected {
+                    if self.held.contains(&KeyCode::LeftAlt)
+                        || self.held.contains(&KeyCode::RightAlt)
+                    {
+                        let map = self.map.as_mut().unwrap();
+                        let insert = map.exports.len() as i32 + 1;
+                        self.actors[selected].duplicate(map);
+                        self.actors.insert(
+                            selected,
+                            actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
+                        );
+                        self.notifs
+                            .success(format!("duplicated {}", &self.actors[selected].name));
+                    }
                     self.grab = match mb {
                         MouseButton::Left => Grab::Location(
                             self.actors[selected]
@@ -782,22 +792,6 @@ impl EventHandler for Stove {
                 }
             },
             KeyCode::H => self.ui = !self.ui,
-            KeyCode::D if keymods.ctrl => match self.selected {
-                Some(index) => {
-                    let map = self.map.as_mut().unwrap();
-                    let insert = map.exports.len() as i32 + 1;
-                    self.actors[index].duplicate(map);
-                    self.actors.insert(
-                        index,
-                        actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
-                    );
-                    self.notifs
-                        .success(format!("duplicated {}", &self.actors[index].name));
-                }
-                None => {
-                    self.notifs.error("nothing selected to duplicate");
-                }
-            },
             KeyCode::T if keymods.ctrl => match &self.map.is_some() {
                 true => {
                     self.transplant_dialog.open();
