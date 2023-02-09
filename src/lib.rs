@@ -309,7 +309,7 @@ impl EventHandler for Stove {
                             self.open_dialog.open();
                         }
                         if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
-                            match &mut self.map{
+                            match &mut self.map {
                                 Some(map) => match asset::save(map,&self.filepath){
                                     Ok(_) => self.notifs.success("map saved"),
                                     Err(e) => self.notifs.error(e.to_string()),
@@ -367,7 +367,7 @@ impl EventHandler for Stove {
                                     .clamp_range(0..=100000)
                             )
                         });
-                        fn binding(ui:&mut egui::Ui,action:&str,binding:&str){
+                        fn binding(ui:&mut egui::Ui, action:&str, binding:&str) {
                             ui.label(action);
                             ui.label(binding);
                             ui.end_row();
@@ -403,8 +403,8 @@ impl EventHandler for Stove {
                         });
                         ui.menu_button("about",|ui|{
                             ui.horizontal_wrapped(|ui|{
-                                let size=ui.fonts().glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' ');
-                                ui.spacing_mut().item_spacing.x=size;
+                                let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
+                                ui.spacing_mut().item_spacing.x = size;
                                 ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
                                 ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
                                 ui.label(egui::special_emojis::GITHUB.to_string());
@@ -457,9 +457,9 @@ impl EventHandler for Stove {
                         }
                     });
                     egui::ComboBox::from_id_source("version")
-                        .selected_text(*VERSIONS.iter().find_map(|(version,name)|(version==&self.version).then_some(name)).unwrap_or(&"unknown"))
+                        .selected_text(*VERSIONS.iter().find_map(|(version, name)| (version == &self.version).then_some(name)).unwrap_or(&"unknown"))
                         .show_ui(ui, |ui| {
-                            for (version,name) in VERSIONS {
+                            for (version, name) in VERSIONS {
                                 ui.selectable_value(&mut self.version, version, name);
                             }
                         });
@@ -473,7 +473,7 @@ impl EventHandler for Stove {
                             ui,
                             ui.text_style_height(&egui::TextStyle::Body),
                             self.actors.len(),
-                            |ui,range|{
+                            |ui, range|{
                             for i in range {
                                 let is_selected = Some(i) == self.selected;
                                 if ui.selectable_label(
@@ -482,17 +482,17 @@ impl EventHandler for Stove {
                                 )
                                 .on_hover_text(&self.actors[i].class)
                                 .clicked(){
-                                    self.selected=(!is_selected).then_some(i);
+                                    self.selected = (!is_selected).then_some(i);
                                 }
                             };
                         })
                     );
-                    if let Some(selected) = self.selected{
+                    if let Some(selected) = self.selected {
                         ui.add_space(10.0);
                         ui.push_id("properties", |ui| egui::ScrollArea::vertical()
                             .auto_shrink([false; 2])
                             .show(ui,|ui|{
-                                self.actors[selected].show(map,ui);
+                                self.actors[selected].show(map, ui);
                                 // otherwise the scroll area bugs out at the bottom
                                 ui.add_space(1.0);
                             })
@@ -503,7 +503,7 @@ impl EventHandler for Stove {
             if let Some(map) = &mut self.map {
                 let mut open = true;
                 let mut transplanted = false;
-                if let Some((donor, actors)) = &self.donor{
+                if let Some((donor, actors)) = &self.donor {
                     egui::Window::new("transplant actor")
                         .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
                         .resizable(false)
@@ -516,7 +516,7 @@ impl EventHandler for Stove {
                                 ui,
                                 ui.text_style_height(&egui::TextStyle::Body),
                                 actors.len(),
-                                |ui,range|{
+                                |ui, range| {
                                     for i in range {
                                         if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
                                             let insert = map.exports.len() as i32 + 1;
@@ -553,7 +553,7 @@ impl EventHandler for Stove {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
                             #[cfg(not(target_family = "wasm"))]
-                            if let Some(client) = &mut self.client{
+                            if let Some(client) = &mut self.client {
                                 if client.set_activity(
                                             default_activity()
                                                 .details("currently editing:")
