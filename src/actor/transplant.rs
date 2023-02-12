@@ -39,9 +39,9 @@ impl super::Actor {
                 .push(actor_ref);
         }
 
+        // resolve all import references from exports
         let import_offset = recipient.imports.len() as i32;
         let mut imports = Vec::new();
-        // resolve all import references from exports
         for child in children.iter_mut() {
             on_import_refs(child, |index| {
                 if let Some(import) = donor.get_import(*index) {
@@ -73,9 +73,9 @@ impl super::Actor {
         // finally add the exports
         recipient.exports.append(&mut children);
 
+        // resolve all import references from exports
         let mut i = 0;
-        // use this because the vector is expanding while the operation occurs
-        // imports.len updates every loop
+        // use a while loop because the vector is expanding while the operation occurs & imports.len() updates every loop
         while i < imports.len() {
             if let Some(parent) = donor.get_import(imports[i].outer_index) {
                 imports[i].outer_index.index = match recipient.find_import_no_index(

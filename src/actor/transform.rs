@@ -26,7 +26,7 @@ impl super::Actor {
                         }
                         None
                     })
-                    .map(|pos| glam::vec3(pos.value.x.0, pos.value.z.0, pos.value.y.0) * 0.01)
+                    .map(|pos| glam::vec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0) * 0.01)
                     .unwrap_or_default()
             })
             .unwrap_or_default()
@@ -45,7 +45,7 @@ impl super::Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 = new.x;
+                        vec.value.x.0 = -new.x;
                         vec.value.y.0 = new.z;
                         vec.value.z.0 = new.y;
                     }
@@ -82,7 +82,7 @@ impl super::Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 += offset.x;
+                        vec.value.x.0 -= offset.x;
                         vec.value.y.0 += offset.z;
                         vec.value.z.0 += offset.y;
                     }
@@ -101,7 +101,7 @@ impl super::Actor {
                         name: FName::from_slice("RelativeLocation"),
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
+                        value: Vector::new((-offset.x).into(), offset.z.into(), offset.y.into()),
                     })],
                 })),
         }

@@ -87,24 +87,25 @@ macro_rules! refresh {
     ($self: expr, $ctx: expr) => {
         $self.actors.clear();
         $self.meshes.clear();
-        let mut paks: Vec<_> = $self
-            .paks
-            .iter()
-            .filter_map(|dir| std::fs::read_dir(dir).ok())
-            .flatten()
-            .filter_map(Result::ok)
-            .filter_map(|path| unpak::Pak::load(|| std::fs::OpenOptions::new().read(true).open(path.path()).ok().map(std::io::BufReader::new), None).ok())
-            .collect();
         $self.selected = None;
         if let Some(map) = &$self.map {
+            let paks: Vec<_> = $self
+                .paks
+                .iter()
+                .filter_map(|dir| std::fs::read_dir(dir).ok())
+                .flatten()
+                .filter_map(Result::ok)
+                .map(|dir| dir.path())
+                .filter_map(|path| unpak::Pak::new_from_path(&path, None).ok().map(|pak| (pak, path)))
+                .collect();
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
                         if let actor::DrawType::Mesh(path) = &actor.draw_type {
                             if !$self.meshes.contains_key(path) {
-                                for pak in paks.iter_mut() {
-                                    let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
-                                    let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
+                                for (pak, pak_file) in paks.iter() {
+                                    let Ok(mesh) = pak.get_from_path(&format!("{path}.uasset"), pak_file) else {continue};
+                                    let mesh_bulk = pak.get_from_path(&format!("{path}.uexp"), pak_file).ok();
                                     let mut mesh = unreal_asset::Asset::new(mesh, mesh_bulk);
                                     mesh.set_engine_version($self.version);
                                     let Ok(()) = mesh.parse_data() else {continue};
@@ -768,6 +769,9 @@ impl EventHandler for Stove {
         self.egui.key_up_event(keycode, keymods);
         if let Some(pos) = self.held.iter().position(|k| k == &keycode) {
             self.held.remove(pos);
+        }
+        if self.egui.egui_ctx().wants_keyboard_input() {
+            return;
         }
         match keycode {
             KeyCode::Delete => match self.selected {

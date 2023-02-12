@@ -149,7 +149,7 @@ pub fn get_mesh_info(asset: Asset) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Er
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
         );
-        positions.push(glam::vec3(x, y, z) * 0.01);
+        positions.push(glam::vec3(-x, y, z) * 0.01);
     }
 
     // vertex buffer

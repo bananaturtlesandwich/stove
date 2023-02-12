@@ -11,7 +11,6 @@ edition = "2021"
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
 unpak = "*"
 glam = { version = "*", features = ["fast-math"] }
-# atm you need to edit miniquad to render points
 miniquad = "*"
 egui = "*"
 egui-miniquad = "*"
