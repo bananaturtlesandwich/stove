@@ -6,7 +6,7 @@ use unreal_asset::{
 };
 
 impl super::Actor {
-    pub fn show(&self, asset: &mut Asset, ui: &mut egui::Ui) {
+    pub fn show(&self, asset: &mut Asset<std::fs::File>, ui: &mut egui::Ui) {
         ui.heading(&self.name);
         fn show_export(ui: &mut egui::Ui, export: &mut Export) {
             if let Some(norm) = export.get_normal_export_mut() {

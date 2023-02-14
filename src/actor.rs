@@ -1,3 +1,4 @@
+use std::fs::File;
 use unreal_asset::{
     cast,
     error::Error,
@@ -31,7 +32,7 @@ impl Actor {
     fn index(&self) -> PackageIndex {
         PackageIndex::new(self.export as i32 + 1)
     }
-    pub fn new(asset: &Asset, package: PackageIndex) -> Result<Self, Error> {
+    pub fn new(asset: &Asset<File>, package: PackageIndex) -> Result<Self, Error> {
         if package.index == 0 {
             return Err(Error::invalid_package_index(
                 "actor was null reference".to_string(),
@@ -114,7 +115,7 @@ impl Actor {
     }
 
     /// gets all exports related to the given actor
-    fn get_actor_exports(&self, asset: &Asset, offset: usize) -> Vec<Export> {
+    fn get_actor_exports(&self, asset: &Asset<File>, offset: usize) -> Vec<Export> {
         // get references to all the actor's children
         let mut child_indexes: Vec<PackageIndex> = asset.exports[self.export]
             .get_base_export()
@@ -151,7 +152,7 @@ impl Actor {
 }
 
 /// gets all actor exports within a map (all exports direct children of PersistentLevel)
-pub fn get_actors(asset: &Asset) -> Vec<PackageIndex> {
+pub fn get_actors(asset: &Asset<File>) -> Vec<PackageIndex> {
     match asset
         .exports
         .iter()
@@ -168,7 +169,7 @@ pub fn get_actors(asset: &Asset) -> Vec<PackageIndex> {
 }
 
 /// creates and assigns a unique name
-fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
+fn give_unique_name(orig: &mut FName, asset: &mut Asset<File>) {
     // for the cases where the number is unnecessary
     if asset.search_name_reference(&orig.content).is_none() {
         *orig = asset.add_fname(&orig.content);

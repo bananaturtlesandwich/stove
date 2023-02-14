@@ -13,8 +13,10 @@ use unreal_asset::{
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     let mut asset = Asset::new(
-        include_bytes!("A02_Outside_Castle.uasset").to_vec(),
-        Some(include_bytes!("A02_Outside_Castle.uexp").to_vec()),
+        io::Cursor::new(include_bytes!("A02_Outside_Castle.uasset").as_slice()),
+        Some(io::Cursor::new(
+            include_bytes!("A02_Outside_Castle.uexp").as_slice(),
+        )),
     );
     asset.set_engine_version(EngineVersion::VER_UE4_25);
     asset.parse_data()?;
@@ -27,7 +29,9 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 // cue4parse: https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Assets/Exports/StaticMesh/UStaticMesh.cs#L13
 // CAS UAssetAPI: https://github.com/LongerWarrior/UEAssetToolkitGenerator/blob/master/UAssetApi/ExportTypes/StaticMeshExport.cs#L6
 /// parses the extra data of the static mesh export to get render data
-pub fn get_mesh_info(asset: Asset) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
+pub fn get_mesh_info<C: io::Read + io::Seek>(
+    asset: Asset<C>,
+) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
     // get the static mesh
     let Some(mesh) = asset
         .exports

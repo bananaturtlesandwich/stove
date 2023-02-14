@@ -1,3 +1,4 @@
+use std::fs::File;
 use unreal_asset::{
     cast,
     exports::ExportNormalTrait,
@@ -11,7 +12,7 @@ use unreal_asset::{
 };
 
 impl super::Actor {
-    pub fn location(&self, map: &Asset) -> glam::Vec3 {
+    pub fn location(&self, map: &Asset<File>) -> glam::Vec3 {
         map.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -32,7 +33,7 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn set_location(&self, map: &mut Asset, mut new: glam::Vec3) {
+    pub fn set_location(&self, map: &mut Asset<File>, mut new: glam::Vec3) {
         new *= 100.0;
         let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
             return
@@ -70,7 +71,7 @@ impl super::Actor {
         }
     }
 
-    pub fn add_location(&self, map: &mut Asset, offset: glam::Vec3) {
+    pub fn add_location(&self, map: &mut Asset<File>, offset: glam::Vec3) {
         let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
             return
         };
@@ -107,7 +108,7 @@ impl super::Actor {
         }
     }
 
-    pub fn rotation(&self, map: &Asset) -> glam::Vec3 {
+    pub fn rotation(&self, map: &Asset<File>) -> glam::Vec3 {
         map.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -128,7 +129,7 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn combine_rotation(&self, map: &mut Asset, offset: glam::Quat) {
+    pub fn combine_rotation(&self, map: &mut Asset<File>, offset: glam::Quat) {
         let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
             return;
         };
@@ -175,7 +176,7 @@ impl super::Actor {
         }
     }
 
-    pub fn scale(&self, map: &Asset) -> glam::Vec3 {
+    pub fn scale(&self, map: &Asset<File>) -> glam::Vec3 {
         map.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -195,7 +196,7 @@ impl super::Actor {
             })
             .unwrap_or(glam::Vec3::ONE)
     }
-    pub fn mul_scale(&self, map: &mut Asset, offset: glam::Vec3) {
+    pub fn mul_scale(&self, map: &mut Asset<File>, offset: glam::Vec3) {
         let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
             return;
         };
@@ -232,7 +233,7 @@ impl super::Actor {
         }
     }
 
-    pub fn model_matrix(&self, map: &Asset) -> glam::Mat4 {
+    pub fn model_matrix(&self, map: &Asset<File>) -> glam::Mat4 {
         let rot = self.rotation(map);
         glam::Mat4::from_scale_rotation_translation(
             self.scale(map),

@@ -7,7 +7,7 @@ use unreal_asset::{
 
 impl super::Actor {
     /// delete an actor from a map
-    pub fn delete(&self, map: &mut Asset) {
+    pub fn delete(&self, map: &mut Asset<std::fs::File>) {
         let val = PackageIndex::new(self.export as i32 + 1);
         if let Some(level) = map
             .exports

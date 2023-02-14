@@ -7,7 +7,7 @@ use unreal_asset::{
 };
 
 impl super::Actor {
-    pub fn transplant(&self, recipient: &mut Asset, donor: &Asset) {
+    pub fn transplant(&self, recipient: &mut Asset<std::fs::File>, donor: &Asset<std::fs::File>) {
         let mut children = self.get_actor_exports(donor, recipient.exports.len());
 
         // make sure the actor has a unique object name

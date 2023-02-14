@@ -23,7 +23,7 @@ enum Grab {
 pub struct Stove {
     camera: rendering::Camera,
     notifs: egui_notify::Toasts,
-    map: Option<unreal_asset::Asset>,
+    map: Option<unreal_asset::Asset<std::fs::File>>,
     version: unreal_asset::engine_version::EngineVersion,
     egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
@@ -31,7 +31,7 @@ pub struct Stove {
     cubes: rendering::Cube,
     meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
-    donor: Option<(unreal_asset::Asset, Vec<actor::Actor>)>,
+    donor: Option<(unreal_asset::Asset<std::fs::File>, Vec<actor::Actor>)>,
     filepath: String,
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
@@ -106,7 +106,7 @@ macro_rules! refresh {
                                 for (pak, pak_file) in paks.iter() {
                                     let Ok(mesh) = pak.get_from_path(&format!("{path}.uasset"), pak_file) else {continue};
                                     let mesh_bulk = pak.get_from_path(&format!("{path}.uexp"), pak_file).ok();
-                                    let mut mesh = unreal_asset::Asset::new(mesh, mesh_bulk);
+                                    let mut mesh = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)));
                                     mesh.set_engine_version($self.version);
                                     let Ok(()) = mesh.parse_data() else {continue};
                                     match extras::get_mesh_info(mesh) {
