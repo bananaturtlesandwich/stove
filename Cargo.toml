@@ -4,7 +4,7 @@ authors = ["spuds"]
 repository = "https://github.com/bananaturtlesandwich/stove"
 description = "an editor for cooked unreal engine 4 map files"
 readme = "README.md"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 
 [dependencies]

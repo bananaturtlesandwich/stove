@@ -30,7 +30,7 @@
 ### advanced functionality
 - [ ] insert default values (properties left as default are cut from the map)
 - [ ] delete excess exports left after actor removal
-- [ ] duplicate and transplant all actor types (not sure why some don't work)
+- [x] duplicate and transplant all actor types (not sure why some don't work)
 ### aesthetic
 - [x] load assets from pak folders
 - [x] retrieve and display static meshes
