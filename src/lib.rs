@@ -137,7 +137,7 @@ impl Stove {
         let mut notifs = egui_notify::Toasts::new();
         let (version, paks, colour, distance) = match config() {
             Some(ref cfg) => {
-                if !cfg.exists() && std::fs::create_dir(&cfg).is_err() {
+                if !cfg.exists() && std::fs::create_dir(cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
                 (
@@ -594,7 +594,7 @@ impl EventHandler for Stove {
             self.pak_dialog.show(ctx);
             if self.pak_dialog.selected() {
                 if let Some(path) = self.pak_dialog.path().and_then(|path|path.to_str().map(str::to_string)) {
-                    self.paks.push(path.to_string());
+                    self.paks.push(path);
                 }
             }
             self.save_dialog.show(ctx);

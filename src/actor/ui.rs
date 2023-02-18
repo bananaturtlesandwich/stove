@@ -34,8 +34,6 @@ impl super::Actor {
                 let response = ui
                     .push_id(id, |ui| ui.collapsing(name, |ui| show_export(ui, ex)))
                     .response;
-                // first time i've ever used drop!
-                drop(ex);
                 response.on_hover_text(&asset.imports[index as usize].object_name.content);
             }
         }
