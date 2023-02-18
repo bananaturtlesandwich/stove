@@ -38,7 +38,6 @@ impl super::Actor {
                 .create_before_serialization_dependencies
                 .push(actor_ref);
         }
-
         // resolve all import references from exports
         let import_offset = recipient.imports.len() as i32;
         let mut imports = Vec::new();
@@ -50,8 +49,27 @@ impl super::Actor {
                         &import.class_name,
                         &import.object_name,
                     ) {
-                        Some(existing) => existing,
-                        None => {
+                        // sometimes e.g for GEN_VARIABLEs you want those imports
+                        Some(existing)
+                            if donor.get_import(import.outer_index).map(|import| {
+                                (
+                                    &import.class_package.content,
+                                    &import.class_name.content,
+                                    &import.object_name.content,
+                                )
+                            }) == recipient.get_import(PackageIndex::new(existing)).map(
+                                |import| {
+                                    (
+                                        &import.class_package.content,
+                                        &import.class_name.content,
+                                        &import.object_name.content,
+                                    )
+                                },
+                            ) =>
+                        {
+                            existing
+                        }
+                        _ => {
                             -import_offset
                                 - match imports.iter().position(|imp: &Import| {
                                     imp.class_package.content == import.class_package.content
@@ -70,6 +88,15 @@ impl super::Actor {
                 }
             })
         }
+        // add export names
+        for export in children.iter() {
+            recipient.add_fname(&export.get_base_export().object_name.content);
+            if let Some(norm) = export.get_normal_export() {
+                for prop in norm.properties.iter() {
+                    super::add_prop_names(prop, recipient, false)
+                }
+            }
+        }
         // finally add the exports
         recipient.exports.append(&mut children);
 
@@ -83,8 +110,26 @@ impl super::Actor {
                     &parent.class_name,
                     &parent.object_name,
                 ) {
-                    Some(existing) => existing,
-                    None => {
+                    Some(existing)
+                        if donor.get_import(parent.outer_index).map(|import| {
+                            (
+                                &import.class_package.content,
+                                &import.class_name.content,
+                                &import.object_name.content,
+                            )
+                        }) == recipient.get_import(PackageIndex::new(existing)).map(
+                            |import| {
+                                (
+                                    &import.class_package.content,
+                                    &import.class_name.content,
+                                    &import.object_name.content,
+                                )
+                            },
+                        ) =>
+                    {
+                        existing
+                    }
+                    _ => {
                         -import_offset
                             - match imports.iter().position(|import: &Import| {
                                 import.class_package.content == parent.class_package.content
@@ -103,6 +148,12 @@ impl super::Actor {
             }
             i += 1;
         }
+        // add import names
+        for import in imports.iter() {
+            recipient.add_fname(&import.class_package.content);
+            recipient.add_fname(&import.class_name.content);
+            recipient.add_fname(&import.object_name.content);
+        }
         recipient.imports.append(&mut imports);
     }
 }
@@ -111,7 +162,7 @@ impl super::Actor {
 fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
-            super::update_props(prop, &mut func);
+            super::on_props(prop, &mut func);
         }
     }
     let export = export.get_base_export_mut();
