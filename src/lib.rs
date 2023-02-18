@@ -96,7 +96,7 @@ macro_rules! refresh {
                 .flatten()
                 .filter_map(Result::ok)
                 .map(|dir| dir.path())
-                .filter_map(|path| unpak::Pak::new_from_path(&path, None).ok().map(|pak| (pak, path)))
+                .filter_map(|path| unpak::Pak::new_any_from_path(&path, None).ok().map(|pak| (pak, path)))
                 .collect();
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
