@@ -58,7 +58,9 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             )
         );
     };
-    let mut data = io::Cursor::new(&mesh.extras);
+    let object = asset.get_object_version();
+    let engine = asset.get_engine_version();
+    let mut data = io::Cursor::new(mesh.extras.as_slice());
     // if I don't read this it breaks
     data.read_i32::<LE>()?;
     if !StripDataFlags::read(&mut data)?.editor_data_stripped()
@@ -82,13 +84,21 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         data.read_u32::<LE>()?;
     }
     // KeepMobileMinLODSettingOnDesktop
-    if asset.get_engine_version() >= EngineVersion::VER_UE4_27 {
+    if engine >= EngineVersion::VER_UE4_27 {
         data.read_i32::<LE>()?;
     }
     // array of lod resources
     // discard len because we'll just read the first LOD
     data.read_u32::<LE>()?;
-    let flags = StripDataFlags::read(&mut data)?;
+    read_lod(&mut data, object, engine)
+}
+
+fn read_lod(
+    data: &mut io::Cursor<&[u8]>,
+    object: ObjectVersion,
+    engine: EngineVersion,
+) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
+    let flags = StripDataFlags::read(data)?;
     if flags.data_stripped_for_server() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -112,23 +122,23 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         // casts shadow
         data.read_u32::<LE>()?;
         // force opaque
-        if asset.get_engine_version() >= EngineVersion::VER_UE4_25 {
+        if engine >= EngineVersion::VER_UE4_25 {
             data.read_u32::<LE>()?;
         }
         //visible in ray tracing
-        if asset.get_engine_version() <= EngineVersion::VER_UE4_26 {
+        if engine <= EngineVersion::VER_UE4_26 {
             data.read_u32::<LE>()?;
         }
     }
     // max deviation
     data.read_f32::<LE>()?;
-    match asset.get_engine_version() >= EngineVersion::VER_UE4_23 {
+    match engine >= EngineVersion::VER_UE4_23 {
         // lod isn't cooked out
         true if data.read_u32::<LE>()? == 0
         // data is inlined
         && data.read_u32::<LE>()? == 1 =>
         {
-            StripDataFlags::read(&mut data)?;
+            StripDataFlags::read(data)?;
         }
         false if !flags.class_data_stripped(2) => (),
         _ => {
@@ -157,10 +167,8 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     }
 
     // vertex buffer
-    if match asset.get_object_version()
-        >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX
-    {
-        true => StripDataFlags::read(&mut data)?,
+    if match object >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX {
+        true => StripDataFlags::read(data)?,
         false => StripDataFlags::default(),
     }
     .data_stripped_for_server()
@@ -172,16 +180,15 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     }
     let num_tex_coords = data.read_u32::<LE>()?;
     // strides
-    if asset.get_engine_version() < EngineVersion::VER_UE4_19 {
+    if engine < EngineVersion::VER_UE4_19 {
         data.read_u32::<LE>()?;
     }
     // num verts
     let num_verts = data.read_u32::<LE>()?;
     let precise_uvs = data.read_u32::<LE>()? != 0;
-    let precise_tangents =
-        asset.get_engine_version() >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? != 0;
+    let precise_tangents = engine >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? != 0;
     fn read_tangents(
-        data: &mut io::Cursor<&Vec<u8>>,
+        data: &mut io::Cursor<&[u8]>,
         precise_tangents: bool,
     ) -> Result<(), io::Error> {
         match precise_tangents {
@@ -201,7 +208,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         Ok(())
     }
     fn read_tex_coords(
-        data: &mut io::Cursor<&Vec<u8>>,
+        data: &mut io::Cursor<&[u8]>,
         num_tex_coords: u32,
         precise_uvs: bool,
     ) -> Result<(), io::Error> {
@@ -219,7 +226,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         }
         Ok(())
     }
-    match asset.get_engine_version() >= EngineVersion::VER_UE4_20 {
+    match engine >= EngineVersion::VER_UE4_20 {
         true => {
             // item size
             data.read_u32::<LE>()?;
@@ -227,7 +234,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_u32::<LE>()?;
             // packed normals
             for _ in 0..num_verts {
-                read_tangents(&mut data, precise_tangents)?;
+                read_tangents(data, precise_tangents)?;
             }
             // item size
             data.read_u32::<LE>()?;
@@ -235,21 +242,21 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_u32::<LE>()?;
             // mesh uv
             for _ in 0..num_verts {
-                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
+                read_tex_coords(data, num_tex_coords, precise_uvs)?;
             }
         }
         false => {
             //size
             data.read_u32::<LE>()?;
             for _ in 0..data.read_u32::<LE>()? {
-                read_tangents(&mut data, precise_tangents)?;
-                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
+                read_tangents(data, precise_tangents)?;
+                read_tex_coords(data, num_tex_coords, precise_uvs)?;
             }
         }
     }
 
     // color vertex buffer
-    if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
+    if StripDataFlags::read(data)?.data_stripped_for_server() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "colour data is stripped",
@@ -267,9 +274,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         }
     }
 
-    let indices = match asset.get_object_version()
-        >= ObjectVersion::VER_UE4_SUPPORT_32BIT_STATIC_MESH_INDICES
-    {
+    let indices = match object >= ObjectVersion::VER_UE4_SUPPORT_32BIT_STATIC_MESH_INDICES {
         true => {
             let x32 = data.read_u32::<LE>()? != 0;
             // size
@@ -302,4 +307,5 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         }
     };
     Ok((positions, indices))
+    // currently need to read more stuff for a full lod so I can get the best detail
 }

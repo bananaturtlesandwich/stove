@@ -14,7 +14,7 @@ pub struct StripDataFlags {
 }
 
 impl StripDataFlags {
-    pub fn read(data: &mut io::Cursor<&Vec<u8>>) -> Result<Self, io::Error> {
+    pub fn read(data: &mut io::Cursor<&[u8]>) -> Result<Self, io::Error> {
         Ok(Self {
             global: data.read_u8()?,
             class: data.read_u8()?,

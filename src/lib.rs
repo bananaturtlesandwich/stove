@@ -151,11 +151,11 @@ impl Stove {
                     // for some reason doing lines and collect here gives the compiler a seizure
                     std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
                     {
-                        let rgb = std::fs::read_to_string(cfg.join("COLOUR"))
+                        let rgb: Vec<_> = std::fs::read_to_string(cfg.join("COLOUR"))
                             .unwrap_or_else(|_| "1.0,1.3,0.0".to_string())
                             .split(',')
                             .filter_map(|str| str.parse::<f32>().ok())
-                            .collect::<Vec<f32>>();
+                            .collect();
                         [rgb[0], rgb[1], rgb[2]]
                     },
                     std::fs::read_to_string(cfg.join("DISTANCE"))
