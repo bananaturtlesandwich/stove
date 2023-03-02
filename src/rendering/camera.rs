@@ -7,9 +7,10 @@ pub struct Camera {
     pub up: glam::Vec3,
     yaw: f32,
     pitch: f32,
-    pub delta_time: f64,
+    delta_time: f64,
     last_time: f64,
     pub speed: u16,
+    focus: Option<glam::Vec3>,
 }
 
 impl Default for Camera {
@@ -24,6 +25,7 @@ impl Default for Camera {
             pitch: 0.0,
             yaw: -90.0,
             speed: 25,
+            focus: None,
         }
     }
 }
@@ -41,21 +43,31 @@ impl Camera {
         self.front.cross(self.up).normalize()
     }
     pub fn move_cam(&mut self, held: &[KeyCode]) {
-        let velocity = (self.speed as f64 * self.delta_time) as f32;
-        for keycode in held.iter() {
-            match keycode {
-                KeyCode::W => self.position += self.front * velocity,
-                KeyCode::A => self.position += self.left() * velocity,
-                KeyCode::S => self.position -= self.front * velocity,
-                KeyCode::D => self.position -= self.left() * velocity,
-                KeyCode::E => self.position += glam::vec3(0.0, velocity, 0.0),
-                KeyCode::Q => self.position -= glam::vec3(0.0, velocity, 0.0),
-                _ => (),
+        match self.focus {
+            Some(target) => {
+                self.position += self.delta_time as f32 * 10.0 * (target - self.position);
+                if self.position.distance(target) < 1.0 {
+                    self.focus = None;
+                }
+            }
+            None => {
+                let velocity = (self.speed as f64 * self.delta_time) as f32;
+                for keycode in held.iter() {
+                    match keycode {
+                        KeyCode::W => self.position += self.front * velocity,
+                        KeyCode::A => self.position += self.left() * velocity,
+                        KeyCode::S => self.position -= self.front * velocity,
+                        KeyCode::D => self.position -= self.left() * velocity,
+                        KeyCode::E => self.position += glam::vec3(0.0, velocity, 0.0),
+                        KeyCode::Q => self.position -= glam::vec3(0.0, velocity, 0.0),
+                        _ => (),
+                    }
+                }
             }
         }
     }
     pub fn set_focus(&mut self, pos: glam::Vec3, sca: glam::Vec3) {
-        self.position = pos - self.front * sca.length() * 4.0;
+        self.focus = Some(pos - self.front * sca.length() * 4.0)
     }
     pub fn handle_mouse_motion(&mut self, delta: glam::Vec2) {
         if self.can_move {
