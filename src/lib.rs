@@ -96,16 +96,16 @@ macro_rules! refresh {
                 .flatten()
                 .filter_map(Result::ok)
                 .map(|dir| dir.path())
-                .filter_map(|path| unpak::Pak::new_any_from_path(&path, None).ok().map(|pak| (pak, path)))
+                .filter_map(|path| unpak::Pak::new_any(&path, None).ok())
                 .collect();
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
                         if let actor::DrawType::Mesh(path) = &actor.draw_type {
                             if !$self.meshes.contains_key(path) {
-                                for (pak, pak_file) in paks.iter() {
-                                    let Ok(mesh) = pak.get_from_path(&format!("{path}.uasset"), pak_file) else {continue};
-                                    let mesh_bulk = pak.get_from_path(&format!("{path}.uexp"), pak_file).ok();
+                                for pak in paks.iter() {
+                                    let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
+                                    let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
                                     let mut mesh = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)));
                                     mesh.set_engine_version($self.version);
                                     let Ok(()) = mesh.parse_data() else {continue};
