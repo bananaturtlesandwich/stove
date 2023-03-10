@@ -43,6 +43,7 @@ pub struct Stove {
     paks: Vec<String>,
     colour: [f32; 3],
     distance: f32,
+    fullscreen: bool,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -238,6 +239,7 @@ impl Stove {
             paks,
             colour,
             distance,
+            fullscreen: true,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -353,9 +355,49 @@ impl EventHandler for Stove {
                         }
                     });
                     ui.menu_button("options", |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("theme:");
-                            egui::global_dark_light_mode_buttons(ui);
+                        ui.menu_button("about",|ui|{
+                            ui.horizontal_wrapped(|ui|{
+                                let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
+                                ui.spacing_mut().item_spacing.x = size;
+                                ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
+                                ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                                ui.label(egui::special_emojis::GITHUB.to_string());
+                            });
+                        });
+                        fn binding(ui:&mut egui::Ui, action:&str, binding:&str) {
+                            ui.label(action);
+                            ui.label(binding);
+                            ui.end_row();
+                        }
+                        ui.menu_button("shortcuts", |ui|{
+                            egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
+                                ui.heading("file");
+                                ui.end_row();
+                                binding(ui, "open map", "ctrl + o");
+                                binding(ui, "save map", "ctrl + s");
+                                binding(ui, "save map as", "ctrl + shift + s");
+                                binding(ui, "add pak folder", "alt + o");
+                                ui.heading("camera");
+                                ui.end_row();
+                                binding(ui, "move", "w + a + s + d");
+                                binding(ui, "rotate", "right-drag");
+                                binding(ui, "change speed", "scroll wheel");
+                                ui.heading("viewport");
+                                ui.end_row();
+                                binding(ui, "exit", "escape");
+                                binding(ui, "toggle fullscreen", "t");
+                                binding(ui, "hide ui", "h");
+                                binding(ui, "select", "left-click");
+                                binding(ui, "transplant", "ctrl + t");
+                                ui.heading("actor");
+                                ui.end_row();
+                                binding(ui, "focus", "f");
+                                binding(ui, "move", "left-drag");
+                                binding(ui, "rotate", "right-drag");
+                                binding(ui, "scale", "middle-drag");
+                                binding(ui, "duplicate", "alt + left-drag");
+                                binding(ui, "delete", "delete");
+                            });
                         });
                         ui.horizontal(|ui| {
                             ui.label("mesh color:");
@@ -368,91 +410,6 @@ impl EventHandler for Stove {
                                     .clamp_range(0..=100000)
                             )
                         });
-                        fn binding(ui:&mut egui::Ui, action:&str, binding:&str) {
-                            ui.label(action);
-                            ui.label(binding);
-                            ui.end_row();
-                        }
-                        ui.menu_button("shortcuts", |ui|{
-                            egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
-                                ui.heading("file");
-                                ui.end_row();
-                                binding(ui,"open map","ctrl + O");
-                                binding(ui,"save map","ctrl + S");
-                                binding(ui,"save map as","ctrl + shift + S");
-                                binding(ui,"add folder","alt + O");
-                                ui.heading("camera");
-                                ui.end_row();
-                                binding(ui,"move","wasd");
-                                binding(ui,"rotate","right-drag");
-                                binding(ui,"change speed","scroll wheel");
-                                ui.heading("viewport");
-                                ui.end_row();
-                                binding(ui,"exit","escape");
-                                binding(ui,"hide ui","H");
-                                binding(ui,"select","left-click");
-                                binding(ui,"transplant","ctrl + T");
-                                ui.heading("actor");
-                                ui.end_row();
-                                binding(ui,"focus","F");
-                                binding(ui,"move","left-drag");
-                                binding(ui,"rotate","right-drag");
-                                binding(ui,"scale","middle-drag");
-                                binding(ui,"duplicate","alt + left-drag");
-                                binding(ui,"delete","delete");
-                            });
-                        });
-                        ui.menu_button("about",|ui|{
-                            ui.horizontal_wrapped(|ui|{
-                                let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
-                                ui.spacing_mut().item_spacing.x = size;
-                                ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
-                                ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
-                                ui.label(egui::special_emojis::GITHUB.to_string());
-                            });
-                        });
-                        if ui.add(egui::Button::new("delete").shortcut_text("delete")).clicked(){
-                            match self.selected {
-                                Some(index) => {
-                                    self.selected = None;
-                                    self.actors[index].delete(self.map.as_mut().unwrap());
-                                    self.notifs
-                                        .success(format!("deleted {}", &self.actors[index].name));
-                                    self.actors.remove(index);
-                                }
-                                None => {
-                                    self.notifs.error("nothing selected to delete");
-                                }
-                            }
-                        }
-                        if ui.add(egui::Button::new("duplicate").shortcut_text("alt + left-drag")).clicked(){
-                            match self.selected {
-                                Some(index) => {
-                                    let map = self.map.as_mut().unwrap();
-                                    let insert = map.exports.len() as i32 + 1;
-                                    self.actors[index].duplicate(map);
-                                    self.actors.insert(
-                                        index,
-                                        actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
-                                    );
-                                    self.notifs
-                                        .success(format!("duplicated {}", &self.actors[index].name));
-                                }
-                                None => {
-                                    self.notifs.error("nothing selected to duplicate");
-                                }
-                            }
-                        }
-                        if ui.add(egui::Button::new("transplant").shortcut_text("ctrl + T")).clicked(){
-                            match &self.map.is_some() {
-                                true => {
-                                    self.transplant_dialog.open();
-                                }
-                                false => {
-                                    self.notifs.error("no map to transplant to");
-                                }
-                            }
-                        }
                         if ui.add(egui::Button::new("exit").shortcut_text("escape")).clicked(){
                             mqctx.request_quit();
                         }
@@ -475,17 +432,20 @@ impl EventHandler for Stove {
                             ui.text_style_height(&egui::TextStyle::Body),
                             self.actors.len(),
                             |ui, range|{
-                            for i in range {
-                                let is_selected = Some(i) == self.selected;
-                                if ui.selectable_label(
-                                    is_selected,
-                                    &self.actors[i].name
+                                ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
+                                    for i in range {
+                                        let is_selected = Some(i) == self.selected;
+                                        if ui.selectable_label(
+                                            is_selected,
+                                            &self.actors[i].name
+                                        )
+                                        .on_hover_text(&self.actors[i].class)
+                                        .clicked(){
+                                            self.selected = (!is_selected).then_some(i);
+                                        }
+                                    }
                                 )
-                                .on_hover_text(&self.actors[i].class)
-                                .clicked(){
-                                    self.selected = (!is_selected).then_some(i);
-                                }
-                            };
+                            ;
                         })
                     );
                     if let Some(selected) = self.selected {
@@ -518,25 +478,27 @@ impl EventHandler for Stove {
                                 ui.text_style_height(&egui::TextStyle::Body),
                                 actors.len(),
                                 |ui, range| {
-                                    for i in range {
-                                        if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
-                                            let insert = map.exports.len() as i32 + 1;
-                                            actors[i].transplant(map, donor);
-                                            let selected = self.actors.len();
-                                            self.actors.push(
-                                                actor::Actor::new(
-                                                    map,
-                                                    PackageIndex::new(insert),
-                                                )
-                                                .unwrap(),
-                                            );
-                                            self.selected = Some(selected);
-                                            // same distance away from camera as focus
-                                            self.actors[selected].set_location(map, self.camera.position + self.camera.front * self.actors[selected].scale(map).length() * 4.0);
-                                            self.notifs.success(format!("transplanted {}", actors[i].name));
-                                            transplanted = true;
+                                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| 
+                                        for i in range {
+                                            if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
+                                                let insert = map.exports.len() as i32 + 1;
+                                                actors[i].transplant(map, donor);
+                                                let selected = self.actors.len();
+                                                self.actors.push(
+                                                    actor::Actor::new(
+                                                        map,
+                                                        PackageIndex::new(insert),
+                                                    )
+                                                    .unwrap(),
+                                                );
+                                                self.selected = Some(selected);
+                                                // same distance away from camera as focus
+                                                self.actors[selected].set_location(map, self.camera.position + self.camera.front * self.actors[selected].scale(map).length() * 4.0);
+                                                self.notifs.success(format!("transplanted {}", actors[i].name));
+                                                transplanted = true;
+                                            }
                                         }
-                                    }
+                                    )
                                 }
                             );
                         }
@@ -826,6 +788,10 @@ impl EventHandler for Stove {
                         self.notifs.error("no map to save");
                     }
                 },
+            },
+            KeyCode::T => {
+                self.fullscreen = !self.fullscreen;
+                ctx.set_fullscreen(self.fullscreen);
             },
             KeyCode::Escape => ctx.request_quit(),
             _ => (),
