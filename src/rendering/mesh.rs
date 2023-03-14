@@ -84,10 +84,10 @@ impl Mesh {
         }
     }
 
-    pub fn draw(&self, ctx: &mut Context, uniform: glam::Mat4, colour: [f32; 3]) {
+    pub fn draw(&self, ctx: &mut Context, uniform: glam::Mat4) {
         ctx.apply_pipeline(&self.solid_pipeline);
         ctx.apply_bindings(&self.solid_bindings);
-        ctx.apply_uniforms(&(uniform, colour));
+        ctx.apply_uniforms(&uniform);
         ctx.draw(0, self.len, 1);
         ctx.apply_pipeline(&self.wire_pipeline);
         ctx.apply_bindings(&self.wire_bindings);

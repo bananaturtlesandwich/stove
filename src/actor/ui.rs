@@ -129,8 +129,10 @@ fn drag_angle(ui: &mut egui::Ui, val: &mut f32) -> egui::Response {
 }
 
 fn text_edit(ui: &mut egui::Ui, val: &mut String) -> egui::Response {
-    let len = (val.len() * 7) as f32;
-    ui.add(egui::widgets::TextEdit::singleline(val).desired_width(len))
+    egui::TextEdit::singleline(val)
+        .clip_text(false)
+        .show(ui)
+        .response
 }
 
 fn show_property(ui: &mut egui::Ui, prop: &mut Property) {

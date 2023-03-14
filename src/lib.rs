@@ -41,9 +41,9 @@ pub struct Stove {
     last_mouse_pos: glam::Vec2,
     grab: Grab,
     paks: Vec<String>,
-    colour: [f32; 3],
     distance: f32,
     fullscreen: bool,
+    aes: String,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
 }
@@ -87,9 +87,16 @@ fn default_activity() -> Activity<'static> {
 macro_rules! refresh {
     ($self: expr, $ctx: expr) => {
         $self.actors.clear();
-        $self.meshes.clear();
         $self.selected = None;
         if let Some(map) = &$self.map {
+            let key = match hex::decode($self.aes.trim_start_matches("0x")) {
+                Ok(key) if !$self.aes.is_empty() => Some(key),
+                Ok(_) => None,
+                Err(_) => {
+                    $self.notifs.error("aes key is invalid hex");
+                    None
+                }
+            };
             let paks: Vec<_> = $self
                 .paks
                 .iter()
@@ -97,7 +104,7 @@ macro_rules! refresh {
                 .flatten()
                 .filter_map(Result::ok)
                 .map(|dir| dir.path())
-                .filter_map(|path| unpak::Pak::new_any(&path, None).ok())
+                .filter_map(|path| unpak::Pak::new_any(&path, key.as_deref()).ok())
                 .collect();
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
@@ -136,7 +143,7 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         ctx.set_cull_face(CullFace::Back);
         let mut notifs = egui_notify::Toasts::new();
-        let (version, paks, colour, distance) = match config() {
+        let (version, paks, distance, aes) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(cfg).is_err() {
                     notifs.error("failed to create config directory");
@@ -151,25 +158,18 @@ impl Stove {
                     .unwrap_or(EngineVersion::UNKNOWN),
                     // for some reason doing lines and collect here gives the compiler a seizure
                     std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
-                    {
-                        let rgb: Vec<_> = std::fs::read_to_string(cfg.join("COLOUR"))
-                            .unwrap_or_else(|_| "1.0,1.3,0.0".to_string())
-                            .split(',')
-                            .filter_map(|str| str.parse::<f32>().ok())
-                            .collect();
-                        [rgb[0], rgb[1], rgb[2]]
-                    },
                     std::fs::read_to_string(cfg.join("DISTANCE"))
                         .unwrap_or_else(|_| "1000.0".to_string())
                         .parse()
                         .unwrap_or(1000.0),
+                    std::fs::read_to_string(cfg.join("AES")).unwrap_or_default(),
                 )
             }
             None => (
                 EngineVersion::UNKNOWN,
                 String::default(),
-                [1.0, 1.3, 0.0],
                 1000.0,
+                String::default(),
             ),
         };
         let paks = paks.lines().map(str::to_string).collect();
@@ -217,18 +217,22 @@ impl Stove {
             ui: true,
             donor: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
+                .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             transplant_dialog: egui_file::FileDialog::open_file(home.clone())
+                .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             save_dialog: egui_file::FileDialog::save_file(home.clone())
+                .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             pak_dialog: egui_file::FileDialog::select_folder(home)
+                .default_size((384.0,256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
@@ -237,9 +241,9 @@ impl Stove {
             last_mouse_pos: glam::Vec2::ZERO,
             grab: Grab::None,
             paks,
-            colour,
             distance,
-            fullscreen: true,
+            fullscreen: false,
+            aes,
             #[cfg(not(target_family = "wasm"))]
             client,
         };
@@ -296,7 +300,7 @@ impl EventHandler for Stove {
                     actor::DrawType::Cube => None,
                 })
             {
-                mesh.draw(mqctx, vp * actor.model_matrix(map), self.colour);
+                mesh.draw(mqctx, vp * actor.model_matrix(map));
             }
         }
         mqctx.end_render_pass();
@@ -331,8 +335,18 @@ impl EventHandler for Stove {
                             }
                         }
                     });
+                    egui::ComboBox::from_id_source("version")
+                        .selected_text(*VERSIONS.iter().find_map(|(version, name)| (version == &self.version).then_some(name)).unwrap_or(&"unknown"))
+                        .show_ui(ui, |ui| {
+                            for (version, name) in VERSIONS {
+                                ui.selectable_value(&mut self.version, version, name);
+                            }
+                        });
                     ui.menu_button("paks", |ui| {
-                        ui.horizontal(|ui| ui.label("here you can add folders containing paks to pull resources from"));
+                        egui::TextEdit::singleline(&mut self.aes)
+                            .clip_text(false)
+                            .hint_text("aes key if needed")
+                            .show(ui);
                         let mut remove_at = None;
                         egui::ScrollArea::vertical().show_rows(
                             ui,
@@ -400,10 +414,6 @@ impl EventHandler for Stove {
                             });
                         });
                         ui.horizontal(|ui| {
-                            ui.label("mesh color:");
-                            ui.color_edit_button_rgb(&mut self.colour)
-                        });
-                        ui.horizontal(|ui| {
                             ui.label("render distance:");
                             ui.add(
                                 egui::widgets::DragValue::new(&mut self.distance)
@@ -414,13 +424,6 @@ impl EventHandler for Stove {
                             mqctx.request_quit();
                         }
                     });
-                    egui::ComboBox::from_id_source("version")
-                        .selected_text(*VERSIONS.iter().find_map(|(version, name)| (version == &self.version).then_some(name)).unwrap_or(&"unknown"))
-                        .show_ui(ui, |ui| {
-                            for (version, name) in VERSIONS {
-                                ui.selectable_value(&mut self.version, version, name);
-                            }
-                        });
                 });
                 if let Some(map) = &mut self.map {
                     ui.add_space(10.0);
@@ -810,8 +813,7 @@ impl Drop for Stove {
                 .unwrap_or_default();
             std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
             std::fs::write(path.join("DISTANCE"), self.distance.to_string()).unwrap_or_default();
-            let [r, g, b] = self.colour;
-            std::fs::write(path.join("COLOUR"), format!("{},{},{}", r, g, b)).unwrap_or_default();
+            std::fs::write(path.join("AES"), &self.aes).unwrap_or_default();
         }
     }
 }
