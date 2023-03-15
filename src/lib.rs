@@ -116,7 +116,7 @@ macro_rules! refresh {
                                     let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
                                     let mut mesh = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)));
                                     mesh.set_engine_version($self.version);
-                                    let Ok(()) = mesh.parse_data() else {continue};
+                                    let Ok(_) = mesh.parse_data() else {continue};
                                     match extras::get_mesh_info(mesh) {
                                         Ok((positions, indices)) => {
                                             $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions, indices));
@@ -139,10 +139,47 @@ macro_rules! refresh {
     };
 }
 
+#[cfg(target_os = "windows")]
+const EXE: &str = "stove.exe";
+#[cfg(target_os = "linux")]
+const EXE: &str = "stove-ubuntu";
+#[cfg(target_os = "macos")]
+const EXE: &str = "stove-macos";
+
+#[cfg(not(any(target_family = "wasm")))]
+fn auto_update() {
+    let api = autoupdater::apis::github::GithubApi::new("bananaturtlesandwich", "stove")
+        .current_version(env!("CARGO_PKG_VERSION"))
+        .prerelease(true);
+    if let Ok(Some(asset)) = api.get_newer(None::<autoupdater::Sort>) {
+        use autoupdater::apis::DownloadApiTrait;
+        if api.download(
+            &asset
+                .assets
+                .into_iter()
+                .find(|asset| asset.name == EXE)
+                .unwrap(),
+            None::<autoupdater::Download>
+        ).is_ok() {
+            std::process::Command::new(EXE)
+                .args(std::env::args().skip(1))
+                .spawn()
+                .unwrap();
+            std::process::exit(0);
+        }
+    }
+}
+
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         ctx.set_cull_face(CullFace::Back);
         let mut notifs = egui_notify::Toasts::new();
+        #[cfg(not(any(target_family = "wasm")))]
+        std::thread::spawn(auto_update);
+        #[cfg(not(target_family = "wasm"))]
+        if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
+            notifs.success(format!("successfully updated to {}", env!("CARGO_PKG_VERSION")));
+        }
         let (version, paks, distance, aes) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(cfg).is_err() {

@@ -8,6 +8,7 @@ fn main() {
             sample_count: 8,
             high_dpi: true,
             window_width: 1200,
+            window_height: 800,
             icon: Some(miniquad::conf::Icon {
                 small: *include_bytes!("../assets/pot_16.rgba"),
                 medium: *include_bytes!("../assets/pot_32.rgba"),

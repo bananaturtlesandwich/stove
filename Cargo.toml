@@ -25,6 +25,7 @@ winres = "*"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 discord-rich-presence = "*"
+autoupdater = { git = "https://github.com/localcc/autoupdater" }
 
 [profile.release]
 strip = true
