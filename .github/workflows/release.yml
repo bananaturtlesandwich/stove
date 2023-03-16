@@ -33,6 +33,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tag: ${{ github.ref_name }}
           asset-path: target/release/stove.exe
         
   upload-macos:
@@ -48,6 +49,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tag: ${{ github.ref_name }}
           asset-path: target/release/stove-macos
   
   upload-linux:
@@ -63,4 +65,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tag: ${{ github.ref_name }}
           asset-path: target/release/stove-linux
