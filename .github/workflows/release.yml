@@ -33,7 +33,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          asset_path: target/release/stove.exe
+          asset-path: target/release/stove.exe
         
   upload-macos:
     needs: draft
@@ -48,7 +48,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          asset_path: target/release/stove-macos
+          asset-path: target/release/stove-macos
   
   upload-linux:
     needs: draft
@@ -63,4 +63,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          asset_path: target/release/stove-linux
+          asset-path: target/release/stove-linux
