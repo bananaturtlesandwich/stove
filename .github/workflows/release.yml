@@ -10,12 +10,10 @@ on:
       - '*[0-9]+*' # e.g 1.0.1
 
 jobs:
-  draft-release:
+  draft:
     runs-on: ubuntu-latest
     steps:
-      - name: draft release
-        id: draft
-        uses: actions/create-release@v1
+      - uses: actions/create-release@v1
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -25,49 +23,44 @@ jobs:
 
   # build and package everything
   upload-windows:
-    needs: draft-release
+    needs: draft
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - name: build
         run: cargo build -r
-      - uses: actions/upload-release-asset@v1
+      - uses: vesoft-inc/upload-assets@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.draft.outputs.upload_url }}
           asset_path: target/release/stove.exe
-          asset_name: stove.exe
-          asset_content_type: application/x-msdownload
         
   upload-macos:
-    needs: draft-release
+    needs: draft
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
       - name: build
         run: cargo build -r
-      - uses: actions/upload-release-asset@v1
+      - name: rename
+        run: mv target/release/stove target/release/stove-macos
+      - uses: vesoft-inc/upload-assets@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.draft.outputs.upload_url }}
-          asset_path: target/release/stove
-          asset_name: stove-macos
-          asset_content_type: application/octet-stream
+          asset_path: target/release/stove-macos
   
   upload-linux:
-    needs: draft-release
+    needs: draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: build
         run: cargo build -r
-      - uses: actions/upload-release-asset@v1
+      - name: rename
+        run: mv target/release/stove target/release/stove-linux
+      - uses: vesoft-inc/upload-assets@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.draft.outputs.upload_url }}
-          asset_path: target/release/stove
-          asset_name: stove-linux
-          asset_content_type: application/octet-stream
+          asset_path: target/release/stove-linux
