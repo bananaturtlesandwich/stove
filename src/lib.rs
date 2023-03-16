@@ -142,7 +142,7 @@ macro_rules! refresh {
 #[cfg(target_os = "windows")]
 const EXE: &str = "stove.exe";
 #[cfg(target_os = "linux")]
-const EXE: &str = "stove-ubuntu";
+const EXE: &str = "stove-linux";
 #[cfg(target_os = "macos")]
 const EXE: &str = "stove-macos";
 
