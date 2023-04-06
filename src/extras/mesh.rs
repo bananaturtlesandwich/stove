@@ -90,15 +90,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     // array of lod resources
     // discard len because we'll just read the first LOD
     data.read_u32::<LE>()?;
-    read_lod(&mut data, object, engine)
-}
-
-fn read_lod(
-    data: &mut io::Cursor<&[u8]>,
-    object: ObjectVersion,
-    engine: EngineVersion,
-) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
-    let flags = StripDataFlags::read(data)?;
+    let flags = StripDataFlags::read(&mut data)?;
     if flags.data_stripped_for_server() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -138,7 +130,7 @@ fn read_lod(
         // data is inlined
         && data.read_u32::<LE>()? == 1 =>
         {
-            StripDataFlags::read(data)?;
+            StripDataFlags::read(&mut data)?;
         }
         false if !flags.class_data_stripped(2) => (),
         _ => {
@@ -168,7 +160,7 @@ fn read_lod(
 
     // vertex buffer
     if match object >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX {
-        true => StripDataFlags::read(data)?,
+        true => StripDataFlags::read(&mut data)?,
         false => StripDataFlags::default(),
     }
     .data_stripped_for_server()
@@ -234,7 +226,7 @@ fn read_lod(
             data.read_u32::<LE>()?;
             // packed normals
             for _ in 0..num_verts {
-                read_tangents(data, precise_tangents)?;
+                read_tangents(&mut data, precise_tangents)?;
             }
             // item size
             data.read_u32::<LE>()?;
@@ -242,21 +234,21 @@ fn read_lod(
             data.read_u32::<LE>()?;
             // mesh uv
             for _ in 0..num_verts {
-                read_tex_coords(data, num_tex_coords, precise_uvs)?;
+                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
             }
         }
         false => {
             //size
             data.read_u32::<LE>()?;
             for _ in 0..data.read_u32::<LE>()? {
-                read_tangents(data, precise_tangents)?;
-                read_tex_coords(data, num_tex_coords, precise_uvs)?;
+                read_tangents(&mut data, precise_tangents)?;
+                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
             }
         }
     }
 
     // color vertex buffer
-    if StripDataFlags::read(data)?.data_stripped_for_server() {
+    if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "colour data is stripped",
@@ -307,5 +299,4 @@ fn read_lod(
         }
     };
     Ok((positions, indices))
-    // currently need to read more stuff for a full lod so I can get the best detail
 }

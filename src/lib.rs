@@ -293,7 +293,7 @@ impl Stove {
 }
 
 fn projection(dist: f32, (width, height): (f32, f32)) -> glam::Mat4 {
-    glam::Mat4::perspective_lh(45f32.to_radians(), width / height, 5.0, dist)
+    glam::Mat4::perspective_lh(45_f32.to_radians(), width / height, 1.0, dist)
 }
 
 fn filter(path: &std::path::Path) -> bool {

@@ -9,23 +9,23 @@ edition = "2021"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset" }
-unpak = "*"
-glam = { version = "*", features = ["fast-math"] }
-miniquad = "*"
-egui = "*"
-egui-miniquad = "*"
-egui-notify = "*"
-egui_file = "*"
-byteorder = "*"
-hashbrown = "*"
-hex = "*"
+unpak = { version = "1.0", features = ["asset-paths"] }
+glam = { version = "0.23", features = ["fast-math"] }
+miniquad = "0.3"
+egui = "0.21"
+egui-miniquad = "0.14"
+egui-notify = "0.6"
+egui_file = "0.8"
+byteorder = "1.4"
+hashbrown = "0.13"
+hex = "0.4"
 
 [build-dependencies]
-winres = "*"
+winres = "0.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-discord-rich-presence = "*"
-autoupdater = { git = "https://github.com/localcc/autoupdater" }
+discord-rich-presence = "0.2"
+autoupdater = "0.3"
 
 [profile.release]
 strip = true
