@@ -12,15 +12,13 @@ use unreal_asset::{
 
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
-    let mut asset = Asset::new(
+    get_mesh_info(Asset::new(
         io::Cursor::new(include_bytes!("A02_Outside_Castle.uasset").as_slice()),
         Some(io::Cursor::new(
             include_bytes!("A02_Outside_Castle.uexp").as_slice(),
         )),
-    );
-    asset.set_engine_version(EngineVersion::VER_UE4_25);
-    asset.parse_data()?;
-    get_mesh_info(asset)?;
+        EngineVersion::VER_UE4_25,
+    )?)?;
     Ok(())
 }
 

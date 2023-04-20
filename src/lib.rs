@@ -114,9 +114,7 @@ macro_rules! refresh {
                                 for pak in paks.iter() {
                                     let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
                                     let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
-                                    let mut mesh = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)));
-                                    mesh.set_engine_version($self.version);
-                                    let Ok(_) = mesh.parse_data() else {continue};
+                                    let Ok(mesh) = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)), $self.version) else {continue};
                                     match extras::get_mesh_info(mesh) {
                                         Ok((positions, indices)) => {
                                             $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions, indices));
