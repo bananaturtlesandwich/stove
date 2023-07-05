@@ -135,16 +135,26 @@ fn text_edit(ui: &mut egui::Ui, val: &mut String) -> egui::Response {
         .response
 }
 
-fn get_content_mut(name: &mut FName) -> &mut String {
+fn fname_edit(ui: &mut egui::Ui, name: &mut FName) -> egui::Response {
     if let FName::Backed {
-        index, name_map, ..
+        index,
+        number,
+        name_map,
+        ..
     } = name
     {
-        let string = name_map.get_ref().get_name_reference(*index);
-        *name = FName::new_dummy(string, 0);
+        if *number >= 0 {
+            let string = name_map.get_ref().get_name_reference(*index);
+            let f = name_map.get_mut().add_fname_with_number(&string, -1);
+            *name = f;
+        }
     }
-    let FName::Dummy { value, .. } = name else { panic!() };
-    value
+    match name {
+        FName::Backed {
+            index, name_map, ..
+        } => text_edit(ui, name_map.get_mut().get_name_reference_mut(*index)),
+        FName::Dummy { value, .. } => text_edit(ui, value),
+    }
 }
 
 fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
@@ -171,16 +181,12 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             drag(ui, byte)
                         }
                         unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
-                            text_edit(
-                                ui,
-                                get_content_mut(
-                                    byte.enum_type.get_or_insert(FName::from_slice("")),
-                                ),
-                            ) | text_edit(ui, get_content_mut(name))
+                            fname_edit(ui, &mut byte.enum_type.get_or_insert(FName::from_slice("")))
+                                | fname_edit(ui, name)
                         }
                     },
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
-                    Property::NameProperty(name) => text_edit(ui, get_content_mut(&mut name.value)),
+                    Property::NameProperty(name) => fname_edit(ui, &mut name.value),
                     Property::StrProperty(str) => {
                         text_edit(ui, str.value.get_or_insert(String::new()))
                     }
@@ -194,16 +200,14 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     }
                     Property::SoftObjectProperty(obj) => {
                         text_edit(ui, obj.value.sub_path_string.get_or_insert(String::new()))
-                            | text_edit(ui, get_content_mut(&mut obj.value.asset_path.asset_name))
-                            | text_edit(
+                            | fname_edit(ui, &mut obj.value.asset_path.asset_name)
+                            | fname_edit(
                                 ui,
-                                get_content_mut(
-                                    &mut obj
-                                        .value
-                                        .asset_path
-                                        .package_name
-                                        .get_or_insert(FName::from_slice("")),
-                                ),
+                                &mut obj
+                                    .value
+                                    .asset_path
+                                    .package_name
+                                    .get_or_insert(FName::from_slice("")),
                             )
                     }
                     Property::IntPointProperty(point) => {
@@ -306,18 +310,14 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::SoftAssetPathProperty(path) => show_path!(ui, path),
                     Property::SoftObjectPathProperty(path) => show_path!(ui, path),
                     Property::SoftClassPathProperty(path) => show_path!(ui, path),
-                    Property::DelegateProperty(del) => {
-                        text_edit(ui, get_content_mut(&mut del.value.delegate))
-                    }
+                    Property::DelegateProperty(del) => fname_edit(ui, &mut del.value.delegate),
                     Property::MulticastDelegateProperty(del) => show_delegate!(ui, del),
                     Property::MulticastSparseDelegateProperty(del) => show_delegate!(ui, del),
                     Property::MulticastInlineDelegateProperty(del) => show_delegate!(ui, del),
                     // Property::RichCurveKeyProperty(_) => todo!(),
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
-                    Property::SmartNameProperty(name) => {
-                        text_edit(ui, get_content_mut(&mut name.display_name))
-                    }
+                    Property::SmartNameProperty(name) => fname_edit(ui, &mut name.display_name),
                     Property::StructProperty(str) => {
                         ui.push_id(str.name.get_content(), |ui| {
                             ui.collapsing("", |ui| {
@@ -328,10 +328,9 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         })
                         .response
                     }
-                    Property::EnumProperty(enm) => text_edit(
-                        ui,
-                        get_content_mut(enm.value.get_or_insert(FName::from_slice(""))),
-                    ),
+                    Property::EnumProperty(enm) => {
+                        fname_edit(ui, enm.value.get_or_insert(FName::from_slice("")))
+                    }
                     // Property::UnknownProperty(unknown) => todo!(),
                     _ => ui.link("unimplemented"),
                 }
