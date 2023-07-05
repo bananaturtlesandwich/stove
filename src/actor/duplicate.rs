@@ -8,7 +8,7 @@ use unreal_asset::{
 impl super::Actor {
     /// adds an actor to a map where the actor is already present
     pub fn duplicate(&self, asset: &mut Asset<std::fs::File>) {
-        let len = asset.exports.len();
+        let len = asset.asset_data.exports.len();
         let mut children = self.get_actor_exports(asset, len);
 
         // make sure the actor has a unique object name
@@ -17,6 +17,7 @@ impl super::Actor {
         let actor_ref = PackageIndex::new(len as i32 + 1);
         // add the actor to persistent level
         if let Some(level) = asset
+            .asset_data
             .exports
             .iter_mut()
             .find_map(|ex| cast!(Export, LevelExport, ex))
@@ -29,6 +30,6 @@ impl super::Actor {
         }
 
         // actually add the exports ;p
-        asset.exports.append(&mut children);
+        asset.asset_data.exports.append(&mut children);
     }
 }

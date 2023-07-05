@@ -7,48 +7,44 @@ use unreal_asset::{
         vector_property::{RotatorProperty, VectorProperty},
         Property, PropertyDataTrait,
     },
-    types::{vector::Vector, FName},
+    types::{fname::FName, vector::Vector},
     Asset,
 };
 
 impl super::Actor {
     pub fn location(&self, map: &Asset<File>) -> glam::Vec3 {
-        map.exports[self.transform]
+        map.asset_data.exports[self.transform]
             .get_normal_export()
-            .map(|norm| {
-                norm.properties
-                    .iter()
-                    .rev()
-                    .find_map(|prop| {
-                        if let Property::StructProperty(struc) = prop {
-                            if &struc.name.content == "RelativeLocation" {
-                                return cast!(Property, VectorProperty, &struc.value[0]);
-                            }
+            .and_then(|norm| {
+                norm.properties.iter().rev().find_map(|prop| {
+                    if let Property::StructProperty(struc) = prop {
+                        if struc.name.get_content() == "RelativeLocation" {
+                            return cast!(Property, VectorProperty, &struc.value[0]);
                         }
-                        None
-                    })
-                    .map(|pos| glam::vec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0) * 0.01)
-                    .unwrap_or_default()
+                    }
+                    None
+                })
             })
+            .map(|pos| glam::dvec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0).as_vec3() * 0.01)
             .unwrap_or_default()
     }
 
     pub fn set_location(&self, map: &mut Asset<File>, mut new: glam::Vec3) {
         new *= 100.0;
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
+        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return
         };
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().content == "RelativeLocation")
+            .find(|prop| prop.get_name().get_content() == "RelativeLoction")
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 = -new.x;
-                        vec.value.y.0 = new.z;
-                        vec.value.z.0 = new.y;
+                        vec.value.x.0 = -new.x as f64;
+                        vec.value.y.0 = new.z as f64;
+                        vec.value.z.0 = new.y as f64;
                     }
                 }
             }
@@ -56,6 +52,9 @@ impl super::Actor {
                 .properties
                 .push(Property::StructProperty(StructProperty {
                     name: FName::from_slice("RelativeLocation"),
+                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                        ancestry: Vec::new(),
+                    },
                     struct_type: Some(FName::from_slice("Vector")),
                     struct_guid: None,
                     property_guid: None,
@@ -63,29 +62,36 @@ impl super::Actor {
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
                         name: FName::from_slice("RelativeLocation"),
+                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                            ancestry: Vec::new(),
+                        },
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(new.x.into(), new.z.into(), new.y.into()),
+                        value: Vector::new(
+                            (new.x as f64).into(),
+                            (new.z as f64).into(),
+                            (new.y as f64).into(),
+                        ),
                     })],
                 })),
         }
     }
 
     pub fn add_location(&self, map: &mut Asset<File>, offset: glam::Vec3) {
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
+        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return
         };
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().content == "RelativeLocation")
+            .find(|prop| prop.get_name().get_content() == "RelativeLocation")
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 -= offset.x;
-                        vec.value.y.0 += offset.z;
-                        vec.value.z.0 += offset.y;
+                        vec.value.x.0 -= offset.x as f64;
+                        vec.value.y.0 += offset.z as f64;
+                        vec.value.z.0 += offset.y as f64;
                     }
                 }
             }
@@ -93,6 +99,9 @@ impl super::Actor {
                 .properties
                 .push(Property::StructProperty(StructProperty {
                     name: FName::from_slice("RelativeLocation"),
+                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                        ancestry: Vec::new(),
+                    },
                     struct_type: Some(FName::from_slice("Vector")),
                     struct_guid: None,
                     property_guid: None,
@@ -100,16 +109,23 @@ impl super::Actor {
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
                         name: FName::from_slice("RelativeLocation"),
+                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                            ancestry: Vec::new(),
+                        },
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new((-offset.x).into(), offset.z.into(), offset.y.into()),
+                        value: Vector::new(
+                            (-offset.x as f64).into(),
+                            (offset.z as f64).into(),
+                            (offset.y as f64).into(),
+                        ),
                     })],
                 })),
         }
     }
 
     pub fn rotation(&self, map: &Asset<File>) -> glam::Vec3 {
-        map.exports[self.transform]
+        map.asset_data.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
                 norm.properties
@@ -117,32 +133,32 @@ impl super::Actor {
                     .rev()
                     .find_map(|prop| {
                         if let Property::StructProperty(struc) = prop {
-                            if &struc.name.content == "RelativeRotation" {
+                            if struc.name.get_content() == "RelativeRotation" {
                                 return cast!(Property, RotatorProperty, &struc.value[0]);
                             }
                         }
                         None
                     })
-                    .map(|rot| glam::vec3(rot.value.x.0, rot.value.y.0, rot.value.z.0))
+                    .map(|rot| glam::dvec3(rot.value.x.0, rot.value.y.0, rot.value.z.0).as_vec3())
                     .unwrap_or_default()
             })
             .unwrap_or_default()
     }
 
     pub fn combine_rotation(&self, map: &mut Asset<File>, offset: glam::Quat) {
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
+        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
         };
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().content == "RelativeRotation")
+            .find(|prop| prop.get_name().get_content() == "RelativeRotation")
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::RotatorProperty(vec) = &mut struc.value[0] {
-                        (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (offset
-                            * glam::Quat::from_euler(
+                        (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (offset.as_f64()
+                            * glam::DQuat::from_euler(
                                 glam::EulerRot::XYZ,
                                 vec.value.x.0.to_radians(),
                                 vec.value.y.0.to_radians(),
@@ -161,6 +177,9 @@ impl super::Actor {
                 .properties
                 .push(Property::StructProperty(StructProperty {
                     name: FName::from_slice("RelativeRotation"),
+                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                        ancestry: Vec::new(),
+                    },
                     struct_type: Some(FName::from_slice("Rotator")),
                     struct_guid: None,
                     property_guid: None,
@@ -168,49 +187,53 @@ impl super::Actor {
                     serialize_none: true,
                     value: vec![Property::RotatorProperty(RotatorProperty {
                         name: FName::from_slice("RelativeRotation"),
+                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                            ancestry: Vec::new(),
+                        },
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
+                        value: Vector::new(
+                            (offset.x as f64).into(),
+                            (offset.z as f64).into(),
+                            (offset.y as f64).into(),
+                        ),
                     })],
                 })),
         }
     }
 
     pub fn scale(&self, map: &Asset<File>) -> glam::Vec3 {
-        map.exports[self.transform]
+        map.asset_data.exports[self.transform]
             .get_normal_export()
-            .map(|norm| {
-                norm.properties
-                    .iter()
-                    .rev()
-                    .find_map(|prop| {
-                        if let Property::StructProperty(struc) = prop {
-                            if &struc.name.content == "RelativeScale3D" {
-                                return cast!(Property, VectorProperty, &struc.value[0]);
-                            }
+            .and_then(|norm| {
+                norm.properties.iter().rev().find_map(|prop| {
+                    if let Property::StructProperty(struc) = prop {
+                        if struc.name.get_content() == "RelativeScale3D" {
+                            return cast!(Property, VectorProperty, &struc.value[0]);
                         }
-                        None
-                    })
-                    .map(|rot| glam::vec3(rot.value.x.0, rot.value.z.0, rot.value.y.0))
-                    .unwrap_or(glam::Vec3::ONE)
+                    }
+                    None
+                })
             })
+            .map(|rot| glam::dvec3(rot.value.x.0, rot.value.z.0, rot.value.y.0).as_vec3())
             .unwrap_or(glam::Vec3::ONE)
     }
+
     pub fn mul_scale(&self, map: &mut Asset<File>, offset: glam::Vec3) {
-        let Some(norm) = map.exports[self.transform].get_normal_export_mut() else {
+        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
         };
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().content == "RelativeScale3D")
+            .find(|prop| prop.get_name().get_content() == "RelativeScale3D")
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 *= offset.x;
-                        vec.value.y.0 *= offset.z;
-                        vec.value.z.0 *= offset.y;
+                        vec.value.x.0 *= offset.x as f64;
+                        vec.value.y.0 *= offset.z as f64;
+                        vec.value.z.0 *= offset.y as f64;
                     }
                 }
             }
@@ -218,6 +241,9 @@ impl super::Actor {
                 .properties
                 .push(Property::StructProperty(StructProperty {
                     name: FName::from_slice("RelativeScale3D"),
+                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                        ancestry: Vec::new(),
+                    },
                     struct_type: Some(FName::from_slice("Vector")),
                     struct_guid: None,
                     property_guid: None,
@@ -225,9 +251,16 @@ impl super::Actor {
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
                         name: FName::from_slice("RelativeScale3D"),
+                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                            ancestry: Vec::new(),
+                        },
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
+                        value: Vector::new(
+                            (offset.x as f64).into(),
+                            (offset.z as f64).into(),
+                            (offset.y as f64).into(),
+                        ),
                     })],
                 })),
         }

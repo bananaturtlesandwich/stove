@@ -51,7 +51,7 @@ impl Camera {
                 }
             }
             None => {
-                let velocity = (self.speed as f64 * self.delta_time) as f32;
+                let velocity = self.speed as f32 * self.delta_time as f32;
                 for keycode in held.iter() {
                     match keycode {
                         KeyCode::W => self.position += self.front * velocity,
@@ -71,7 +71,7 @@ impl Camera {
     }
     pub fn handle_mouse_motion(&mut self, delta: glam::Vec2) {
         if self.can_move {
-            let scale = (10.0 * self.delta_time) as f32;
+            let scale = 10.0 * self.delta_time as f32;
             self.yaw -= delta.x * scale;
             self.pitch -= delta.y * scale;
             self.pitch = self.pitch.clamp(-89.0, 89.0);

@@ -4,8 +4,8 @@ use unreal_asset::{
     error::Error,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{Property, PropertyDataTrait},
-    reader::asset_trait::AssetTrait,
-    types::{FName, PackageIndex},
+    reader::archive_trait::ArchiveTrait,
+    types::{fname::FName, PackageIndex},
     Asset,
 };
 
@@ -48,10 +48,10 @@ impl Actor {
         let Some(norm) = ex.get_normal_export() else {
             return Err(Error::no_data(format!("actor at index {} failed to parse", package.index)))
         };
-        let name = norm.base_export.object_name.content.clone();
+        let name = norm.base_export.object_name.get_content();
         let class = asset
             .get_import(norm.base_export.class_index)
-            .map(|import| import.object_name.content.clone())
+            .map(|import| import.object_name.get_content())
             .unwrap_or_default();
         let draw_type = match norm
             .base_export
@@ -62,7 +62,7 @@ impl Actor {
             .find(|i| {
                 asset
                     .get_import(i.get_base_export().class_index)
-                    .filter(|import| import.object_name.content == "StaticMeshComponent")
+                    .filter(|import| import.object_name.get_content() == "StaticMeshComponent")
                     .is_some()
             }) {
             Some(norm) => norm
@@ -70,18 +70,18 @@ impl Actor {
                 .iter()
                 .find_map(|prop| {
                     cast!(Property, ObjectProperty, prop)
-                        .filter(|prop| prop.get_name().content == "StaticMesh")
+                        .filter(|prop| prop.get_name().get_content() == "StaticMesh")
                 })
                 .and_then(|obj| asset.get_import(obj.value))
                 .and_then(|import| asset.get_import(import.outer_index))
                 .map_or(DrawType::Cube, |path| {
-                    DrawType::Mesh(path.object_name.content.clone())
+                    DrawType::Mesh(path.object_name.get_content())
                 }),
             None => DrawType::Cube,
         };
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
-            match prop.get_name().content.as_str() {
+            match prop.get_name().get_content().as_str() {
                 // of course this wouldn't be able to be detected if all transforms were left default
                 "RelativeLocation" | "RelativeRotation" | "RelativeScale3D" => {
                     return Ok(Self {
@@ -110,14 +110,14 @@ impl Actor {
         }
         Err(Error::no_data(format!(
             "couldn't find transform component for {}",
-            &norm.base_export.object_name.content
+            norm.base_export.object_name.get_content()
         )))
     }
 
     /// gets all exports related to the given actor
     fn get_actor_exports(&self, asset: &Asset<File>, offset: usize) -> Vec<Export> {
         // get references to all the actor's children
-        let mut child_indexes: Vec<PackageIndex> = asset.exports[self.export]
+        let mut child_indexes: Vec<PackageIndex> = asset.asset_data.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
             .iter()
@@ -154,6 +154,7 @@ impl Actor {
 /// gets all actor exports within a map (all exports direct children of PersistentLevel)
 pub fn get_actors(asset: &Asset<File>) -> Vec<PackageIndex> {
     match asset
+        .asset_data
         .exports
         .iter()
         .find_map(|ex| cast!(Export, LevelExport, ex))
@@ -171,11 +172,11 @@ pub fn get_actors(asset: &Asset<File>) -> Vec<PackageIndex> {
 /// creates and assigns a unique name
 fn give_unique_name(orig: &mut FName, asset: &mut Asset<File>) {
     // for the cases where the number is unnecessary
-    if asset.search_name_reference(&orig.content).is_none() {
-        *orig = asset.add_fname(&orig.content);
+    let mut name = orig.get_content();
+    if asset.search_name_reference(&name).is_none() {
+        *orig = asset.add_fname(&name);
         return;
     }
-    let mut name = orig.content.clone();
     let mut id: u16 = match name.rfind(|ch: char| ch.to_digit(10).is_none()) {
         Some(index) if index != name.len() - 1 => {
             name.drain(index + 1..).collect::<String>().parse().unwrap()
@@ -258,166 +259,6 @@ fn on_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
             for entry in struc.value.iter_mut() {
                 on_props(entry, func);
             }
-        }
-        _ => (),
-    }
-}
-
-fn add_prop_names(prop: &Property, asset: &mut Asset<std::fs::File>, is_array: bool) {
-    use unreal_asset::types::ToFName;
-    asset.add_fname(&prop.to_fname().content);
-    // the name of properties in arrays is their index
-    if !is_array {
-        asset.add_fname(&prop.get_name().content);
-    }
-    match prop {
-        Property::ByteProperty(prop) => {
-            if let Some(en) = &prop.enum_type {
-                asset.add_fname(&en.content);
-            }
-            if let unreal_asset::properties::int_property::BytePropertyValue::FName(name) =
-                &prop.value
-            {
-                asset.add_fname(&name.content);
-            }
-        }
-        Property::NameProperty(prop) => {
-            asset.add_fname(&prop.value.content);
-        }
-        Property::TextProperty(prop) => {
-            if let Some(id) = prop.table_id.as_ref() {
-                asset.add_fname(&id.content);
-            }
-        }
-        Property::SoftObjectProperty(prop) => {
-            asset.add_fname(&prop.value.asset_path_name.content);
-        }
-        Property::SoftAssetPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_ref() {
-                asset.add_fname(&path.content);
-            }
-        }
-        Property::SoftObjectPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_ref() {
-                asset.add_fname(&path.content);
-            }
-        }
-        Property::SoftClassPathProperty(prop) => {
-            if let Some(path) = prop.asset_path_name.as_ref() {
-                asset.add_fname(&path.content);
-            }
-        }
-        Property::DelegateProperty(del) => {
-            asset.add_fname(&del.value.delegate.content);
-        }
-        Property::MulticastDelegateProperty(del) => {
-            for delegate in del.value.iter() {
-                asset.add_fname(&delegate.delegate.content);
-            }
-        }
-        Property::MulticastSparseDelegateProperty(del) => {
-            for delegate in del.value.iter() {
-                asset.add_fname(&delegate.delegate.content);
-            }
-        }
-        Property::MulticastInlineDelegateProperty(del) => {
-            for delegate in del.value.iter() {
-                asset.add_fname(&delegate.delegate.content);
-            }
-        }
-        Property::SmartNameProperty(prop) => {
-            asset.add_fname(&prop.display_name.content);
-        }
-        Property::StructProperty(prop) => {
-            if let Some(typ) = prop.struct_type.as_ref() {
-                asset.add_fname(&typ.content);
-            }
-            for prop in prop.value.iter() {
-                add_prop_names(prop, asset, false);
-            }
-        }
-        Property::ArrayProperty(prop) => {
-            for prop in prop.value.iter() {
-                add_prop_names(prop, asset, true);
-            }
-        }
-        Property::EnumProperty(prop) => {
-            asset.add_fname(&prop.value.content);
-            if let Some(typ) = prop.enum_type.as_ref() {
-                asset.add_fname(&typ.content);
-            }
-        }
-        Property::UnknownProperty(prop) => {
-            asset.add_fname(&prop.serialized_type.content);
-        }
-        Property::SetProperty(prop) => {
-            for prop in prop.value.value.iter() {
-                add_prop_names(prop, asset, true);
-            }
-            for prop in prop.removed_items.value.iter() {
-                add_prop_names(prop, asset, true);
-            }
-        }
-        Property::MapProperty(prop) => {
-            for (_, key, value) in prop.value.iter() {
-                add_prop_names(key, asset, false);
-                add_prop_names(value, asset, false);
-            }
-        }
-        Property::MaterialAttributesInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::ExpressionInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::ColorMaterialInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::ScalarMaterialInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::ShadingModelMaterialInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::VectorMaterialInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::Vector2MaterialInputProperty(prop) => {
-            asset.add_fname(&prop.material_expression.input_name.content);
-            asset.add_fname(&prop.material_expression.expression_name.content);
-        }
-        Property::StringAssetReferenceProperty(prop) => {
-            if let Some(path) = &prop.asset_path_name {
-                asset.add_fname(&path.content);
-            }
-        }
-        Property::GameplayTagContainerProperty(prop) => {
-            for name in prop.value.iter() {
-                asset.add_fname(&name.content);
-            }
-        }
-        Property::UniqueNetIdProperty(net) => {
-            if let Some(id) = &net.value {
-                asset.add_fname(&id.ty.content);
-            }
-        }
-        Property::NiagaraVariableProperty(prop) => {
-            for prop in prop.struct_property.value.iter() {
-                add_prop_names(prop, asset, false);
-            }
-            asset.add_fname(&prop.variable_name.content);
-        }
-        Property::NiagaraVariableWithOffsetProperty(prop) => {
-            for prop in prop.niagara_variable.struct_property.value.iter() {
-                add_prop_names(prop, asset, false);
-            }
-            asset.add_fname(&prop.niagara_variable.variable_name.content);
         }
         _ => (),
     }

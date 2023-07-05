@@ -1,7 +1,7 @@
 use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{array_property::ArrayProperty, Property, PropertyDataTrait},
-    types::{FName, ToFName},
+    types::fname::{FName, ToSerializedName},
     Asset,
 };
 
@@ -15,8 +15,8 @@ impl super::Actor {
                 }
             }
         }
-        show_export(ui, &mut asset.exports[self.export]);
-        for i in asset.exports[self.export]
+        show_export(ui, &mut asset.asset_data.exports[self.export]);
+        for i in asset.asset_data.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
             .clone()
@@ -26,7 +26,7 @@ impl super::Actor {
                 let (name, id, index) = {
                     let ex = ex.get_base_export();
                     (
-                        ex.object_name.content.clone(),
+                        ex.object_name.get_content(),
                         ex.serial_offset,
                         -ex.class_index.index - 1,
                     )
@@ -34,14 +34,14 @@ impl super::Actor {
                 let response = ui
                     .push_id(id, |ui| ui.collapsing(name, |ui| show_export(ui, ex)))
                     .response;
-                response.on_hover_text(&asset.imports[index as usize].object_name.content);
+                response.on_hover_text(&asset.imports[index as usize].object_name.get_content());
             }
         }
     }
 }
 
 fn show_array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Response {
-    ui.push_id(&arr.name.content, |ui| {
+    ui.push_id(arr.name.get_content(), |ui| {
         ui.collapsing("", |ui| {
             for (i, entry) in arr.value.iter_mut().enumerate() {
                 ui.push_id(i, |ui| show_property(ui, entry));
@@ -54,7 +54,7 @@ fn show_array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Resp
 
 // I don't want to install OrderedFloat
 macro_rules! show_vector {
-    ($ui:ident,$val:expr) => {
+    ($ui:ident, $val:expr) => {
         drag($ui, &mut $val.value.x.0)
             | drag($ui, &mut $val.value.y.0)
             | drag($ui, &mut $val.value.z.0)
@@ -62,7 +62,7 @@ macro_rules! show_vector {
 }
 
 macro_rules! show_vector4 {
-    ($ui:ident,$val:expr) => {
+    ($ui:ident, $val:expr) => {
         drag($ui, &mut $val.value.w.0)
             | drag($ui, &mut $val.value.x.0)
             | drag($ui, &mut $val.value.y.0)
@@ -71,7 +71,7 @@ macro_rules! show_vector4 {
 }
 
 macro_rules! show_sampler {
-    ($ui:ident,$val:expr) => {
+    ($ui:ident, $val:expr) => {
         $ui.collapsing("alias", |$ui| {
             for i in $val.alias.iter_mut() {
                 drag($ui, i);
@@ -91,24 +91,24 @@ macro_rules! show_sampler {
 }
 
 macro_rules! show_path {
-    ($ui:ident,$val:expr) => {
+    ($ui:ident, $val:expr) => {
         text_edit(
             $ui,
             &mut $val
                 .asset_path_name
                 .get_or_insert(FName::from_slice(""))
-                .content,
+                .get_content(),
         ) | text_edit($ui, $val.sub_path.get_or_insert(String::new()))
             | text_edit($ui, $val.path.get_or_insert(String::new()))
     };
 }
 
 macro_rules! show_delegate {
-    ($ui:ident,$val:expr) => {
-        $ui.push_id(&$val.name.content, |ui| {
+    ($ui:ident, $val:expr) => {
+        $ui.push_id($val.name.get_content(), |ui| {
             ui.collapsing("", |ui| {
                 for delegate in $val.value.iter_mut() {
-                    text_edit(ui, &mut delegate.delegate.content);
+                    text_edit(ui, &mut delegate.delegate.get_content());
                 }
             })
         })
@@ -124,7 +124,7 @@ fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) -> egui::Re
     )
 }
 
-fn drag_angle(ui: &mut egui::Ui, val: &mut f32) -> egui::Response {
+fn drag_angle(ui: &mut egui::Ui, val: &mut f64) -> egui::Response {
     ui.add(egui::widgets::DragValue::new(val).suffix("°"))
 }
 
@@ -135,11 +135,23 @@ fn text_edit(ui: &mut egui::Ui, val: &mut String) -> egui::Response {
         .response
 }
 
+fn get_content_mut(name: &mut FName) -> &mut String {
+    if let FName::Backed {
+        index, name_map, ..
+    } = name
+    {
+        let string = name_map.get_ref().get_name_reference(*index);
+        *name = FName::new_dummy(string, 0);
+    }
+    let FName::Dummy { value, .. } = name else { panic!() };
+    value
+}
+
 fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
     if let Property::ObjectProperty(_) = prop {
         return;
     }
-    match prop.get_name().content.as_str() {
+    match prop.get_name().get_content().as_str() {
         "UCSModifiedProperties" | "UCSSerializationIndex" | "BlueprintCreatedComponents" => (),
         name => {
             ui.horizontal(|ui| {
@@ -161,12 +173,14 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
                             text_edit(
                                 ui,
-                                &mut byte.enum_type.get_or_insert(FName::from_slice("")).content,
-                            ) | text_edit(ui, &mut name.content)
+                                get_content_mut(
+                                    byte.enum_type.get_or_insert(FName::from_slice("")),
+                                ),
+                            ) | text_edit(ui, get_content_mut(name))
                         }
                     },
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
-                    Property::NameProperty(name) => text_edit(ui, &mut name.value.content),
+                    Property::NameProperty(name) => text_edit(ui, get_content_mut(&mut name.value)),
                     Property::StrProperty(str) => {
                         text_edit(ui, str.value.get_or_insert(String::new()))
                     }
@@ -180,15 +194,25 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     }
                     Property::SoftObjectProperty(obj) => {
                         text_edit(ui, obj.value.sub_path_string.get_or_insert(String::new()))
-                            | text_edit(ui, &mut obj.value.asset_path_name.content)
+                            | text_edit(ui, get_content_mut(&mut obj.value.asset_path.asset_name))
+                            | text_edit(
+                                ui,
+                                get_content_mut(
+                                    &mut obj
+                                        .value
+                                        .asset_path
+                                        .package_name
+                                        .get_or_insert(FName::from_slice("")),
+                                ),
+                            )
                     }
                     Property::IntPointProperty(point) => {
-                        drag(ui, &mut point.x) | drag(ui, &mut point.y)
+                        drag(ui, &mut point.value.x) | drag(ui, &mut point.value.y)
                     }
                     Property::VectorProperty(vec) => show_vector!(ui, vec),
                     Property::Vector4Property(vec) => show_vector4!(ui, vec),
                     Property::Vector2DProperty(vec) => {
-                        drag(ui, &mut vec.x.0) | drag(ui, &mut vec.y.0)
+                        drag(ui, &mut vec.value.x.0) | drag(ui, &mut vec.value.y.0)
                     }
                     Property::BoxProperty(pak) => {
                         ui.collapsing("v1", |ui| show_vector!(ui, &mut pak.v1))
@@ -232,7 +256,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::SetProperty(set) => show_array_property(ui, &mut set.value),
                     Property::ArrayProperty(arr) => show_array_property(ui, arr),
                     Property::MapProperty(map) => {
-                        ui.push_id(&map.name.content, |ui| {
+                        ui.push_id(map.name.get_content(), |ui| {
                             ui.collapsing("", |ui| {
                                 for value in map.value.values_mut() {
                                     show_property(ui, value);
@@ -283,7 +307,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::SoftObjectPathProperty(path) => show_path!(ui, path),
                     Property::SoftClassPathProperty(path) => show_path!(ui, path),
                     Property::DelegateProperty(del) => {
-                        text_edit(ui, &mut del.value.delegate.content)
+                        text_edit(ui, get_content_mut(&mut del.value.delegate))
                     }
                     Property::MulticastDelegateProperty(del) => show_delegate!(ui, del),
                     Property::MulticastSparseDelegateProperty(del) => show_delegate!(ui, del),
@@ -292,10 +316,10 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
                     Property::SmartNameProperty(name) => {
-                        text_edit(ui, &mut name.display_name.content)
+                        text_edit(ui, get_content_mut(&mut name.display_name))
                     }
                     Property::StructProperty(str) => {
-                        ui.push_id(&str.name.content, |ui| {
+                        ui.push_id(str.name.get_content(), |ui| {
                             ui.collapsing("", |ui| {
                                 for val in str.value.iter_mut() {
                                     show_property(ui, val)
@@ -304,13 +328,16 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         })
                         .response
                     }
-                    Property::EnumProperty(enm) => text_edit(ui, &mut enm.value.content),
+                    Property::EnumProperty(enm) => text_edit(
+                        ui,
+                        get_content_mut(enm.value.get_or_insert(FName::from_slice(""))),
+                    ),
                     // Property::UnknownProperty(unknown) => todo!(),
                     _ => ui.link("unimplemented"),
                 }
             })
             .response
-            .on_hover_text(prop.to_fname().content);
+            .on_hover_text(prop.to_serialized_name());
         }
     };
 }

@@ -352,7 +352,7 @@ impl EventHandler for Stove {
                         }
                         if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
                             match &mut self.map {
-                                Some(map) => match asset::save(map,&self.filepath){
+                                Some(map) => match asset::save(map, &self.filepath) {
                                     Ok(_) => self.notifs.success("map saved"),
                                     Err(e) => self.notifs.error(e.to_string()),
                                 },
@@ -519,7 +519,7 @@ impl EventHandler for Stove {
                                     ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| 
                                         for i in range {
                                             if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
-                                                let insert = map.exports.len() as i32 + 1;
+                                                let insert = map.asset_data.exports.len() as i32 + 1;
                                                 actors[i].transplant(map, donor);
                                                 let selected = self.actors.len();
                                                 self.actors.push(
@@ -698,7 +698,7 @@ impl EventHandler for Stove {
                         || self.held.contains(&KeyCode::RightAlt)
                     {
                         let map = self.map.as_mut().unwrap();
-                        let insert = map.exports.len() as i32 + 1;
+                        let insert = map.asset_data.exports.len() as i32 + 1;
                         self.actors[selected].duplicate(map);
                         self.actors.insert(
                             selected,
@@ -853,7 +853,7 @@ impl Drop for Stove {
     }
 }
 
-const VERSIONS: [(EngineVersion, &str); 31] = [
+const VERSIONS: [(EngineVersion, &str); 33] = [
     (UNKNOWN, "unknown"),
     (VER_UE4_OLDEST_LOADABLE_PACKAGE, "oldest"),
     (VER_UE4_0, "4.0"),
@@ -885,4 +885,6 @@ const VERSIONS: [(EngineVersion, &str); 31] = [
     (VER_UE4_26, "4.26"),
     (VER_UE4_27, "4.27"),
     (VER_UE5_0, "5.0"),
+    (VER_UE5_1, "5.1"),
+    (VER_UE5_2, "5.2")
 ];

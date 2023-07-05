@@ -6,7 +6,7 @@ use unreal_asset::{
     engine_version::EngineVersion,
     exports::{ExportBaseTrait, ExportNormalTrait},
     object_version::ObjectVersion,
-    reader::asset_trait::AssetTrait,
+    reader::archive_trait::ArchiveTrait,
     Asset,
 };
 
@@ -32,11 +32,12 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
 ) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
     // get the static mesh
     let Some(mesh) = asset
+        .asset_data
         .exports
         .iter()
         .find(|ex| {
             asset.get_import(ex.get_base_export().class_index)
-                .map(|import| &import.object_name.content == "StaticMesh")
+                .map(|import| import.object_name.get_content() == "StaticMesh")
                 .unwrap_or(false)
         })
         else {
@@ -70,7 +71,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     // bodysetup reference
     data.read_u32::<LE>()?;
     // nav collision reference
-    if asset.object_version >= ObjectVersion::VER_UE4_STATIC_MESH_STORE_NAV_COLLISION {
+    if object >= ObjectVersion::VER_UE4_STATIC_MESH_STORE_NAV_COLLISION {
         data.read_u32::<LE>()?;
     }
     // lighting guid

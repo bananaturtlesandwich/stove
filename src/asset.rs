@@ -16,7 +16,7 @@ pub fn save<C: std::io::Read + std::io::Seek>(
     asset: &mut Asset<C>,
     path: impl AsRef<Path>,
 ) -> Result<(), Error> {
-    asset.rebuild_name_map()?;
+    asset.rebuild_name_map();
     asset.write_data(
         &mut File::create(&path)?,
         Some(&mut File::create(path.as_ref().with_extension("uexp"))?),
