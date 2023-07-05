@@ -24,7 +24,7 @@ pub struct Stove {
     camera: rendering::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset<std::fs::File>>,
-    version: unreal_asset::engine_version::EngineVersion,
+    version: usize,
     egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
@@ -114,7 +114,7 @@ macro_rules! refresh {
                                 for pak in paks.iter() {
                                     let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
                                     let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
-                                    let Ok(mesh) = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)), $self.version) else {continue};
+                                    let Ok(mesh) = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)), VERSIONS[$self.version].0) else {continue};
                                     match extras::get_mesh_info(mesh) {
                                         Ok((positions, indices)) => {
                                             $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions, indices));
@@ -184,13 +184,10 @@ impl Stove {
                     notifs.error("failed to create config directory");
                 }
                 (
-                    EngineVersion::try_from(
-                        std::fs::read_to_string(cfg.join("VERSION"))
-                            .unwrap_or_else(|_| "0".to_string())
-                            .parse::<i32>()
-                            .unwrap_or_default(),
-                    )
-                    .unwrap_or(EngineVersion::UNKNOWN),
+                    std::fs::read_to_string(cfg.join("VERSION"))
+                        .unwrap_or_else(|_| "0".to_string())
+                        .parse::<usize>()
+                        .unwrap_or_default(),
                     // for some reason doing lines and collect here gives the compiler a seizure
                     std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
                     std::fs::read_to_string(cfg.join("DISTANCE"))
@@ -201,7 +198,7 @@ impl Stove {
                 )
             }
             None => (
-                EngineVersion::UNKNOWN,
+                0,
                 String::default(),
                 1000.0,
                 String::default(),
@@ -212,7 +209,7 @@ impl Stove {
         let map =
             std::env::args()
                 .nth(1)
-                .and_then(|path| match asset::open(path.clone(), version) {
+                .and_then(|path| match asset::open(path.clone(), VERSIONS[version].0) {
                     Ok(asset) => {
                         filepath = path;
                         Some(asset)
@@ -371,12 +368,7 @@ impl EventHandler for Stove {
                         }
                     });
                     egui::ComboBox::from_id_source("version")
-                        .selected_text(*VERSIONS.iter().find_map(|(version, name)| (version == &self.version).then_some(name)).unwrap_or(&"unknown"))
-                        .show_ui(ui, |ui| {
-                            for (version, name) in VERSIONS {
-                                ui.selectable_value(&mut self.version, version, name);
-                            }
-                        });
+                        .show_index(ui, &mut self.version, 33, |i| VERSIONS[i].1.to_string());
                     ui.menu_button("paks", |ui| {
                         egui::TextEdit::singleline(&mut self.aes)
                             .clip_text(false)
@@ -550,7 +542,7 @@ impl EventHandler for Stove {
             self.open_dialog.show(ctx);
             if self.open_dialog.selected() {
                 if let Some(path) = self.open_dialog.path() {
-                    match asset::open(path.clone(), self.version) {
+                    match asset::open(path.clone(), VERSIONS[self.version].0) {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
                             #[cfg(not(target_family = "wasm"))]
@@ -576,7 +568,7 @@ impl EventHandler for Stove {
             self.transplant_dialog.show(ctx);
             if self.transplant_dialog.selected() {
                 if let Some(path) = self.transplant_dialog.path() {
-                    match asset::open(path, self.version) {
+                    match asset::open(path, VERSIONS[self.version].0) {
                         Ok(donor) => {
                             // no need for verbose warnings here
                             let actors = actor::get_actors(&donor)
@@ -844,7 +836,7 @@ impl Drop for Stove {
             client.close().unwrap_or_default();
         }
         if let Some(path) = config() {
-            std::fs::write(path.join("VERSION"), (self.version as u8).to_string())
+            std::fs::write(path.join("VERSION"), self.version.to_string())
                 .unwrap_or_default();
             std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
             std::fs::write(path.join("DISTANCE"), self.distance.to_string()).unwrap_or_default();
