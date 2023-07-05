@@ -46,6 +46,8 @@ pub struct Stove {
     aes: String,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
+    #[cfg(not(target_family = "wasm"))]
+    autoupdate: bool,
 }
 
 fn home_dir() -> Option<std::path::PathBuf> {
@@ -172,13 +174,11 @@ impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
         ctx.set_cull_face(CullFace::Back);
         let mut notifs = egui_notify::Toasts::new();
-        #[cfg(not(any(target_family = "wasm")))]
-        std::thread::spawn(auto_update);
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
             notifs.success(format!("successfully updated to {}", env!("CARGO_PKG_VERSION")));
         }
-        let (version, paks, distance, aes) = match config() {
+        let (version, paks, distance, aes, autoupdate) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir(cfg).is_err() {
                     notifs.error("failed to create config directory");
@@ -195,6 +195,10 @@ impl Stove {
                         .parse()
                         .unwrap_or(1000.0),
                     std::fs::read_to_string(cfg.join("AES")).unwrap_or_default(),
+                    std::fs::read_to_string(cfg.join("AUTOUPDATE"))
+                        .unwrap_or_else(|_| "false".to_string())
+                        .parse::<bool>()
+                        .unwrap_or_default(),
                 )
             }
             None => (
@@ -202,6 +206,7 @@ impl Stove {
                 String::default(),
                 1000.0,
                 String::default(),
+                false
             ),
         };
         let paks = paks.lines().map(str::to_string).collect();
@@ -219,6 +224,10 @@ impl Stove {
                         None
                     }
                 });
+        #[cfg(not(any(target_family = "wasm")))]
+        if autoupdate {
+            std::thread::spawn(auto_update);
+        }
         #[cfg(not(target_family = "wasm"))]
         let client = discord_rich_presence::DiscordIpcClient::new("1059578289737433249")
             .ok()
@@ -278,6 +287,8 @@ impl Stove {
             aes,
             #[cfg(not(target_family = "wasm"))]
             client,
+            #[cfg(not(target_family = "wasm"))]
+            autoupdate
         };
         refresh!(stove, ctx);
         if stove.map.is_none() {
@@ -439,6 +450,10 @@ impl EventHandler for Stove {
                                 binding(ui, "duplicate", "alt + left-drag");
                                 binding(ui, "delete", "delete");
                             });
+                        });
+                        ui.horizontal(|ui|{
+                            ui.label("autoupdate:");
+                            ui.add(egui::Checkbox::without_text(&mut self.autoupdate));
                         });
                         ui.horizontal(|ui| {
                             ui.label("render distance:");
@@ -841,6 +856,7 @@ impl Drop for Stove {
             std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
             std::fs::write(path.join("DISTANCE"), self.distance.to_string()).unwrap_or_default();
             std::fs::write(path.join("AES"), &self.aes).unwrap_or_default();
+            std::fs::write(path.join("AUTOUPDATE"), self.autoupdate.to_string()).unwrap_or_default();
         }
     }
 }
