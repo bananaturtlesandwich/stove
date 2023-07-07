@@ -20,12 +20,17 @@ enum Grab {
     Scale3D(glam::Vec2),
 }
 
+static mut EGUI: Option<egui_miniquad::EguiMq> = None;
+
+fn egui() -> &'static mut egui_miniquad::EguiMq{
+    unsafe { EGUI.as_mut().unwrap() }
+}
+
 pub struct Stove {
     camera: rendering::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset<std::fs::File>>,
     version: usize,
-    egui: egui_miniquad::EguiMq,
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cubes: rendering::Cube,
@@ -172,6 +177,7 @@ fn auto_update() {
 
 impl Stove {
     pub fn new(ctx: &mut GraphicsContext) -> Self {
+        unsafe { EGUI = Some(egui_miniquad::EguiMq::new(ctx)) };
         ctx.set_cull_face(CullFace::Back);
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
@@ -250,7 +256,6 @@ impl Stove {
             notifs,
             map,
             version,
-            egui: egui_miniquad::EguiMq::new(ctx),
             actors: Vec::new(),
             selected: None,
             cubes: rendering::Cube::new(ctx),
@@ -351,7 +356,7 @@ impl EventHandler for Stove {
             mqctx.commit_frame();
             return;
         }
-        self.egui.run(mqctx, |mqctx, ctx| {
+        egui().run(mqctx, |mqctx, ctx| {
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
@@ -617,12 +622,12 @@ impl EventHandler for Stove {
                 }
             }
         });
-        self.egui.draw(mqctx);
+        egui().draw(mqctx);
         mqctx.commit_frame();
     }
 
     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
-        self.egui.mouse_motion_event(x, y);
+        egui().mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
         self.camera.handle_mouse_motion(delta);
         match self.grab {
@@ -658,9 +663,9 @@ impl EventHandler for Stove {
     }
 
     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
-        self.egui.mouse_wheel_event(dx, dy);
+        egui().mouse_wheel_event(dx, dy);
         // a logarithmic speed increase is better because unreal maps can get massive
-        if !self.egui.egui_ctx().is_pointer_over_area() {
+        if !egui().egui_ctx().is_pointer_over_area() {
             self.camera.speed = (self.camera.speed as f32
                 * match dy.is_sign_negative() {
                     true => 100.0 / -dy,
@@ -671,8 +676,8 @@ impl EventHandler for Stove {
     }
 
     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-        self.egui.mouse_button_down_event(ctx, mb, x, y);
-        if self.egui.egui_ctx().is_pointer_over_area() {
+        egui().mouse_button_down_event(ctx, mb, x, y);
+        if egui().egui_ctx().is_pointer_over_area() {
             return;
         }
         // THE HACKIEST MOUSE PICKING EVER CONCEIVED
@@ -750,7 +755,7 @@ impl EventHandler for Stove {
     }
 
     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-        self.egui.mouse_button_up_event(ctx, mb, x, y);
+        egui().mouse_button_up_event(ctx, mb, x, y);
         if mb == MouseButton::Right {
             self.camera.disable_move()
         }
@@ -759,12 +764,12 @@ impl EventHandler for Stove {
 
     // boilerplate >n<
     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
-        self.egui.char_event(character);
+        egui().char_event(character);
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
-        self.egui.key_down_event(ctx, keycode, keymods);
-        if !self.egui.egui_ctx().is_pointer_over_area()
+        egui().key_down_event(ctx, keycode, keymods);
+        if !egui().egui_ctx().is_pointer_over_area()
             && !keymods.ctrl
             && !self.held.contains(&keycode)
         {
@@ -773,11 +778,11 @@ impl EventHandler for Stove {
     }
 
     fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
-        self.egui.key_up_event(keycode, keymods);
+        egui().key_up_event(keycode, keymods);
         if let Some(pos) = self.held.iter().position(|k| k == &keycode) {
             self.held.remove(pos);
         }
-        if self.egui.egui_ctx().wants_keyboard_input() {
+        if egui().egui_ctx().wants_keyboard_input() {
             return;
         }
         match keycode {
