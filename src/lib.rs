@@ -91,59 +91,6 @@ fn default_activity() -> Activity<'static> {
         )])
 }
 
-macro_rules! refresh {
-    ($self: expr, $ctx: expr) => {
-        $self.actors.clear();
-        $self.selected = None;
-        if let Some(map) = &$self.map {
-            let key = match hex::decode($self.aes.trim_start_matches("0x")) {
-                Ok(key) if !$self.aes.is_empty() => Some(key),
-                Ok(_) => None,
-                Err(_) => {
-                    $self.notifs.error("aes key is invalid hex");
-                    None
-                }
-            };
-            let paks: Vec<_> = $self
-                .paks
-                .iter()
-                .filter_map(|dir| std::fs::read_dir(dir).ok())
-                .flatten()
-                .filter_map(Result::ok)
-                .map(|dir| dir.path())
-                .filter_map(|path| unpak::Pak::new_any(&path, key.as_deref()).ok())
-                .collect();
-            for index in actor::get_actors(map) {
-                match actor::Actor::new(map, index) {
-                    Ok(actor) => {
-                        if let actor::DrawType::Mesh(path) = &actor.draw_type {
-                            if !$self.meshes.contains_key(path) {
-                                for pak in paks.iter() {
-                                    let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
-                                    let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
-                                    let Ok(mesh) = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)), VERSIONS[$self.version].0) else {continue};
-                                    match extras::get_mesh_info(mesh) {
-                                        Ok((positions, indices)) => {
-                                            $self.meshes.insert(path.to_string(), rendering::Mesh::new($ctx, positions, indices));
-                                        },
-                                        Err(e)=>{
-                                            $self.notifs.error(format!("{path}: {e}"));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        $self.actors.push(actor);
-                    }
-                    Err(e) => {
-                        $self.notifs.warning(e.to_string());
-                    }
-                }
-            }
-        }
-    };
-}
-
 #[cfg(target_os = "windows")]
 const EXE: &str = "stove.exe";
 #[cfg(target_os = "linux")]
@@ -295,11 +242,61 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate
         };
-        refresh!(stove, ctx);
+        stove.refresh(ctx);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
         stove
+    }
+    fn refresh(&mut self,ctx: &mut Context){
+        self.actors.clear();
+        self.selected = None;
+        if let Some(map) = self.map.as_ref() {
+            let key = match hex::decode(self.aes.trim_start_matches("0x")) {
+                Ok(key) if !self.aes.is_empty() => Some(key),
+                Ok(_) => None,
+                Err(_) => {
+                    self.notifs.error("aes key is invalid hex");
+                    None
+                }
+            };
+            let paks: Vec<_> = self
+                .paks
+                .iter()
+                .filter_map(|dir| std::fs::read_dir(dir).ok())
+                .flatten()
+                .filter_map(Result::ok)
+                .map(|dir| dir.path())
+                .filter_map(|path| unpak::Pak::new_any(&path, key.as_deref()).ok())
+                .collect();
+            for index in actor::get_actors(map) {
+                match actor::Actor::new(map, index) {
+                    Ok(actor) => {
+                        if let actor::DrawType::Mesh(path) = &actor.draw_type {
+                            if !self.meshes.contains_key(path) {
+                                for pak in paks.iter() {
+                                    let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
+                                    let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
+                                    let Ok(mesh) = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)), VERSIONS[self.version].0) else {continue};
+                                    match extras::get_mesh_info(mesh) {
+                                        Ok((positions, indices)) => {
+                                            self.meshes.insert(path.to_string(), rendering::Mesh::new(ctx, positions, indices));
+                                        },
+                                        Err(e)=>{
+                                            self.notifs.error(format!("{path}: {e}"));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        self.actors.push(actor);
+                    }
+                    Err(e) => {
+                        self.notifs.warning(e.to_string());
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -324,7 +321,7 @@ impl EventHandler for Stove {
             stencil: None,
         });
         let vp = projection(self.distance, mqctx.screen_size()) * self.camera.view_matrix();
-        if let Some(map) = &self.map {
+        if let Some(map) = self.map.as_ref() {
             self.cubes.draw(
                 mqctx,
                 &self
@@ -364,7 +361,7 @@ impl EventHandler for Stove {
                             self.open_dialog.open();
                         }
                         if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
-                            match &mut self.map {
+                            match self.map.as_mut() {
                                 Some(map) => match asset::save(map, &self.filepath) {
                                     Ok(_) => self.notifs.success("map saved"),
                                     Err(e) => self.notifs.error(e.to_string()),
@@ -472,7 +469,7 @@ impl EventHandler for Stove {
                         }
                     });
                 });
-                if let Some(map) = &mut self.map {
+                if let Some(map) = self.map.as_mut() {
                     ui.add_space(10.0);
                     ui.push_id("actors", |ui| egui::ScrollArea::vertical()
                         .auto_shrink([false; 2])
@@ -511,7 +508,7 @@ impl EventHandler for Stove {
                     }
                 }
             });
-            if let Some(map) = &mut self.map {
+            if let Some(map) = self.map.as_mut() {
                 let mut open = true;
                 let mut transplanted = false;
                 if let Some((donor, actors)) = &self.donor {
@@ -577,7 +574,7 @@ impl EventHandler for Stove {
                                     }
                             }
                             self.map = Some(asset);
-                            refresh!(self, mqctx);
+                            self.refresh(mqctx);
                         }
                         Err(e) => {
                             self.notifs.error(e.to_string());
@@ -808,7 +805,7 @@ impl EventHandler for Stove {
                 }
             },
             KeyCode::H => self.ui = !self.ui,
-            KeyCode::T if keymods.ctrl => match &self.map.is_some() {
+            KeyCode::T if keymods.ctrl => match self.map.is_some() {
                 true => {
                     self.transplant_dialog.open();
                 }
@@ -825,7 +822,7 @@ impl EventHandler for Stove {
                         self.notifs.error("no map to save");
                     }
                 },
-                false => match &mut self.map {
+                false => match self.map.as_mut() {
                     Some(map) => match asset::save(map, &self.filepath) {
                         Ok(_) => {
                             self.notifs.success("map saved");
