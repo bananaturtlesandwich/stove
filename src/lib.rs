@@ -298,6 +298,23 @@ impl Stove {
             }
         }
     }
+    fn save(&mut self) {
+        match self.map.as_mut() {
+            Some(map) => match asset::save(map, &self.filepath) {
+                Ok(_) => self.notifs.success("map saved"),
+                Err(e) => self.notifs.error(e.to_string())
+            },
+            None => self.notifs.error("no map to save")
+        };
+    }
+    fn open_save_dialog(&mut self){
+        match self.map.is_some() {
+            true => self.save_dialog.open(),
+            false => {
+                self.notifs.error("no map to save");
+            },
+        }
+    }
 }
 
 fn projection(dist: f32, (width, height): (f32, f32)) -> glam::Mat4 {
@@ -361,23 +378,10 @@ impl EventHandler for Stove {
                             self.open_dialog.open();
                         }
                         if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
-                            match self.map.as_mut() {
-                                Some(map) => match asset::save(map, &self.filepath) {
-                                    Ok(_) => self.notifs.success("map saved"),
-                                    Err(e) => self.notifs.error(e.to_string()),
-                                },
-                                None => {
-                                    self.notifs.error("no map to save")
-                                },
-                            };
+                            self.save()
                         }
                         if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift+ S")).clicked(){
-                            match self.map.is_some() {
-                                true => self.save_dialog.open(),
-                                false => {
-                                    self.notifs.error("no map to save");
-                                },
-                            }
+                            self.open_save_dialog()
                         }
                     });
                     egui::ComboBox::from_id_source("version")
@@ -609,13 +613,8 @@ impl EventHandler for Stove {
             self.save_dialog.show(ctx);
             if self.save_dialog.selected() {
                 if let Some(path) = self.save_dialog.path() {
-                    match asset::save(self.map.as_mut().unwrap(), path.clone()){
-                        Ok(_) => {
-                            self.filepath = path.to_str().unwrap_or_default().to_string();
-                            self.notifs.success("map saved")
-                        },
-                        Err(e) => self.notifs.error(e.to_string()),
-                    };
+                    self.filepath = path.to_str().unwrap_or_default().to_string();
+                    self.save()
                 }
             }
         });
@@ -806,9 +805,7 @@ impl EventHandler for Stove {
             },
             KeyCode::H => self.ui = !self.ui,
             KeyCode::T if keymods.ctrl => match self.map.is_some() {
-                true => {
-                    self.transplant_dialog.open();
-                }
+                true => self.transplant_dialog.open(),
                 false => {
                     self.notifs.error("no map to transplant to");
                 }
@@ -816,25 +813,8 @@ impl EventHandler for Stove {
             KeyCode::O if keymods.ctrl => self.open_dialog.open(),
             KeyCode::O if keymods.alt => self.pak_dialog.open(),
             KeyCode::S if keymods.ctrl => match keymods.shift {
-                true => match self.map.is_some() {
-                    true => self.save_dialog.open(),
-                    false => {
-                        self.notifs.error("no map to save");
-                    }
-                },
-                false => match self.map.as_mut() {
-                    Some(map) => match asset::save(map, &self.filepath) {
-                        Ok(_) => {
-                            self.notifs.success("map saved");
-                        }
-                        Err(e) => {
-                            self.notifs.error(e.to_string());
-                        }
-                    },
-                    None => {
-                        self.notifs.error("no map to save");
-                    }
-                },
+                true => self.open_save_dialog(),
+                false => self.save(),
             },
             KeyCode::T => {
                 self.fullscreen = !self.fullscreen;
