@@ -53,7 +53,7 @@ impl Actor {
             .get_import(norm.base_export.class_index)
             .map(|import| import.object_name.get_content())
             .unwrap_or_default();
-        let draw_type = match norm
+        let draw_type = norm
             .base_export
             .create_before_serialization_dependencies
             .iter()
@@ -64,21 +64,18 @@ impl Actor {
                     .get_import(i.get_base_export().class_index)
                     .filter(|import| import.object_name.get_content() == "StaticMeshComponent")
                     .is_some()
-            }) {
-            Some(norm) => norm
-                .properties
-                .iter()
-                .find_map(|prop| {
+            })
+            .and_then(|norm| {
+                norm.properties.iter().find_map(|prop| {
                     cast!(Property, ObjectProperty, prop)
                         .filter(|prop| prop.get_name().get_content() == "StaticMesh")
                 })
-                .and_then(|obj| asset.get_import(obj.value))
-                .and_then(|import| asset.get_import(import.outer_index))
-                .map_or(DrawType::Cube, |path| {
-                    DrawType::Mesh(path.object_name.get_content())
-                }),
-            None => DrawType::Cube,
-        };
+            })
+            .and_then(|obj| asset.get_import(obj.value))
+            .and_then(|import| asset.get_import(import.outer_index))
+            .map_or(DrawType::Cube, |path| {
+                DrawType::Mesh(path.object_name.get_content())
+            });
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
             match prop.get_name().get_content().as_str() {

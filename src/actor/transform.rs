@@ -11,6 +11,10 @@ use unreal_asset::{
     Asset,
 };
 
+pub const LOCATION: &str = "RelativeLocation";
+pub const ROTATION: &str = "RelativeRotation";
+pub const SCALE: &str = "RelativeScale3D";
+
 impl super::Actor {
     pub fn location(&self, map: &Asset<File>) -> glam::Vec3 {
         map.asset_data.exports[self.transform]
@@ -18,7 +22,7 @@ impl super::Actor {
             .and_then(|norm| {
                 norm.properties.iter().rev().find_map(|prop| {
                     if let Property::StructProperty(struc) = prop {
-                        if struc.name.get_content() == "RelativeLocation" {
+                        if struc.name.get_content() == LOCATION {
                             return cast!(Property, VectorProperty, &struc.value[0]);
                         }
                     }
@@ -38,7 +42,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == "RelativeLoction")
+            .find(|prop| prop.get_name().get_content() == LOCATION)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -55,7 +59,7 @@ impl super::Actor {
                     name: names
                         .clone_resource()
                         .get_mut()
-                        .add_fname("RelativeLocation"),
+                        .add_fname(LOCATION),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -65,7 +69,7 @@ impl super::Actor {
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname("RelativeLocation"),
+                        name: names.get_mut().add_fname(LOCATION),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
@@ -89,7 +93,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == "RelativeLocation")
+            .find(|prop| prop.get_name().get_content() == LOCATION)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -106,7 +110,7 @@ impl super::Actor {
                     name: names
                         .clone_resource()
                         .get_mut()
-                        .add_fname("RelativeLocation"),
+                        .add_fname(LOCATION),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -116,7 +120,7 @@ impl super::Actor {
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname("RelativeLocation"),
+                        name: names.get_mut().add_fname(LOCATION),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
@@ -141,7 +145,7 @@ impl super::Actor {
                     .rev()
                     .find_map(|prop| {
                         if let Property::StructProperty(struc) = prop {
-                            if struc.name.get_content() == "RelativeRotation" {
+                            if struc.name.get_content() == ROTATION {
                                 return cast!(Property, RotatorProperty, &struc.value[0]);
                             }
                         }
@@ -161,7 +165,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == "RelativeRotation")
+            .find(|prop| prop.get_name().get_content() == ROTATION)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -188,7 +192,7 @@ impl super::Actor {
                     name: names
                         .clone_resource()
                         .get_mut()
-                        .add_fname("RelativeRotation"),
+                        .add_fname(ROTATION),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -198,7 +202,7 @@ impl super::Actor {
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::RotatorProperty(RotatorProperty {
-                        name: names.get_mut().add_fname("RelativeRotation"),
+                        name: names.get_mut().add_fname(ROTATION),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
@@ -220,7 +224,7 @@ impl super::Actor {
             .and_then(|norm| {
                 norm.properties.iter().rev().find_map(|prop| {
                     if let Property::StructProperty(struc) = prop {
-                        if struc.name.get_content() == "RelativeScale3D" {
+                        if struc.name.get_content() == SCALE {
                             return cast!(Property, VectorProperty, &struc.value[0]);
                         }
                     }
@@ -239,7 +243,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == "RelativeScale3D")
+            .find(|prop| prop.get_name().get_content() == SCALE)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -256,7 +260,7 @@ impl super::Actor {
                     name: names
                         .clone_resource()
                         .get_mut()
-                        .add_fname("RelativeScale3D"),
+                        .add_fname(SCALE),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -266,7 +270,7 @@ impl super::Actor {
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname("RelativeScale3D"),
+                        name: names.get_mut().add_fname(SCALE),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
