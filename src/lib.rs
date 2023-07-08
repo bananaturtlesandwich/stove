@@ -613,7 +613,7 @@ impl EventHandler for Stove {
             self.save_dialog.show(ctx);
             if self.save_dialog.selected() {
                 if let Some(path) = self.save_dialog.path() {
-                    self.filepath = path.to_str().unwrap_or_default().to_string();
+                    self.filepath = path.with_extension("umap").to_str().unwrap_or_default().to_string();
                     self.save()
                 }
             }
