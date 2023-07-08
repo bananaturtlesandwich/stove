@@ -7,7 +7,7 @@ use unreal_asset::{
         vector_property::{RotatorProperty, VectorProperty},
         Property, PropertyDataTrait,
     },
-    types::{fname::FName, vector::Vector},
+    types::vector::Vector,
     Asset,
 };
 
@@ -31,6 +31,7 @@ impl super::Actor {
 
     pub fn set_location(&self, map: &mut Asset<File>, mut new: glam::Vec3) {
         new *= 100.0;
+        let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return
         };
@@ -51,17 +52,20 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: FName::from_slice("RelativeLocation"),
+                    name: names
+                        .clone_resource()
+                        .get_mut()
+                        .add_fname("RelativeLocation"),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
-                    struct_type: Some(FName::from_slice("Vector")),
-                    struct_guid: None,
+                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
+                    struct_guid: Some([0; 16]),
                     property_guid: None,
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
-                        name: FName::from_slice("RelativeLocation"),
+                        name: names.get_mut().add_fname("RelativeLocation"),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
@@ -78,6 +82,7 @@ impl super::Actor {
     }
 
     pub fn add_location(&self, map: &mut Asset<File>, offset: glam::Vec3) {
+        let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return
         };
@@ -98,17 +103,20 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: FName::from_slice("RelativeLocation"),
+                    name: names
+                        .clone_resource()
+                        .get_mut()
+                        .add_fname("RelativeLocation"),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
-                    struct_type: Some(FName::from_slice("Vector")),
-                    struct_guid: None,
+                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
+                    struct_guid: Some([0; 16]),
                     property_guid: None,
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
-                        name: FName::from_slice("RelativeLocation"),
+                        name: names.get_mut().add_fname("RelativeLocation"),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
@@ -146,6 +154,7 @@ impl super::Actor {
     }
 
     pub fn combine_rotation(&self, map: &mut Asset<File>, offset: glam::Quat) {
+        let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
         };
@@ -176,17 +185,20 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: FName::from_slice("RelativeRotation"),
+                    name: names
+                        .clone_resource()
+                        .get_mut()
+                        .add_fname("RelativeRotation"),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
-                    struct_type: Some(FName::from_slice("Rotator")),
-                    struct_guid: None,
+                    struct_type: Some(names.clone_resource().get_mut().add_fname("Rotator")),
+                    struct_guid: Some([0; 16]),
                     property_guid: None,
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::RotatorProperty(RotatorProperty {
-                        name: FName::from_slice("RelativeRotation"),
+                        name: names.get_mut().add_fname("RelativeRotation"),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
@@ -220,6 +232,7 @@ impl super::Actor {
     }
 
     pub fn mul_scale(&self, map: &mut Asset<File>, offset: glam::Vec3) {
+        let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
         };
@@ -240,17 +253,20 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: FName::from_slice("RelativeScale3D"),
+                    name: names
+                        .clone_resource()
+                        .get_mut()
+                        .add_fname("RelativeScale3D"),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
-                    struct_type: Some(FName::from_slice("Vector")),
-                    struct_guid: None,
+                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
+                    struct_guid: Some([0; 16]),
                     property_guid: None,
                     duplication_index: 0,
                     serialize_none: true,
                     value: vec![Property::VectorProperty(VectorProperty {
-                        name: FName::from_slice("RelativeScale3D"),
+                        name: names.get_mut().add_fname("RelativeScale3D"),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
