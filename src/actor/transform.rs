@@ -56,10 +56,7 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: names
-                        .clone_resource()
-                        .get_mut()
-                        .add_fname(LOCATION),
+                    name: names.clone_resource().get_mut().add_fname(LOCATION),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -107,10 +104,7 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: names
-                        .clone_resource()
-                        .get_mut()
-                        .add_fname(LOCATION),
+                    name: names.clone_resource().get_mut().add_fname(LOCATION),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -136,7 +130,7 @@ impl super::Actor {
         }
     }
 
-    pub fn rotation(&self, map: &Asset<File>) -> glam::Vec3 {
+    pub fn rotation(&self, map: &Asset<File>) -> glam::Quat {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -151,7 +145,15 @@ impl super::Actor {
                         }
                         None
                     })
-                    .map(|rot| glam::dvec3(rot.value.x.0, rot.value.y.0, rot.value.z.0).as_vec3())
+                    .map(|rot| {
+                        glam::DQuat::from_euler(
+                            glam::EulerRot::XYZ,
+                            rot.value.x.0,
+                            rot.value.y.0,
+                            rot.value.z.0,
+                        )
+                        .as_f32()
+                    })
                     .unwrap_or_default()
             })
             .unwrap_or_default()
@@ -189,10 +191,7 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: names
-                        .clone_resource()
-                        .get_mut()
-                        .add_fname(ROTATION),
+                    name: names.clone_resource().get_mut().add_fname(ROTATION),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -257,10 +256,7 @@ impl super::Actor {
             None => norm
                 .properties
                 .push(Property::StructProperty(StructProperty {
-                    name: names
-                        .clone_resource()
-                        .get_mut()
-                        .add_fname(SCALE),
+                    name: names.clone_resource().get_mut().add_fname(SCALE),
                     ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                         ancestry: Vec::new(),
                     },
@@ -287,15 +283,9 @@ impl super::Actor {
     }
 
     pub fn model_matrix(&self, map: &Asset<File>) -> glam::Mat4 {
-        let rot = self.rotation(map);
         glam::Mat4::from_scale_rotation_translation(
             self.scale(map),
-            glam::Quat::from_euler(
-                glam::EulerRot::XYZ,
-                rot.x.to_radians(),
-                rot.y.to_radians(),
-                rot.z.to_radians(),
-            ),
+            self.rotation(map),
             self.location(map),
         )
     }
