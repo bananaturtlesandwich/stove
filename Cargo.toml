@@ -12,10 +12,10 @@ unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package 
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math"] }
 miniquad = "0.3"
-egui = "0.21"
-egui-miniquad = "0.14"
-egui-notify = "0.6"
-egui_file = "0.8"
+egui = "0.22"
+egui-miniquad = { git = "https://github.com/not-fl3/egui-miniquad", rev = "22a34d9"}
+egui-notify = "0.7"
+egui_file = { git = "https://github.com/bananaturtlesandwich/egui_file", rev = "c037b78" }
 byteorder = "1.4"
 hashbrown = "0.13"
 hex = "0.4"

@@ -1,14 +1,11 @@
 name: release
 
-permissions:
-  contents: write
-
 # runs whenever a version git tag is created
 on:
   push:
     tags:
       - "*.*.*" # e.g 1.0.1
-
+  workflow_dispatch:
 jobs:
   draft:
     runs-on: ubuntu-latest
@@ -24,12 +21,12 @@ jobs:
           draft: true
           prerelease: true
           body: "# Changes"
-
   windows:
     needs: draft
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v1
       - name: build
         run: cargo build -r
       - name: upload
@@ -47,6 +44,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v1
       - name: build
         run: cargo build -r
       - name: upload
@@ -64,6 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v1
       - name: build
         run: cargo build -r
       - name: upload
