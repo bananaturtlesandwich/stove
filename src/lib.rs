@@ -55,29 +55,8 @@ pub struct Stove {
     autoupdate: bool,
 }
 
-fn home_dir() -> Option<std::path::PathBuf> {
-    #[cfg(target_family = "wasm")]
-    return None;
-    #[cfg(not(target_family = "wasm"))]
-    std::env::var_os(
-        #[cfg(target_family = "windows")]
-        "USERPROFILE",
-        #[cfg(target_family = "unix")]
-        "HOME",
-    )
-    .filter(|home| !home.is_empty())
-    .map(std::path::PathBuf::from)
-}
-
 fn config() -> Option<std::path::PathBuf> {
-    home_dir().map(|path| {
-        path.join(
-            #[cfg(target_family = "windows")]
-            "AppData/Local/stove",
-            #[cfg(target_family = "unix")]
-            ".config/stove",
-        )
-    })
+    dirs::config_local_dir().map(|path|path.join("stove"))
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -98,7 +77,7 @@ const EXE: &str = "stove-linux";
 #[cfg(target_os = "macos")]
 const EXE: &str = "stove-macos";
 
-#[cfg(not(any(target_family = "wasm")))]
+#[cfg(not(target_family = "wasm"))]
 fn auto_update() {
     let api = autoupdater::apis::github::GithubApi::new("bananaturtlesandwich", "stove")
         .current_version(env!("CARGO_PKG_VERSION"))
@@ -133,8 +112,11 @@ impl Stove {
         }
         let (version, paks, distance, aes, autoupdate) = match config() {
             Some(ref cfg) => {
-                if !cfg.exists() && std::fs::create_dir(cfg).is_err() {
+                if !cfg.exists() && std::fs::create_dir_all(cfg).is_err() {
                     notifs.error("failed to create config directory");
+                }
+                if std::fs::create_dir_all(cfg.join("cache")).is_err(){
+                    notifs.error("failed to create cache directory");
                 }
                 (
                     std::fs::read_to_string(cfg.join("VERSION"))
@@ -177,7 +159,7 @@ impl Stove {
                         None
                     }
                 });
-        #[cfg(not(any(target_family = "wasm")))]
+        #[cfg(not(target_family = "wasm"))]
         if autoupdate {
             std::thread::spawn(auto_update);
         }
@@ -196,7 +178,7 @@ impl Stove {
                         .is_ok())
                 .then_some(cl)
             });
-        let home = home_dir();
+        let home = dirs::home_dir();
 
         let mut stove = Self {
             camera: rendering::Camera::default(),
@@ -269,21 +251,51 @@ impl Stove {
                 .map(|dir| dir.path())
                 .filter_map(|path| unpak::Pak::new_any(&path, key.as_deref()).ok())
                 .collect();
+            let cache = config().map(|path| path.join("cache"));
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
                         if let actor::DrawType::Mesh(path) = &actor.draw_type {
                             if !self.meshes.contains_key(path) {
+                                let (mesh, bulk) = (path.to_string() + ".uasset",path.to_string() + ".uexp");
+                                let mesh_path = mesh.trim_start_matches('/');
                                 for pak in paks.iter() {
-                                    let Ok(mesh) = pak.get(&format!("{path}.uasset")) else {continue};
-                                    let mesh_bulk = pak.get(&format!("{path}.uexp")).ok();
-                                    let Ok(mesh) = unreal_asset::Asset::new(std::io::Cursor::new(mesh), mesh_bulk.map(|bulk| std::io::Cursor::new(bulk)), VERSIONS[self.version].0) else {continue};
-                                    match extras::get_mesh_info(mesh) {
+                                    let info = match cache.as_ref() {
+                                        Some(cache) if cache.join(mesh_path).exists() ||
+                                            // try to create cache if it doesn't exist
+                                            (
+                                                std::fs::create_dir_all(std::path::PathBuf::from(cache.join(mesh_path)).parent().unwrap()).is_ok() &&
+                                                pak.read_to_file(&mesh, cache.join(mesh_path)).is_ok() &&
+                                                // we don't care whether this is successful in case there is no uexp
+                                                pak.read_to_file(&bulk, cache.join(bulk.trim_start_matches('/'))).map_or(true,|_| true)
+                                            ) => {
+                                            let Ok(mesh) = asset::open(cache.join(mesh_path), VERSIONS[self.version].0) else { continue };
+                                            extras::get_mesh_info(mesh)
+                                        }
+                                        // if the cache cannot be created fall back to storing in memory
+                                        _ => {
+                                            let Ok(mesh) = pak.get(&mesh) else { continue };
+                                            let Ok(mesh) = unreal_asset::Asset::new(
+                                                std::io::Cursor::new(mesh),
+                                                pak.get(&bulk).ok().map(|bulk| std::io::Cursor::new(bulk)),
+                                                VERSIONS[self.version].0
+                                            ) else { continue };
+                                            extras::get_mesh_info(mesh)
+                                        }
+                                    };
+                                    match info {
                                         Ok((positions, indices)) => {
-                                            self.meshes.insert(path.to_string(), rendering::Mesh::new(ctx, positions, indices));
-                                        },
-                                        Err(e)=>{
-                                            self.notifs.error(format!("{path}: {e}"));
+                                            self.meshes.insert(
+                                                path.to_string(),
+                                                rendering::Mesh::new(ctx, positions, indices),
+                                            );
+                                            break;
+                                        }
+                                        Err(e) => {
+                                            self.notifs.error(format!(
+                                                "{}: {e}",
+                                                path.split('/').last().unwrap_or_default()
+                                            ));
                                         }
                                     }
                                 }

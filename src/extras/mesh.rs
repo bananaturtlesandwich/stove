@@ -31,31 +31,23 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     asset: Asset<C>,
 ) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
     // get the static mesh
-    let Some(mesh) = asset
-        .asset_data
-        .exports
-        .iter()
-        .find(|ex| {
-            asset.get_import(ex.get_base_export().class_index)
-                .map(|import| import.object_name.get_content() == "StaticMesh")
-                .unwrap_or(false)
-        })
-        else {
-            return Err(
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                     "failed to find mesh export"
-                    )
-                );
-        };
+    let Some(mesh) = asset.asset_data.exports.iter().find(|ex| {
+        asset
+            .get_import(ex.get_base_export().class_index)
+            .map(|import| import.object_name.get_content() == "StaticMesh")
+            .unwrap_or(false)
+    }) else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "failed to find mesh export",
+        ));
+    };
     // get the normal export
     let Some(mesh) = mesh.get_normal_export() else {
-        return Err(
-            io::Error::new(
+        return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "failed to cast mesh data"
-            )
-        );
+            "failed to cast mesh data",
+        ));
     };
     let object = asset.get_object_version();
     let engine = asset.get_engine_version();
