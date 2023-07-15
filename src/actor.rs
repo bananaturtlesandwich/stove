@@ -43,10 +43,13 @@ impl Actor {
             return Err(Error::invalid_package_index(format!(
                 "failed to find actor at index {}",
                 package.index
-            )))
+            )));
         };
         let Some(norm) = ex.get_normal_export() else {
-            return Err(Error::no_data(format!("actor at index {} failed to parse", package.index)))
+            return Err(Error::no_data(format!(
+                "actor at index {} failed to parse",
+                package.index
+            )));
         };
         let name = norm.base_export.object_name.get_content();
         let class = asset

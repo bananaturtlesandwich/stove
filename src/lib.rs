@@ -22,7 +22,7 @@ enum Grab {
 
 static mut EGUI: Option<egui_miniquad::EguiMq> = None;
 
-fn egui() -> &'static mut egui_miniquad::EguiMq{
+fn egui() -> &'static mut egui_miniquad::EguiMq {
     unsafe { EGUI.as_mut().unwrap() }
 }
 
@@ -49,6 +49,7 @@ pub struct Stove {
     distance: f32,
     fullscreen: bool,
     aes: String,
+    cache: bool,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
     #[cfg(not(target_family = "wasm"))]
@@ -56,7 +57,7 @@ pub struct Stove {
 }
 
 fn config() -> Option<std::path::PathBuf> {
-    dirs::config_local_dir().map(|path|path.join("stove"))
+    dirs::config_local_dir().map(|path| path.join("stove"))
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -84,14 +85,17 @@ fn auto_update() {
         .prerelease(true);
     if let Ok(Some(asset)) = api.get_newer(None::<autoupdater::Sort>) {
         use autoupdater::apis::DownloadApiTrait;
-        if api.download(
-            &asset
-                .assets
-                .into_iter()
-                .find(|asset| asset.name == EXE)
-                .unwrap(),
-            None::<autoupdater::Download>
-        ).is_ok() {
+        if api
+            .download(
+                &asset
+                    .assets
+                    .into_iter()
+                    .find(|asset| asset.name == EXE)
+                    .unwrap(),
+                None::<autoupdater::Download>,
+            )
+            .is_ok()
+        {
             std::process::Command::new(EXE)
                 .args(std::env::args().skip(1))
                 .spawn()
@@ -108,14 +112,17 @@ impl Stove {
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
-            notifs.success(format!("successfully updated to {}", env!("CARGO_PKG_VERSION")));
+            notifs.success(format!(
+                "successfully updated to {}",
+                env!("CARGO_PKG_VERSION")
+            ));
         }
-        let (version, paks, distance, aes, autoupdate) = match config() {
+        let (version, paks, distance, aes, autoupdate, cache) = match config() {
             Some(ref cfg) => {
                 if !cfg.exists() && std::fs::create_dir_all(cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
-                if std::fs::create_dir_all(cfg.join("cache")).is_err(){
+                if std::fs::create_dir_all(cfg.join("cache")).is_err() {
                     notifs.error("failed to create cache directory");
                 }
                 (
@@ -134,15 +141,13 @@ impl Stove {
                         .unwrap_or_else(|_| "false".to_string())
                         .parse::<bool>()
                         .unwrap_or_default(),
+                    std::fs::read_to_string(cfg.join("CACHE"))
+                        .unwrap_or_else(|_| "true".to_string())
+                        .parse::<bool>()
+                        .unwrap_or_default(),
                 )
             }
-            None => (
-                0,
-                String::default(),
-                1000.0,
-                String::default(),
-                false
-            ),
+            None => (0, String::default(), 1000.0, String::default(), false, true),
         };
         let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
@@ -207,7 +212,7 @@ impl Stove {
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             pak_dialog: egui_file::FileDialog::select_folder(home)
-                .default_size((384.0,256.0))
+                .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
@@ -219,10 +224,11 @@ impl Stove {
             distance,
             fullscreen: false,
             aes,
+            cache,
             #[cfg(not(target_family = "wasm"))]
             client,
             #[cfg(not(target_family = "wasm"))]
-            autoupdate
+            autoupdate,
         };
         stove.refresh(ctx);
         if stove.map.is_none() {
@@ -230,7 +236,7 @@ impl Stove {
         }
         stove
     }
-    fn refresh(&mut self,ctx: &mut Context){
+    fn refresh(&mut self, ctx: &mut Context) {
         self.actors.clear();
         self.selected = None;
         if let Some(map) = self.map.as_ref() {
@@ -257,19 +263,28 @@ impl Stove {
                     Ok(actor) => {
                         if let actor::DrawType::Mesh(path) = &actor.draw_type {
                             if !self.meshes.contains_key(path) {
-                                let (mesh, bulk) = (path.to_string() + ".uasset",path.to_string() + ".uexp");
+                                let (mesh, bulk) =
+                                    (path.to_string() + ".uasset", path.to_string() + ".uexp");
                                 let mesh_path = mesh.trim_start_matches('/');
                                 for pak in paks.iter() {
                                     let info = match cache.as_ref() {
-                                        Some(cache) if cache.join(mesh_path).exists() ||
+                                        Some(cache)
+                                            if self.cache
+                                                && (cache.join(mesh_path).exists() ||
                                             // try to create cache if it doesn't exist
                                             (
                                                 std::fs::create_dir_all(std::path::PathBuf::from(cache.join(mesh_path)).parent().unwrap()).is_ok() &&
                                                 pak.read_to_file(&mesh, cache.join(mesh_path)).is_ok() &&
                                                 // we don't care whether this is successful in case there is no uexp
                                                 pak.read_to_file(&bulk, cache.join(bulk.trim_start_matches('/'))).map_or(true,|_| true)
-                                            ) => {
-                                            let Ok(mesh) = asset::open(cache.join(mesh_path), VERSIONS[self.version].0) else { continue };
+                                            )) =>
+                                        {
+                                            let Ok(mesh) = asset::open(
+                                                cache.join(mesh_path),
+                                                VERSIONS[self.version].0,
+                                            ) else {
+                                                continue;
+                                            };
                                             extras::get_mesh_info(mesh)
                                         }
                                         // if the cache cannot be created fall back to storing in memory
@@ -277,9 +292,13 @@ impl Stove {
                                             let Ok(mesh) = pak.get(&mesh) else { continue };
                                             let Ok(mesh) = unreal_asset::Asset::new(
                                                 std::io::Cursor::new(mesh),
-                                                pak.get(&bulk).ok().map(|bulk| std::io::Cursor::new(bulk)),
-                                                VERSIONS[self.version].0
-                                            ) else { continue };
+                                                pak.get(&bulk)
+                                                    .ok()
+                                                    .map(|bulk| std::io::Cursor::new(bulk)),
+                                                VERSIONS[self.version].0,
+                                            ) else {
+                                                continue;
+                                            };
                                             extras::get_mesh_info(mesh)
                                         }
                                     };
@@ -314,17 +333,17 @@ impl Stove {
         match self.map.as_mut() {
             Some(map) => match asset::save(map, &self.filepath) {
                 Ok(_) => self.notifs.success("map saved"),
-                Err(e) => self.notifs.error(e.to_string())
+                Err(e) => self.notifs.error(e.to_string()),
             },
-            None => self.notifs.error("no map to save")
+            None => self.notifs.error("no map to save"),
         };
     }
-    fn open_save_dialog(&mut self){
+    fn open_save_dialog(&mut self) {
         match self.map.is_some() {
             true => self.save_dialog.open(),
             false => {
                 self.notifs.error("no map to save");
-            },
+            }
         }
     }
 }
@@ -473,6 +492,10 @@ impl EventHandler for Stove {
                             ui.label("autoupdate:");
                             ui.add(egui::Checkbox::without_text(&mut self.autoupdate));
                         });
+                        ui.horizontal(|ui|{
+                            ui.label("cache meshes:");
+                            ui.add(egui::Checkbox::without_text(&mut self.cache));
+                        });
                         ui.horizontal(|ui| {
                             ui.label("render distance:");
                             ui.add(
@@ -541,7 +564,7 @@ impl EventHandler for Stove {
                                 ui.text_style_height(&egui::TextStyle::Body),
                                 actors.len(),
                                 |ui, range| {
-                                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| 
+                                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
                                         for i in range {
                                             if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
                                                 let insert = map.asset_data.exports.len() as i32 + 1;
@@ -831,7 +854,7 @@ impl EventHandler for Stove {
             KeyCode::T => {
                 self.fullscreen = !self.fullscreen;
                 ctx.set_fullscreen(self.fullscreen);
-            },
+            }
             KeyCode::Escape => ctx.request_quit(),
             _ => (),
         }
@@ -845,12 +868,13 @@ impl Drop for Stove {
             client.close().unwrap_or_default();
         }
         if let Some(path) = config() {
-            std::fs::write(path.join("VERSION"), self.version.to_string())
-                .unwrap_or_default();
+            std::fs::write(path.join("VERSION"), self.version.to_string()).unwrap_or_default();
             std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
             std::fs::write(path.join("DISTANCE"), self.distance.to_string()).unwrap_or_default();
             std::fs::write(path.join("AES"), &self.aes).unwrap_or_default();
-            std::fs::write(path.join("AUTOUPDATE"), self.autoupdate.to_string()).unwrap_or_default();
+            std::fs::write(path.join("AUTOUPDATE"), self.autoupdate.to_string())
+                .unwrap_or_default();
+            std::fs::write(path.join("cache"), self.cache.to_string()).unwrap_or_default();
         }
     }
 }
@@ -888,5 +912,5 @@ const VERSIONS: [(EngineVersion, &str); 33] = [
     (VER_UE4_27, "4.27"),
     (VER_UE5_0, "5.0"),
     (VER_UE5_1, "5.1"),
-    (VER_UE5_2, "5.2")
+    (VER_UE5_2, "5.2"),
 ];

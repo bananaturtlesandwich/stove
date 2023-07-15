@@ -37,7 +37,7 @@ impl super::Actor {
         new *= 100.0;
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
-            return
+            return;
         };
         match norm
             .properties
@@ -85,7 +85,7 @@ impl super::Actor {
     pub fn add_location(&self, map: &mut Asset<File>, offset: glam::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
-            return
+            return;
         };
         match norm
             .properties
