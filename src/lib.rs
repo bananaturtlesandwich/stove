@@ -133,9 +133,9 @@ impl Stove {
                     // for some reason doing lines and collect here gives the compiler a seizure
                     std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
                     std::fs::read_to_string(cfg.join("DISTANCE"))
-                        .unwrap_or_else(|_| "1000.0".to_string())
+                        .unwrap_or_else(|_| "10000.0".to_string())
                         .parse()
-                        .unwrap_or(1000.0),
+                        .unwrap_or(10000.0),
                     std::fs::read_to_string(cfg.join("AES")).unwrap_or_default(),
                     std::fs::read_to_string(cfg.join("AUTOUPDATE"))
                         .unwrap_or_else(|_| "false".to_string())
@@ -147,23 +147,29 @@ impl Stove {
                         .unwrap_or_default(),
                 )
             }
-            None => (0, String::default(), 1000.0, String::default(), false, true),
+            None => (
+                0,
+                String::default(),
+                10000.0,
+                String::default(),
+                false,
+                true,
+            ),
         };
         let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
-        let map =
-            std::env::args()
-                .nth(1)
-                .and_then(|path| match asset::open(path.clone(), VERSIONS[version].0) {
-                    Ok(asset) => {
-                        filepath = path;
-                        Some(asset)
-                    }
-                    Err(e) => {
-                        notifs.error(e.to_string());
-                        None
-                    }
-                });
+        let map = std::env::args().nth(1).and_then(|path| {
+            match asset::open(path.clone(), VERSIONS[version].0) {
+                Ok(asset) => {
+                    filepath = path;
+                    Some(asset)
+                }
+                Err(e) => {
+                    notifs.error(e.to_string());
+                    None
+                }
+            }
+        });
         #[cfg(not(target_family = "wasm"))]
         if autoupdate {
             std::thread::spawn(auto_update);
@@ -197,21 +203,25 @@ impl Stove {
             ui: true,
             donor: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
+                .title("open map")
                 .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             transplant_dialog: egui_file::FileDialog::open_file(home.clone())
+                .title("transplant actor")
                 .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             save_dialog: egui_file::FileDialog::save_file(home.clone())
+                .title("save as")
                 .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                 .filter(Box::new(filter)),
             pak_dialog: egui_file::FileDialog::select_folder(home)
+                .title("add pak folder")
                 .default_size((384.0, 256.0))
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
@@ -235,6 +245,9 @@ impl Stove {
             stove.open_dialog.open()
         }
         stove
+    }
+    fn version(&self) -> EngineVersion {
+        VERSIONS[self.version].0
     }
     fn refresh(&mut self, ctx: &mut Context) {
         self.actors.clear();
@@ -279,10 +292,9 @@ impl Stove {
                                                 pak.read_to_file(&bulk, cache.join(bulk.trim_start_matches('/'))).map_or(true,|_| true)
                                             )) =>
                                         {
-                                            let Ok(mesh) = asset::open(
-                                                cache.join(mesh_path),
-                                                VERSIONS[self.version].0,
-                                            ) else {
+                                            let Ok(mesh) =
+                                                asset::open(cache.join(mesh_path), self.version())
+                                            else {
                                                 continue;
                                             };
                                             extras::get_mesh_info(mesh)
@@ -295,7 +307,7 @@ impl Stove {
                                                 pak.get(&bulk)
                                                     .ok()
                                                     .map(|bulk| std::io::Cursor::new(bulk)),
-                                                VERSIONS[self.version].0,
+                                                self.version(),
                                             ) else {
                                                 continue;
                                             };
@@ -405,13 +417,13 @@ impl EventHandler for Stove {
             egui::SidePanel::left("sidepanel").show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
-                        if ui.add(egui::Button::new("open").shortcut_text("ctrl + O")).clicked() {
+                        if ui.add(egui::Button::new("open").shortcut_text("ctrl + o")).clicked() {
                             self.open_dialog.open();
                         }
-                        if ui.add(egui::Button::new("save").shortcut_text("ctrl + S")).clicked(){
+                        if ui.add(egui::Button::new("save").shortcut_text("ctrl + s")).clicked(){
                             self.save()
                         }
-                        if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift+ S")).clicked(){
+                        if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift + s")).clicked(){
                             self.open_save_dialog()
                         }
                     });
@@ -439,7 +451,7 @@ impl EventHandler for Stove {
                         if let Some(i) = remove_at {
                             self.paks.remove(i);
                         }
-                        if ui.add(egui::Button::new("select folder").shortcut_text("alt + O")).clicked() {
+                        if ui.add(egui::Button::new("add pak folder").shortcut_text("alt + o")).clicked() {
                             self.pak_dialog.open();
                         }
                     });
@@ -462,9 +474,9 @@ impl EventHandler for Stove {
                             egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
                                 ui.heading("file");
                                 ui.end_row();
-                                binding(ui, "open map", "ctrl + o");
-                                binding(ui, "save map", "ctrl + s");
-                                binding(ui, "save map as", "ctrl + shift + s");
+                                binding(ui, "open", "ctrl + o");
+                                binding(ui, "save", "ctrl + s");
+                                binding(ui, "save as", "ctrl + shift + s");
                                 binding(ui, "add pak folder", "alt + o");
                                 ui.heading("camera");
                                 ui.end_row();
@@ -598,7 +610,7 @@ impl EventHandler for Stove {
             self.open_dialog.show(ctx);
             if self.open_dialog.selected() {
                 if let Some(path) = self.open_dialog.path() {
-                    match asset::open(path.clone(), VERSIONS[self.version].0) {
+                    match asset::open(path, self.version()) {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
                             #[cfg(not(target_family = "wasm"))]
@@ -624,7 +636,7 @@ impl EventHandler for Stove {
             self.transplant_dialog.show(ctx);
             if self.transplant_dialog.selected() {
                 if let Some(path) = self.transplant_dialog.path() {
-                    match asset::open(path, VERSIONS[self.version].0) {
+                    match asset::open(path, self.version()) {
                         Ok(donor) => {
                             // no need for verbose warnings here
                             let actors = actor::get_actors(&donor)
@@ -641,7 +653,7 @@ impl EventHandler for Stove {
             }
             self.pak_dialog.show(ctx);
             if self.pak_dialog.selected() {
-                if let Some(path) = self.pak_dialog.path().and_then(|path|path.to_str().map(str::to_string)) {
+                if let Some(path) = self.pak_dialog.path().and_then(|path| path.to_str().map(str::to_string)) {
                     self.paks.push(path);
                 }
             }
