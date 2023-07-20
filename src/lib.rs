@@ -50,6 +50,7 @@ pub struct Stove {
     fullscreen: bool,
     aes: String,
     cache: bool,
+    script: String,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
     #[cfg(not(target_family = "wasm"))]
@@ -117,14 +118,15 @@ impl Stove {
                 env!("CARGO_PKG_VERSION")
             ));
         }
-        let (version, paks, distance, aes, autoupdate, cache) = config().map_or(
+        let (version, paks, distance, aes, autoupdate, cache, script) = config().map_or(
             (
                 0,
-                String::default(),
+                String::new(),
                 10000.0,
-                String::default(),
+                String::new(),
                 false,
                 true,
+                String::new(),
             ),
             |ref cfg| {
                 if !cfg.exists() && std::fs::create_dir_all(cfg).is_err() {
@@ -153,6 +155,7 @@ impl Stove {
                         .unwrap_or_else(|_| "true".to_string())
                         .parse::<bool>()
                         .unwrap_or_default(),
+                    std::fs::read_to_string(cfg.join("SCRIPT")).unwrap_or_default(),
                 )
             },
         );
@@ -235,6 +238,7 @@ impl Stove {
             fullscreen: false,
             aes,
             cache,
+            script,
             #[cfg(not(target_family = "wasm"))]
             client,
             #[cfg(not(target_family = "wasm"))]
@@ -349,6 +353,32 @@ impl Stove {
             },
             None => self.notifs.error("no map to save"),
         };
+        // literally no idea why std::process::Command doesn't work
+        #[cfg(target_os = "windows")]
+        const PATH: &str = "./script.bat";
+        #[cfg(not(target_os = "windows"))]
+        const PATH: &str = "./script.sh";
+        for line in self.script.lines() {
+            if let Err(e) = std::fs::write(PATH, line) {
+                self.notifs
+                    .error(format!("failed to make save script: {e}"));
+            }
+            match std::process::Command::new(PATH)
+                .stdout(std::process::Stdio::piped())
+                .output()
+            {
+                Ok(out) => self
+                    .notifs
+                    .success(String::from_utf8(out.stdout).unwrap_or_default()),
+                Err(e) => self.notifs.error(format!("failed to run save script: {e}")),
+            };
+        }
+        if !self.script.is_empty() {
+            if let Err(e) = std::fs::remove_file(PATH) {
+                self.notifs
+                    .error(format!("failed to remove save script: {e}"));
+            }
+        }
     }
     fn open_save_dialog(&mut self) {
         match self.map.is_some() {
@@ -515,9 +545,8 @@ impl EventHandler for Stove {
                                     .clamp_range(0..=100000)
                             )
                         });
-                        if ui.add(egui::Button::new("exit").shortcut_text("escape")).clicked(){
-                            mqctx.request_quit();
-                        }
+                        ui.label("commands to run on save:");
+                        ui.text_edit_multiline(&mut self.script);
                     });
                 });
                 if let Some(map) = self.map.as_mut() {
@@ -867,7 +896,6 @@ impl EventHandler for Stove {
                 self.fullscreen = !self.fullscreen;
                 ctx.set_fullscreen(self.fullscreen);
             }
-            KeyCode::Escape => ctx.request_quit(),
             _ => (),
         }
     }
@@ -886,7 +914,8 @@ impl Drop for Stove {
             std::fs::write(path.join("AES"), &self.aes).unwrap_or_default();
             std::fs::write(path.join("AUTOUPDATE"), self.autoupdate.to_string())
                 .unwrap_or_default();
-            std::fs::write(path.join("cache"), self.cache.to_string()).unwrap_or_default();
+            std::fs::write(path.join("CACHE"), self.cache.to_string()).unwrap_or_default();
+            std::fs::write(path.join("SCRIPT"), &self.script).unwrap_or_default();
         }
     }
 }

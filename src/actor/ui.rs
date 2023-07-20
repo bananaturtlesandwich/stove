@@ -131,10 +131,7 @@ fn drag_angle(ui: &mut egui::Ui, val: &mut f64) -> egui::Response {
 }
 
 fn text_edit(ui: &mut egui::Ui, val: &mut String) -> egui::Response {
-    egui::TextEdit::singleline(val)
-        .clip_text(false)
-        .show(ui)
-        .response
+    egui::TextEdit::singleline(val).show(ui).response
 }
 
 fn fname_edit(ui: &mut egui::Ui, name: &mut FName) -> egui::Response {
