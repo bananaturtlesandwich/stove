@@ -49,7 +49,7 @@ pub struct Stove {
     distance: f32,
     fullscreen: bool,
     aes: String,
-    cache: bool,
+    use_cache: bool,
     script: String,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
@@ -118,7 +118,7 @@ impl Stove {
                 env!("CARGO_PKG_VERSION")
             ));
         }
-        let (version, paks, distance, aes, autoupdate, cache, script) = config().map_or(
+        let (version, paks, distance, aes, autoupdate, use_cache, script) = config().map_or(
             (
                 0,
                 String::new(),
@@ -151,7 +151,7 @@ impl Stove {
                         .unwrap_or_else(|_| "false".to_string())
                         .parse::<bool>()
                         .unwrap_or_default(),
-                    std::fs::read_to_string(cfg.join("CACHE"))
+                    std::fs::read_to_string(cfg.join("USE_CACHE"))
                         .unwrap_or_else(|_| "true".to_string())
                         .parse::<bool>()
                         .unwrap_or_default(),
@@ -237,7 +237,7 @@ impl Stove {
             distance,
             fullscreen: false,
             aes,
-            cache,
+            use_cache,
             script,
             #[cfg(not(target_family = "wasm"))]
             client,
@@ -286,7 +286,7 @@ impl Stove {
                                 for pak in paks.iter() {
                                     let info = match cache.as_ref() {
                                         Some(cache)
-                                            if self.cache
+                                            if self.use_cache
                                                 && (cache.join(mesh_path).exists() ||
                                             // try to create cache if it doesn't exist
                                             (
@@ -536,7 +536,7 @@ impl EventHandler for Stove {
                         });
                         ui.horizontal(|ui|{
                             ui.label("cache meshes:");
-                            ui.add(egui::Checkbox::without_text(&mut self.cache));
+                            ui.add(egui::Checkbox::without_text(&mut self.use_cache));
                         });
                         ui.horizontal(|ui| {
                             ui.label("render distance:");
@@ -914,7 +914,7 @@ impl Drop for Stove {
             std::fs::write(path.join("AES"), &self.aes).unwrap_or_default();
             std::fs::write(path.join("AUTOUPDATE"), self.autoupdate.to_string())
                 .unwrap_or_default();
-            std::fs::write(path.join("CACHE"), self.cache.to_string()).unwrap_or_default();
+            std::fs::write(path.join("USE_CACHE"), self.use_cache.to_string()).unwrap_or_default();
             std::fs::write(path.join("SCRIPT"), &self.script).unwrap_or_default();
         }
     }
