@@ -48,6 +48,7 @@ pub struct Stove {
     paks: Vec<String>,
     distance: f32,
     fullscreen: bool,
+    size: (f32, f32),
     aes: String,
     use_cache: bool,
     script: String,
@@ -236,6 +237,7 @@ impl Stove {
             paks,
             distance,
             fullscreen: false,
+            size: ctx.screen_size(),
             aes,
             use_cache,
             script,
@@ -516,7 +518,7 @@ impl EventHandler for Stove {
                                 ui.heading("viewport");
                                 ui.end_row();
                                 binding(ui, "exit", "escape");
-                                binding(ui, "toggle fullscreen", "t");
+                                binding(ui, "toggle fullscreen", "alt + enter");
                                 binding(ui, "hide ui", "h");
                                 binding(ui, "select", "left-click");
                                 binding(ui, "transplant", "ctrl + t");
@@ -892,9 +894,15 @@ impl EventHandler for Stove {
                 true => self.open_save_dialog(),
                 false => self.save(),
             },
-            KeyCode::T => {
+            KeyCode::Enter if keymods.alt => {
+                if !self.fullscreen {
+                    self.size = ctx.screen_size();
+                }
                 self.fullscreen = !self.fullscreen;
                 ctx.set_fullscreen(self.fullscreen);
+                if !self.fullscreen {
+                    ctx.set_window_size(self.size.0 as u32, self.size.1 as u32)
+                }
             }
             _ => (),
         }
