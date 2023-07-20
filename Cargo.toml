@@ -8,7 +8,7 @@ version = "0.7.3"
 edition = "2021"
 
 [dependencies]
-unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "4ee974d" }
+unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "f32af30" }
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math"] }
 miniquad = "0.3"

@@ -34,7 +34,9 @@ impl super::Actor {
                 let response = ui
                     .push_id(id, |ui| ui.collapsing(name, |ui| show_export(ui, ex)))
                     .response;
-                response.on_hover_text(&asset.imports[index as usize].object_name.get_content());
+                if let Some(import) = asset.imports.get(index as usize) {
+                    response.on_hover_text(import.object_name.get_content());
+                }
             }
         }
     }

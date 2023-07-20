@@ -148,9 +148,9 @@ impl super::Actor {
                     .map(|rot| {
                         glam::DQuat::from_euler(
                             glam::EulerRot::XYZ,
-                            rot.value.x.0,
-                            rot.value.y.0,
-                            rot.value.z.0,
+                            rot.value.x.0.to_radians(),
+                            rot.value.y.0.to_radians(),
+                            rot.value.z.0.to_radians(),
                         )
                         .as_f32()
                     })

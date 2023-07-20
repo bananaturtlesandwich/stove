@@ -117,8 +117,16 @@ impl Stove {
                 env!("CARGO_PKG_VERSION")
             ));
         }
-        let (version, paks, distance, aes, autoupdate, cache) = match config() {
-            Some(ref cfg) => {
+        let (version, paks, distance, aes, autoupdate, cache) = config().map_or(
+            (
+                0,
+                String::default(),
+                10000.0,
+                String::default(),
+                false,
+                true,
+            ),
+            |ref cfg| {
                 if !cfg.exists() && std::fs::create_dir_all(cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
@@ -146,16 +154,8 @@ impl Stove {
                         .parse::<bool>()
                         .unwrap_or_default(),
                 )
-            }
-            None => (
-                0,
-                String::default(),
-                10000.0,
-                String::default(),
-                false,
-                true,
-            ),
-        };
+            },
+        );
         let paks = paks.lines().map(str::to_string).collect();
         let mut filepath = String::new();
         let map = std::env::args().nth(1).and_then(|path| {
