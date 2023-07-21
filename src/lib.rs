@@ -36,7 +36,11 @@ pub struct Stove {
     cubes: rendering::Cube,
     meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
-    donor: Option<(unreal_asset::Asset<std::fs::File>, Vec<actor::Actor>)>,
+    transplant: Option<(
+        unreal_asset::Asset<std::fs::File>,
+        Vec<actor::Actor>,
+        Vec<usize>,
+    )>,
     filepath: String,
     open_dialog: egui_file::FileDialog,
     transplant_dialog: egui_file::FileDialog,
@@ -205,7 +209,7 @@ impl Stove {
             cubes: rendering::Cube::new(ctx),
             meshes: hashbrown::HashMap::new(),
             ui: true,
-            donor: None,
+            transplant: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
                 .title("open map")
                 .default_size((384.0, 256.0))
@@ -274,7 +278,7 @@ impl Stove {
                 .flatten()
                 .filter_map(Result::ok)
                 .map(|dir| dir.path())
-                .filter_map(|path| unpak::Pak::new_any(&path, key.as_deref()).ok())
+                .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
                 .collect();
             let cache = config().map(|path| path.join("cache"));
             for index in actor::get_actors(map) {
@@ -292,7 +296,7 @@ impl Stove {
                                                 && (cache.join(mesh_path).exists() ||
                                             // try to create cache if it doesn't exist
                                             (
-                                                std::fs::create_dir_all(std::path::PathBuf::from(cache.join(mesh_path)).parent().unwrap()).is_ok() &&
+                                                std::fs::create_dir_all(cache.join(mesh_path).parent().unwrap()).is_ok() &&
                                                 pak.read_to_file(&mesh, cache.join(mesh_path)).is_ok() &&
                                                 // we don't care whether this is successful in case there is no uexp
                                                 pak.read_to_file(&bulk, cache.join(bulk.trim_start_matches('/'))).map_or(true,|_| true)
@@ -312,7 +316,7 @@ impl Stove {
                                                 std::io::Cursor::new(mesh),
                                                 pak.get(&bulk)
                                                     .ok()
-                                                    .map(|bulk| std::io::Cursor::new(bulk)),
+                                                    .map(std::io::Cursor::new),
                                                 self.version(),
                                             ) else {
                                                 continue;
@@ -554,7 +558,7 @@ impl EventHandler for Stove {
                 if let Some(map) = self.map.as_mut() {
                     ui.add_space(10.0);
                     ui.push_id("actors", |ui| egui::ScrollArea::vertical()
-                        .auto_shrink([false; 2])
+                        .auto_shrink([false, true])
                         .max_height(ui.available_height() * 0.5)
                         .show_rows(
                             ui,
@@ -593,48 +597,72 @@ impl EventHandler for Stove {
             if let Some(map) = self.map.as_mut() {
                 let mut open = true;
                 let mut transplanted = false;
-                if let Some((donor, actors)) = &self.donor {
+                if let Some((donor, actors, selected)) = self.transplant.as_mut() {
                     egui::Window::new("transplant actor")
-                        .anchor(egui::Align2::CENTER_CENTER, (0.0,0.0))
+                        .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
                         .resizable(false)
                         .collapsible(false)
                         .open(&mut open)
-                        .show(ctx, |ui|{
+                        .show(ctx, |ui| {
+                        // putting the button below breaks the scroll area somehow
+                        ui.add_enabled_ui(!selected.is_empty(), |ui| {
+                            if ui.vertical_centered_justified(|ui| ui.button("transplant selected")).inner.clicked(){
+                                for actor in selected.iter().map(|i| &actors[*i]) {
+                                    let insert = map.asset_data.exports.len() as i32 + 1;
+                                    actor.transplant(map, donor);
+                                    self.actors.push(
+                                        actor::Actor::new(
+                                            map,
+                                            PackageIndex::new(insert),
+                                        )
+                                        .unwrap(),
+                                    );
+                                    // same distance away from camera as focus
+                                    self.notifs.success(format!("transplanted {}", actor.name));
+                                }
+                                self.selected = Some(self.actors.len() - 1);
+                                transplanted = true;
+                            }
+                        });
                         egui::ScrollArea::vertical()
-                            .auto_shrink([false;2])
+                            .auto_shrink([false; 2])
                             .show_rows(
                                 ui,
                                 ui.text_style_height(&egui::TextStyle::Body),
                                 actors.len(),
                                 |ui, range| {
-                                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
-                                        for i in range {
-                                            if ui.selectable_label(false, &actors[i].name).on_hover_text(&actors[i].class).clicked(){
-                                                let insert = map.asset_data.exports.len() as i32 + 1;
-                                                actors[i].transplant(map, donor);
-                                                let selected = self.actors.len();
-                                                self.actors.push(
-                                                    actor::Actor::new(
-                                                        map,
-                                                        PackageIndex::new(insert),
-                                                    )
-                                                    .unwrap(),
-                                                );
-                                                self.selected = Some(selected);
-                                                // same distance away from camera as focus
-                                                self.actors[selected].set_location(map, self.camera.position + self.camera.front * self.actors[selected].scale(map).length() * 4.0);
-                                                self.notifs.success(format!("transplanted {}", actors[i].name));
-                                                transplanted = true;
+                                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                                        for (i, actor) in range.clone().zip(actors[range].iter()) {
+                                            if ui.selectable_label(selected.contains(&i), &actor.name).on_hover_text(&actor.class).clicked() {
+                                                ui.input(|input| { 
+                                                    match selected.iter().position(|entry| entry == &i) {
+                                                        Some(i) => {
+                                                            selected.remove(i);
+                                                        },
+                                                        None if input.modifiers.shift &&
+                                                                selected.last().is_some_and(|last| last != &i)
+                                                            => {
+                                                            let last_selected = *selected.last().unwrap();
+                                                            for i in match i < last_selected{
+                                                                true => i..last_selected,
+                                                                false => last_selected + 1..i + 1
+                                                            } {
+                                                                selected.push(i)
+                                                            }
+                                                        },
+                                                        _ => selected.push(i)
+                                                    }                                                        
+                                                })
                                             }
                                         }
-                                    )
+                                    })
                                 }
                             );
                         }
                     );
                 }
                 if transplanted || !open {
-                    self.donor = None;
+                    self.transplant = None;
                 }
             }
             self.notifs.show(ctx);
@@ -645,7 +673,7 @@ impl EventHandler for Stove {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
                             #[cfg(not(target_family = "wasm"))]
-                            if let Some(client) = &mut self.client {
+                            if let Some(client) = self.client.as_mut() {
                                 if client.set_activity(
                                             default_activity()
                                                 .details("currently editing:")
@@ -670,11 +698,12 @@ impl EventHandler for Stove {
                     match asset::open(path, self.version()) {
                         Ok(donor) => {
                             // no need for verbose warnings here
-                            let actors = actor::get_actors(&donor)
+                            let actors: Vec<_> = actor::get_actors(&donor)
                                 .into_iter()
                                 .filter_map(|index| actor::Actor::new(&donor, index).ok())
                                 .collect();
-                            self.donor = Some((donor, actors));
+                            let selected = Vec::with_capacity(actors.len());
+                            self.transplant = Some((donor, actors, selected));
                         }
                         Err(e) => {
                             self.notifs.error(e.to_string());

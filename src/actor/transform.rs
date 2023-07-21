@@ -33,55 +33,6 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn set_location(&self, map: &mut Asset<File>, mut new: glam::Vec3) {
-        new *= 100.0;
-        let mut names = map.get_name_map();
-        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
-            return;
-        };
-        match norm
-            .properties
-            .iter_mut()
-            .find(|prop| prop.get_name().get_content() == LOCATION)
-        {
-            Some(scale) => {
-                if let Property::StructProperty(struc) = scale {
-                    if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 = -new.x as f64;
-                        vec.value.y.0 = new.z as f64;
-                        vec.value.z.0 = new.y as f64;
-                    }
-                }
-            }
-            None => norm
-                .properties
-                .push(Property::StructProperty(StructProperty {
-                    name: names.clone_resource().get_mut().add_fname(LOCATION),
-                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                        ancestry: Vec::new(),
-                    },
-                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
-                    struct_guid: Some([0; 16]),
-                    property_guid: None,
-                    duplication_index: 0,
-                    serialize_none: true,
-                    value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname(LOCATION),
-                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                            ancestry: Vec::new(),
-                        },
-                        property_guid: None,
-                        duplication_index: 0,
-                        value: Vector::new(
-                            (new.x as f64).into(),
-                            (new.z as f64).into(),
-                            (new.y as f64).into(),
-                        ),
-                    })],
-                })),
-        }
-    }
-
     pub fn add_location(&self, map: &mut Asset<File>, offset: glam::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {

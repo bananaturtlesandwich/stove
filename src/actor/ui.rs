@@ -180,7 +180,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             drag(ui, byte)
                         }
                         unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
-                            fname_edit(ui, &mut byte.enum_type.get_or_insert(FName::from_slice("")))
+                            fname_edit(ui, byte.enum_type.get_or_insert(FName::from_slice("")))
                                 | fname_edit(ui, name)
                         }
                     },
@@ -202,7 +202,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             | fname_edit(ui, &mut obj.value.asset_path.asset_name)
                             | fname_edit(
                                 ui,
-                                &mut obj
+                                obj
                                     .value
                                     .asset_path
                                     .package_name
