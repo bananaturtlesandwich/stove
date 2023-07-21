@@ -81,6 +81,67 @@ impl super::Actor {
         }
     }
 
+    pub fn get_raw_location(&self, map: &Asset<File>) -> glam::DVec3 {
+        map.asset_data.exports[self.transform]
+            .get_normal_export()
+            .and_then(|norm| {
+                norm.properties.iter().rev().find_map(|prop| {
+                    if let Property::StructProperty(struc) = prop {
+                        if struc.name.get_content() == LOCATION {
+                            return cast!(Property, VectorProperty, &struc.value[0]);
+                        }
+                    }
+                    None
+                })
+            })
+            .map(|pos| glam::dvec3(pos.value.x.0, pos.value.y.0, pos.value.z.0))
+            .unwrap_or_default()
+    }
+
+    pub fn set_raw_location(&self, map: &mut Asset<File>, new: glam::DVec3) {
+        let mut names = map.get_name_map();
+        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
+            return;
+        };
+        match norm
+            .properties
+            .iter_mut()
+            .find(|prop| prop.get_name().get_content() == LOCATION)
+        {
+            Some(scale) => {
+                if let Property::StructProperty(struc) = scale {
+                    if let Property::VectorProperty(vec) = &mut struc.value[0] {
+                        vec.value.x.0 = new.x;
+                        vec.value.y.0 = new.y;
+                        vec.value.z.0 = new.z;
+                    }
+                }
+            }
+            None => norm
+                .properties
+                .push(Property::StructProperty(StructProperty {
+                    name: names.clone_resource().get_mut().add_fname(LOCATION),
+                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                        ancestry: Vec::new(),
+                    },
+                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
+                    struct_guid: Some([0; 16]),
+                    property_guid: None,
+                    duplication_index: 0,
+                    serialize_none: true,
+                    value: vec![Property::VectorProperty(VectorProperty {
+                        name: names.get_mut().add_fname(LOCATION),
+                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                            ancestry: Vec::new(),
+                        },
+                        property_guid: None,
+                        duplication_index: 0,
+                        value: Vector::new(new.x.into(), new.z.into(), new.y.into()),
+                    })],
+                })),
+        }
+    }
+
     pub fn rotation(&self, map: &Asset<File>) -> glam::Quat {
         map.asset_data.exports[self.transform]
             .get_normal_export()

@@ -56,6 +56,7 @@ pub struct Stove {
     aes: String,
     use_cache: bool,
     script: String,
+    locbuf: glam::DVec3,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
     #[cfg(not(target_family = "wasm"))]
@@ -245,6 +246,7 @@ impl Stove {
             aes,
             use_cache,
             script,
+            locbuf: glam::DVec3::ZERO,
             #[cfg(not(target_family = "wasm"))]
             client,
             #[cfg(not(target_family = "wasm"))]
@@ -532,6 +534,8 @@ impl EventHandler for Stove {
                                 binding(ui, "move", "left-drag");
                                 binding(ui, "rotate", "right-drag");
                                 binding(ui, "scale", "middle-drag");
+                                binding(ui, "copy location", "ctrl + c");
+                                binding(ui, "paste location", "ctrl + v");
                                 binding(ui, "duplicate", "alt + left-drag");
                                 binding(ui, "delete", "delete");
                             });
@@ -932,6 +936,14 @@ impl EventHandler for Stove {
                 if !self.fullscreen {
                     ctx.set_window_size(self.size.0 as u32, self.size.1 as u32)
                 }
+            }
+            KeyCode::C if keymods.ctrl => if let Some(selected) = self.selected {
+                self.locbuf = self.actors[selected].get_raw_location(self.map.as_ref().unwrap());
+                self.notifs.success("location copied");
+            }
+            KeyCode::V if keymods.ctrl => if let Some(selected) = self.selected {
+                self.actors[selected].set_raw_location(self.map.as_mut().unwrap(), self.locbuf);
+                self.notifs.success("location pasted");
             }
             _ => (),
         }
