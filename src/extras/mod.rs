@@ -1,6 +1,7 @@
-// still under development
-#![allow(dead_code)]
 mod mesh;
+// still under development
+#[allow(dead_code)]
+mod texture;
 
 use std::io;
 

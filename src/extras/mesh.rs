@@ -7,12 +7,11 @@ use unreal_asset::{
     exports::{ExportBaseTrait, ExportNormalTrait},
     object_version::ObjectVersion,
     reader::archive_trait::ArchiveTrait,
-    Asset,
 };
 
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
-    get_mesh_info(Asset::new(
+    get_mesh_info(unreal_asset::Asset::new(
         io::Cursor::new(include_bytes!("A02_Outside_Castle.uasset").as_slice()),
         Some(io::Cursor::new(
             include_bytes!("A02_Outside_Castle.uexp").as_slice(),
@@ -29,7 +28,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 // CAS UAssetAPI: https://github.com/LongerWarrior/UEAssetToolkitGenerator/blob/master/UAssetApi/ExportTypes/StaticMeshExport.cs#L6
 /// parses the extra data of the static mesh export to get render data
 pub fn get_mesh_info<C: io::Read + io::Seek>(
-    asset: Asset<C>,
+    asset: unreal_asset::Asset<C>,
 ) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
     // get the static mesh
     let Some(mesh) = asset.asset_data.exports.iter().find(|ex| {
@@ -53,7 +52,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     let engine = asset.get_engine_version();
     let object = asset.get_object_version();
     let mut data = io::Cursor::new(mesh.extras.as_slice());
-    // if I don't read this it breaks
+    // if this isn't read it breaks
     data.read_i32::<LE>()?;
     if !StripDataFlags::read(&mut data)?.editor_data_stripped()
         // data isn't cooked
