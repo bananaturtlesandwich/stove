@@ -131,7 +131,10 @@ fn drag_angle(ui: &mut egui::Ui, val: &mut f64) -> egui::Response {
 }
 
 fn text_edit(ui: &mut egui::Ui, val: &mut String) -> egui::Response {
-    egui::TextEdit::singleline(val).show(ui).response
+    egui::TextEdit::singleline(val)
+        .clip_text(false)
+        .show(ui)
+        .response
 }
 
 fn fname_edit(ui: &mut egui::Ui, name: &mut FName) -> egui::Response {
@@ -202,8 +205,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             | fname_edit(ui, &mut obj.value.asset_path.asset_name)
                             | fname_edit(
                                 ui,
-                                obj
-                                    .value
+                                obj.value
                                     .asset_path
                                     .package_name
                                     .get_or_insert(FName::from_slice("")),

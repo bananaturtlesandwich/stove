@@ -561,7 +561,7 @@ impl EventHandler for Stove {
                 });
                 if let Some(map) = self.map.as_mut() {
                     ui.add_space(10.0);
-                    ui.push_id("actors", |ui| egui::ScrollArea::vertical()
+                    ui.push_id("actors", |ui| egui::ScrollArea::both()
                         .auto_shrink([false, true])
                         .max_height(ui.available_height() * 0.5)
                         .show_rows(
@@ -587,9 +587,9 @@ impl EventHandler for Stove {
                     );
                     if let Some(selected) = self.selected {
                         ui.add_space(10.0);
-                        ui.push_id("properties", |ui| egui::ScrollArea::vertical()
+                        ui.push_id("properties", |ui| egui::ScrollArea::both()
                             .auto_shrink([false; 2])
-                            .show(ui,|ui|{
+                            .show(ui,|ui| {
                                 self.actors[selected].show(map, ui);
                                 // otherwise the scroll area bugs out at the bottom
                                 ui.add_space(1.0);
@@ -628,7 +628,7 @@ impl EventHandler for Stove {
                                 transplanted = true;
                             }
                         });
-                        egui::ScrollArea::vertical()
+                        egui::ScrollArea::both()
                             .auto_shrink([false; 2])
                             .show_rows(
                                 ui,
