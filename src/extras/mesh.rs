@@ -74,10 +74,12 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     for _ in 0..data.read_u32::<LE>()? {
         data.read_u32::<LE>()?;
     }
-    // KeepMobileMinLODSettingOnDesktop
+    // KeepMobileMinLODSettingOnDesktop is not here by default
+    /*
     if engine >= EngineVersion::VER_UE4_27 {
         data.read_i32::<LE>()?;
     }
+    */
     // array of lod resources
     // discard len because we'll just read the first LOD
     data.read_u32::<LE>()?;
@@ -109,7 +111,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_u32::<LE>()?;
         }
         //visible in ray tracing
-        if engine <= EngineVersion::VER_UE4_26 {
+        if engine >= EngineVersion::VER_UE4_26 {
             data.read_u32::<LE>()?;
         }
     }
@@ -141,12 +143,12 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     data.read_u32::<LE>()?;
     let mut positions = Vec::with_capacity(data.read_u32::<LE>()? as usize);
     for _ in 0..positions.capacity() {
-        let (x, z, y) = (
+        let (x, y, z) = (
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
         );
-        positions.push(glam::vec3(-x, y, z) * 0.01);
+        positions.push(glam::vec3(-x, z, y) * 0.01);
     }
 
     // vertex buffer
@@ -162,14 +164,14 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         ));
     }
     let num_tex_coords = data.read_u32::<LE>()?;
-    // strides
+    // stride
     if engine < EngineVersion::VER_UE4_19 {
         data.read_u32::<LE>()?;
     }
     // num verts
     let num_verts = data.read_u32::<LE>()?;
-    let precise_uvs = data.read_u32::<LE>()? != 0;
-    let precise_tangents = engine >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? != 0;
+    let precise_uvs = data.read_u32::<LE>()? == 1;
+    let precise_tangents = engine >= EngineVersion::VER_UE4_12 && data.read_u32::<LE>()? == 1;
     fn read_tangents(
         data: &mut io::Cursor<&[u8]>,
         precise_tangents: bool,
@@ -229,9 +231,11 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             }
         }
         false => {
-            //size
+            // size
             data.read_u32::<LE>()?;
-            for _ in 0..data.read_u32::<LE>()? {
+            // length
+            data.read_u32::<LE>()?;
+            for _ in 0..num_verts {
                 read_tangents(&mut data, precise_tangents)?;
                 read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
             }
@@ -239,7 +243,12 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     }
 
     // color vertex buffer
-    if StripDataFlags::read(&mut data)?.data_stripped_for_server() {
+    if match object >= ObjectVersion::VER_UE4_STATIC_SKELETAL_MESH_SERIALIZATION_FIX {
+        true => StripDataFlags::read(&mut data)?,
+        false => StripDataFlags::default(),
+    }
+    .data_stripped_for_server()
+    {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "colour data is stripped",
@@ -259,7 +268,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
 
     let indices = match object >= ObjectVersion::VER_UE4_SUPPORT_32BIT_STATIC_MESH_INDICES {
         true => {
-            let x32 = data.read_u32::<LE>()? != 0;
+            let x32 = data.read_u32::<LE>()? == 1;
             // size
             data.read_u32::<LE>()?;
             match x32 {
