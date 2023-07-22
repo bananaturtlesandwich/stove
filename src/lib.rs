@@ -11,6 +11,7 @@ mod asset;
 mod extras;
 mod rendering;
 
+#[derive(PartialEq)]
 enum Grab {
     None,
     // actor distance from camera
@@ -34,6 +35,7 @@ pub struct Stove {
     actors: Vec<actor::Actor>,
     selected: Option<usize>,
     cubes: rendering::Cube,
+    axes: rendering::Axes,
     meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
     transplant: Option<(
@@ -209,6 +211,7 @@ impl Stove {
             actors: Vec::new(),
             selected: None,
             cubes: rendering::Cube::new(ctx),
+            axes: rendering::Axes::new(ctx),
             meshes: hashbrown::HashMap::new(),
             ui: true,
             transplant: None,
@@ -445,6 +448,16 @@ impl EventHandler for Stove {
                 })
             {
                 mesh.draw(mqctx, vp * actor.model_matrix(map));
+            }
+            if let Some(selected) = self.selected {
+                if self.grab != Grab::None {
+                    self.axes.draw(
+                        mqctx,
+                        &self.filter,
+                        vp * glam::Mat4::from_translation(self.actors[selected].location(map))
+                            * glam::Mat4::from_scale(self.actors[selected].scale(map)),
+                    )
+                }
             }
         }
         mqctx.end_render_pass();
