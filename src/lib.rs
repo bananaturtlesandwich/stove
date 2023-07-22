@@ -263,9 +263,11 @@ impl Stove {
         }
         stove
     }
+
     fn version(&self) -> EngineVersion {
         VERSIONS[self.version].0
     }
+
     fn refresh(&mut self, ctx: &mut Context) {
         self.actors.clear();
         self.selected = None;
@@ -356,6 +358,7 @@ impl Stove {
             }
         }
     }
+
     fn save(&mut self) {
         match self.map.as_mut() {
             Some(map) => match asset::save(map, &self.filepath) {
@@ -391,6 +394,7 @@ impl Stove {
             }
         }
     }
+
     fn open_save_dialog(&mut self) {
         match self.map.is_some() {
             true => self.save_dialog.open(),
@@ -399,10 +403,23 @@ impl Stove {
             }
         }
     }
+
     fn view_projection(&self, ctx: &Context) -> glam::Mat4 {
         let (width, height) = ctx.screen_size();
         glam::Mat4::perspective_lh(45_f32.to_radians(), width / height, 1.0, self.distance)
             * self.camera.view_matrix()
+    }
+
+    fn focus(&mut self) {
+        match self.selected.zip(self.map.as_ref()) {
+            Some((selected, map)) => self.camera.set_focus(
+                self.actors[selected].location(map),
+                self.actors[selected].scale(map),
+            ),
+            None => {
+                self.notifs.error("nothing selected to focus on");
+            }
+        }
     }
 }
 
@@ -586,7 +603,7 @@ impl EventHandler for Stove {
                                     .clamp_range(0..=100000)
                             )
                         });
-                        ui.label("commands to run on save:");
+                        ui.label("post-save commands");
                         ui.text_edit_multiline(&mut self.script);
                     });
                 });
@@ -652,10 +669,8 @@ impl EventHandler for Stove {
                                         )
                                         .unwrap(),
                                     );
-                                    // same distance away from camera as focus
                                     self.notifs.success(format!("transplanted {}", actor.name));
                                 }
-                                self.selected = Some(self.actors.len() - 1);
                                 transplanted = true;
                             }
                         });
@@ -697,6 +712,8 @@ impl EventHandler for Stove {
                     );
                 }
                 if transplanted || !open {
+                    self.selected = Some(self.actors.len() - 1);
+                    self.focus();
                     self.transplant = None;
                 }
             }
@@ -937,15 +954,7 @@ impl EventHandler for Stove {
                     self.notifs.error("nothing selected to delete");
                 }
             },
-            KeyCode::F => match self.selected.zip(self.map.as_ref()) {
-                Some((selected, map)) => self.camera.set_focus(
-                    self.actors[selected].location(map),
-                    self.actors[selected].scale(map),
-                ),
-                None => {
-                    self.notifs.error("nothing selected to focus on");
-                }
-            },
+            KeyCode::F => self.focus(),
             KeyCode::H => self.ui = !self.ui,
             KeyCode::T if keymods.ctrl => match self.map.is_some() {
                 true => self.transplant_dialog.open(),

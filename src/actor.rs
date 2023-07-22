@@ -32,6 +32,7 @@ impl Actor {
     fn index(&self) -> PackageIndex {
         PackageIndex::new(self.export as i32 + 1)
     }
+
     pub fn new(asset: &Asset<File>, package: PackageIndex) -> Result<Self, Error> {
         if package.index == 0 {
             return Err(Error::invalid_package_index(

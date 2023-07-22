@@ -20,6 +20,7 @@ impl StripDataFlags {
             class: data.read_u8()?,
         })
     }
+
     pub fn editor_data_stripped(&self) -> bool {
         (self.global & 1) != 0
     }

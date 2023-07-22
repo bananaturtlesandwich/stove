@@ -36,12 +36,15 @@ impl Camera {
         self.delta_time = time - self.last_time;
         self.last_time = time;
     }
+
     pub fn view_matrix(&self) -> glam::Mat4 {
         glam::Mat4::look_at_lh(self.position, self.position + self.front, self.up)
     }
+
     pub fn left(&self) -> glam::Vec3 {
         self.front.cross(self.up).normalize()
     }
+
     pub fn move_cam(&mut self, held: &[KeyCode]) {
         match self.focus {
             Some(target) => {
@@ -66,9 +69,11 @@ impl Camera {
             }
         }
     }
+
     pub fn set_focus(&mut self, pos: glam::Vec3, sca: glam::Vec3) {
         self.focus = Some(pos - self.front * sca.length() * 4.0)
     }
+
     pub fn handle_mouse_motion(&mut self, delta: glam::Vec2) {
         if self.can_move {
             let scale = 10.0 * self.delta_time as f32;
@@ -85,9 +90,11 @@ impl Camera {
             .normalize();
         }
     }
+
     pub fn enable_move(&mut self) {
         self.can_move = true;
     }
+
     pub fn disable_move(&mut self) {
         self.can_move = false;
     }
