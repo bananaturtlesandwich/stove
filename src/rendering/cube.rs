@@ -1,7 +1,7 @@
 use miniquad::*;
 pub struct Cube {
-    pub pipeline: Pipeline,
-    pub bindings: Bindings,
+    pipeline: Pipeline,
+    bindings: Bindings,
 }
 
 impl Cube {
@@ -9,12 +9,12 @@ impl Cube {
         let shader = Shader::new(
             ctx,
             include_str!("cube.vert"),
-            include_str!("cube.frag"),
+            include_str!("common.frag"),
             ShaderMeta {
                 uniforms: UniformBlockLayout {
                     uniforms: vec![
                         UniformDesc::new("vp", UniformType::Mat4),
-                        UniformDesc::new("uselected", UniformType::Int2),
+                        UniformDesc::new("selected", UniformType::Int2),
                     ],
                 },
                 images: vec![],

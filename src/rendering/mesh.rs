@@ -10,28 +10,13 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(ctx: &mut Context, vertices: Vec<glam::Vec3>, indices: Vec<u32>) -> Self {
-        let solid = Shader::new(
+        let shader = Shader::new(
             ctx,
-            include_str!("mesh.vert"),
-            include_str!("solid.frag"),
+            include_str!("common.vert"),
+            include_str!("common.frag"),
             ShaderMeta {
                 uniforms: UniformBlockLayout {
-                    uniforms: vec![
-                        UniformDesc::new("vp", UniformType::Mat4),
-                        UniformDesc::new("tint", UniformType::Float3),
-                    ],
-                },
-                images: vec![],
-            },
-        )
-        .unwrap();
-        let wire = Shader::new(
-            ctx,
-            include_str!("mesh.vert"),
-            include_str!("wire.frag"),
-            ShaderMeta {
-                uniforms: UniformBlockLayout {
-                    uniforms: vec![UniformDesc::new("vp", UniformType::Mat4)],
+                    uniforms: vec![UniformDesc::new("transform", UniformType::Mat4)],
                 },
                 images: vec![],
             },
@@ -42,9 +27,18 @@ impl Mesh {
             len,
             solid_pipeline: Pipeline::with_params(
                 ctx,
-                &[BufferLayout::default()],
-                &[VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0)],
-                solid,
+                &[
+                    BufferLayout::default(),
+                    BufferLayout {
+                        step_func: VertexStep::PerInstance,
+                        ..Default::default()
+                    },
+                ],
+                &[
+                    VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
+                    VertexAttribute::with_buffer("colour", VertexFormat::Float3, 1),
+                ],
+                shader,
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
                     depth_write: true,
@@ -53,15 +47,27 @@ impl Mesh {
                 },
             ),
             solid_bindings: Bindings {
-                vertex_buffers: vec![Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices)],
+                vertex_buffers: vec![
+                    Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices),
+                    Buffer::immutable(ctx, BufferType::VertexBuffer, &[glam::vec3(0.2, 0.5, 1.0)]),
+                ],
                 index_buffer: Buffer::immutable(ctx, BufferType::IndexBuffer, &indices),
                 images: vec![],
             },
             wire_pipeline: Pipeline::with_params(
                 ctx,
-                &[BufferLayout::default()],
-                &[VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0)],
-                wire,
+                &[
+                    BufferLayout::default(),
+                    BufferLayout {
+                        step_func: VertexStep::PerInstance,
+                        ..Default::default()
+                    },
+                ],
+                &[
+                    VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
+                    VertexAttribute::with_buffer("colour", VertexFormat::Float3, 1),
+                ],
+                shader,
                 PipelineParams {
                     depth_test: Comparison::LessOrEqual,
                     depth_write: true,
@@ -70,7 +76,10 @@ impl Mesh {
                 },
             ),
             wire_bindings: Bindings {
-                vertex_buffers: vec![Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices)],
+                vertex_buffers: vec![
+                    Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices),
+                    Buffer::immutable(ctx, BufferType::VertexBuffer, &[glam::Vec3::ZERO]),
+                ],
                 index_buffer: Buffer::immutable(
                     ctx,
                     BufferType::IndexBuffer,
@@ -84,14 +93,14 @@ impl Mesh {
         }
     }
 
-    pub fn draw(&self, ctx: &mut Context, uniform: glam::Mat4) {
+    pub fn draw(&self, ctx: &mut Context, vp: glam::Mat4) {
         ctx.apply_pipeline(&self.solid_pipeline);
         ctx.apply_bindings(&self.solid_bindings);
-        ctx.apply_uniforms(&uniform);
+        ctx.apply_uniforms(&vp);
         ctx.draw(0, self.len, 1);
         ctx.apply_pipeline(&self.wire_pipeline);
         ctx.apply_bindings(&self.wire_bindings);
-        ctx.apply_uniforms(&uniform);
+        ctx.apply_uniforms(&vp);
         ctx.draw(0, self.len, 1);
     }
 }
