@@ -15,7 +15,7 @@ miniquad = "0.3"
 egui = "0.22"
 egui-miniquad = { git = "https://github.com/not-fl3/egui-miniquad", rev = "22a34d9"}
 egui-notify = "0.7"
-egui_file = { git = "https://github.com/bananaturtlesandwich/egui_file", rev = "94c9ca9" }
+egui_file = "0.10"
 byteorder = "1.4"
 hashbrown = "0.13"
 dirs = "5.0"

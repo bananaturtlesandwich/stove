@@ -397,7 +397,7 @@ impl Stove {
 
     fn open_save_dialog(&mut self) {
         match self.map.is_some() {
-            true => self.save_dialog.open(),
+            true => self.try_open(|stove| &mut stove.save_dialog),
             false => {
                 self.notifs.error("no map to save");
             }
@@ -418,6 +418,25 @@ impl Stove {
             ),
             None => {
                 self.notifs.error("nothing selected to focus on");
+            }
+        }
+    }
+
+    fn try_open(&mut self, dialog: impl Fn(&mut Self) -> &mut egui_file::FileDialog) {
+        macro_rules! open {
+            ($dialog: ident) => {
+                self.$dialog.state() != egui_file::State::Open
+            };
+        }
+        match open!(open_dialog)
+            && open!(save_dialog)
+            && open!(pak_dialog)
+            && open!(transplant_dialog)
+            && self.transplant.is_none()
+        {
+            true => dialog(self).open(),
+            false => {
+                self.notifs.error("another dialog is currently open");
             }
         }
     }
@@ -467,7 +486,7 @@ impl EventHandler for Stove {
                 mesh.draw(mqctx, vp * actor.model_matrix(map));
             }
             if let Some(selected) = self.selected {
-                if self.grab != Grab::None {
+                if matches!(self.grab, Grab::Location(_)) {
                     self.axes.draw(
                         mqctx,
                         &self.filter,
@@ -487,7 +506,7 @@ impl EventHandler for Stove {
                 ui.horizontal(|ui| {
                     ui.menu_button("file", |ui| {
                         if ui.add(egui::Button::new("open").shortcut_text("ctrl + o")).clicked() {
-                            self.open_dialog.open();
+                            self.try_open(|stove| &mut stove.open_dialog)
                         }
                         if ui.add(egui::Button::new("save").shortcut_text("ctrl + s")).clicked(){
                             self.save()
@@ -521,7 +540,7 @@ impl EventHandler for Stove {
                             self.paks.remove(i);
                         }
                         if ui.add(egui::Button::new("add pak folder").shortcut_text("alt + o")).clicked() {
-                            self.pak_dialog.open();
+                            self.try_open(|stove| &mut stove.pak_dialog);
                         }
                     });
                     ui.menu_button("options", |ui| {
@@ -957,13 +976,13 @@ impl EventHandler for Stove {
             KeyCode::F => self.focus(),
             KeyCode::H => self.ui = !self.ui,
             KeyCode::T if keymods.ctrl => match self.map.is_some() {
-                true => self.transplant_dialog.open(),
+                true => self.try_open(|stove| &mut stove.transplant_dialog),
                 false => {
                     self.notifs.error("no map to transplant to");
                 }
             },
-            KeyCode::O if keymods.ctrl => self.open_dialog.open(),
-            KeyCode::O if keymods.alt => self.pak_dialog.open(),
+            KeyCode::O if keymods.ctrl => self.try_open(|stove| &mut stove.open_dialog),
+            KeyCode::O if keymods.alt => self.try_open(|stove| &mut stove.pak_dialog),
             KeyCode::S if keymods.ctrl => match keymods.shift {
                 true => self.open_save_dialog(),
                 false => self.save(),
