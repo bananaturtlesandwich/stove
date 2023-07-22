@@ -169,10 +169,17 @@ impl Stove {
             },
         );
         let paks = paks.lines().map(str::to_string).collect();
+        let mut home = dirs::home_dir();
         let mut filepath = String::new();
         let map = std::env::args().nth(1).and_then(|path| {
-            match asset::open(path.clone(), VERSIONS[version].0) {
+            match asset::open(&path, VERSIONS[version].0) {
                 Ok(asset) => {
+                    home = Some(
+                        std::path::PathBuf::from(&path)
+                            .parent()
+                            .unwrap()
+                            .to_path_buf(),
+                    );
                     filepath = path;
                     Some(asset)
                 }
@@ -237,8 +244,7 @@ impl Stove {
                 .title("add pak folder")
                 .default_size((384.0, 256.0))
                 .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
-                .filter(Box::new(filter)),
+                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0)),
             filepath,
             held: Vec::new(),
             last_mouse_pos: glam::Vec2::ZERO,
@@ -496,7 +502,7 @@ impl EventHandler for Stove {
                 mesh.draw(mqctx, vp * actor.model_matrix(map));
             }
             if let Some(selected) = self.selected {
-                if matches!(self.grab, Grab::Location(_)) {
+                if self.grab != Grab::None {
                     self.axes.draw(
                         mqctx,
                         &self.filter,
@@ -849,11 +855,11 @@ impl EventHandler for Stove {
             ),
             Grab::Scale3D(coords) => self.actors[self.selected.unwrap()].mul_scale(
                 self.map.as_mut().unwrap(),
-                self.filter
-                    * (glam::Vec3::ONE
-                        + (coords.distance(glam::vec2(x, y))
+                glam::Vec3::ONE
+                    + self.filter
+                        * (coords.distance(glam::vec2(x, y))
                             - coords.distance(self.last_mouse_pos))
-                            * 0.005),
+                        * 0.005,
             ),
         }
         self.last_mouse_pos = glam::vec2(x, y);
