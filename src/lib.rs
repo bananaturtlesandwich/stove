@@ -1,6 +1,5 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
-use glam::Vec4Swizzles;
 use miniquad::*;
 use unreal_asset::{
     engine_version::EngineVersion::{self, *},
@@ -787,6 +786,7 @@ impl EventHandler for Stove {
         if egui().egui_ctx().is_pointer_over_area() {
             return;
         }
+        let proj = self.view_projection(ctx);
         // THE HACKIEST MOUSE PICKING EVER CONCEIVED
         let pick = self
             .map
@@ -795,15 +795,9 @@ impl EventHandler for Stove {
                 // convert mouse coordinates to NDC
                 let (width, height) = ctx.screen_size();
                 let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                let proj = self.view_projection(ctx);
                 self.actors
                     .iter()
-                    .map(|actor| {
-                        let proj = proj * actor.location(map).extend(1.0);
-                        // get NDC coordinates of actor
-                        let actor = proj.xy() / proj.w.abs();
-                        mouse.distance(actor)
-                    })
+                    .map(|actor| mouse.distance(actor.coords(map, proj)))
                     .enumerate()
                     // get closest pick
                     .min_by(|(_, x), (_, y)| x.total_cmp(y))
@@ -812,11 +806,10 @@ impl EventHandler for Stove {
         match self.selected == pick && pick.is_some() {
             // grabby time
             true => {
-                if let Some(selected) = self.selected {
+                if let Some((selected, map)) = self.selected.zip(self.map.as_mut()) {
                     if self.held.contains(&KeyCode::LeftAlt)
                         || self.held.contains(&KeyCode::RightAlt)
                     {
-                        let map = self.map.as_mut().unwrap();
                         let insert = map.asset_data.exports.len() as i32 + 1;
                         self.actors[selected].duplicate(map);
                         self.actors.insert(
@@ -829,22 +822,14 @@ impl EventHandler for Stove {
                     self.grab = match mb {
                         MouseButton::Left => Grab::Location(
                             self.actors[selected]
-                                .location(self.map.as_ref().unwrap())
+                                .location(map)
                                 .distance(self.camera.position),
                         ),
                         MouseButton::Right => Grab::Rotation,
                         MouseButton::Middle => Grab::Scale3D({
-                            // convert to mouse coordinates
-                            let proj = self.view_projection(ctx)
-                                * self.camera.view_matrix()
-                                * self.actors[selected]
-                                    .location(self.map.as_ref().unwrap())
-                                    .extend(1.0);
                             let (width, height) = ctx.screen_size();
-                            glam::vec2(
-                                (proj.x / proj.w.abs() + 1.0) * width * 0.5,
-                                (1.0 - proj.y / proj.w.abs()) * height * 0.5,
-                            )
+                            let (x, y) = self.actors[selected].coords(map, proj).into();
+                            glam::vec2((x + 1.0) * width * 0.5, (1.0 - y) * height * 0.5)
                         }),
                         MouseButton::Unknown => Grab::None,
                     }
@@ -893,22 +878,22 @@ impl EventHandler for Stove {
             return;
         }
         match keycode {
-            KeyCode::Delete => match self.selected {
-                Some(index) => {
+            KeyCode::Delete => match self.selected.zip(self.map.as_mut()) {
+                Some((selected, map)) => {
                     self.selected = None;
-                    self.actors[index].delete(self.map.as_mut().unwrap());
+                    self.actors[selected].delete(map);
                     self.notifs
-                        .success(format!("deleted {}", &self.actors[index].name));
-                    self.actors.remove(index);
+                        .success(format!("deleted {}", &self.actors[selected].name));
+                    self.actors.remove(selected);
                 }
                 None => {
                     self.notifs.error("nothing selected to delete");
                 }
             },
-            KeyCode::F => match self.selected {
-                Some(selected) => self.camera.set_focus(
-                    self.actors[selected].location(self.map.as_ref().unwrap()),
-                    self.actors[selected].scale(self.map.as_ref().unwrap()),
+            KeyCode::F => match self.selected.zip(self.map.as_ref()) {
+                Some((selected, map)) => self.camera.set_focus(
+                    self.actors[selected].location(map),
+                    self.actors[selected].scale(map),
                 ),
                 None => {
                     self.notifs.error("nothing selected to focus on");
@@ -938,15 +923,14 @@ impl EventHandler for Stove {
                 }
             }
             KeyCode::C if keymods.ctrl => {
-                if let Some(selected) = self.selected {
-                    self.locbuf =
-                        self.actors[selected].get_raw_location(self.map.as_ref().unwrap());
+                if let Some((selected, map)) = self.selected.zip(self.map.as_ref()) {
+                    self.locbuf = self.actors[selected].get_raw_location(map);
                     self.notifs.success("location copied");
                 }
             }
             KeyCode::V if keymods.ctrl => {
-                if let Some(selected) = self.selected {
-                    self.actors[selected].set_raw_location(self.map.as_mut().unwrap(), self.locbuf);
+                if let Some((selected, map)) = self.selected.zip(self.map.as_mut()) {
+                    self.actors[selected].set_raw_location(map, self.locbuf);
                     self.notifs.success("location pasted");
                 }
             }

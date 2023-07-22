@@ -33,6 +33,12 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
+    pub fn coords(&self, map: &Asset<File>, proj: glam::Mat4) -> glam::Vec2 {
+        use glam::Vec4Swizzles;
+        let coords = proj * self.location(map).extend(1.0);
+        coords.xy() / coords.w.abs()
+    }
+
     pub fn add_location(&self, map: &mut Asset<File>, offset: glam::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
