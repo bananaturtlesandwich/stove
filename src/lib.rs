@@ -57,6 +57,7 @@ pub struct Stove {
     use_cache: bool,
     script: String,
     locbuf: glam::DVec3,
+    filter: glam::Vec3,
     #[cfg(not(target_family = "wasm"))]
     client: Option<discord_rich_presence::DiscordIpcClient>,
     #[cfg(not(target_family = "wasm"))]
@@ -247,6 +248,7 @@ impl Stove {
             use_cache,
             script,
             locbuf: glam::DVec3::ZERO,
+            filter: glam::Vec3::ONE,
             #[cfg(not(target_family = "wasm"))]
             client,
             #[cfg(not(target_family = "wasm"))]
@@ -502,42 +504,59 @@ impl EventHandler for Stove {
                                 ui.label(egui::special_emojis::GITHUB.to_string());
                             });
                         });
-                        fn binding(ui:&mut egui::Ui, action:&str, binding:&str) {
-                            ui.label(action);
-                            ui.label(binding);
-                            ui.end_row();
-                        }
                         ui.menu_button("shortcuts", |ui|{
-                            egui::Grid::new("shortcuts").striped(true).show(ui,|ui|{
-                                ui.heading("file");
-                                ui.end_row();
-                                binding(ui, "open", "ctrl + o");
-                                binding(ui, "save", "ctrl + s");
-                                binding(ui, "save as", "ctrl + shift + s");
-                                binding(ui, "add pak folder", "alt + o");
-                                ui.heading("camera");
-                                ui.end_row();
-                                binding(ui, "move", "w + a + s + d");
-                                binding(ui, "rotate", "right-drag");
-                                binding(ui, "change speed", "scroll wheel");
-                                ui.heading("viewport");
-                                ui.end_row();
-                                binding(ui, "exit", "escape");
-                                binding(ui, "toggle fullscreen", "alt + enter");
-                                binding(ui, "hide ui", "h");
-                                binding(ui, "select", "left-click");
-                                binding(ui, "transplant", "ctrl + t");
-                                ui.heading("actor");
-                                ui.end_row();
-                                binding(ui, "focus", "f");
-                                binding(ui, "move", "left-drag");
-                                binding(ui, "rotate", "right-drag");
-                                binding(ui, "scale", "middle-drag");
-                                binding(ui, "copy location", "ctrl + c");
-                                binding(ui, "paste location", "ctrl + v");
-                                binding(ui, "duplicate", "alt + left-drag");
-                                binding(ui, "delete", "delete");
-                            });
+                            let mut section = |heading: &str, bindings: &[(&str,&str)]| {
+                                ui.menu_button(heading, |ui| {
+                                    egui::Grid::new(heading).striped(true).show(ui, |ui| {
+                                        for (action, binding) in bindings {
+                                            ui.label(*action);
+                                            ui.label(*binding);
+                                            ui.end_row();
+                                        }
+                                    })
+                                })
+                            };
+                            section(
+                                "file",
+                                &[
+                                    ("open","ctrl + o"),
+                                    ("save", "ctrl + s"),
+                                    ("save as","ctrl + shift + s"),
+                                    ("add pak folder", "alt + o")
+                                ]
+                            );
+                            section(
+                                "camera",
+                                &[
+                                    ("move","w + a + s + d"),
+                                    ("rotate", "right-drag"),
+                                    ("change speed", "scroll"),
+                                ]
+                            );
+                            section(
+                                "viewport",
+                                &[
+                                    ("toggle fullscreen", "alt + enter"),
+                                    ("hide ui", "h"),
+                                    ("select", "left-click"),
+                                    ("transplant", "ctrl + t")
+                                ]
+                            );
+                            section(
+                                "actor",
+                                &[
+                                    ("focus", "f"),
+                                    ("move", "left-drag"),
+                                    ("rotate", "right-drag"),
+                                    ("scale", "middle-drag"),
+                                    ("copy location", "ctrl + c"),
+                                    ("paste location", "ctrl + v"),
+                                    ("duplicate", "alt + left-drag"),
+                                    ("delete", "delete"),
+                                    ("lock x / y / z axis", "x / y / z"),
+                                    ("lock x / y / z plane", "shift + x / y / z"),
+                                ]
+                            )
                         });
                         ui.horizontal(|ui|{
                             ui.label("autoupdate:");
@@ -740,9 +759,14 @@ impl EventHandler for Stove {
             Grab::None => (),
             Grab::Location(dist) => self.actors[self.selected.unwrap()].add_location(
                 self.map.as_mut().unwrap(),
-                // move across the camera view plane
-                (self.camera.left() * -delta.x
-                    + self.camera.front.cross(self.camera.left()) * delta.y)
+                self.filter
+                    // move across the camera view plane
+                    * (
+                        self.camera.left()
+                        * -delta.x
+                        + self.camera.front.cross(self.camera.left())
+                        * delta.y
+                    )
                     // scale by consistent distance
                     * dist
                     // scale to match mouse cursor
@@ -751,7 +775,7 @@ impl EventHandler for Stove {
             Grab::Rotation => self.actors[self.selected.unwrap()].combine_rotation(
                 self.map.as_mut().unwrap(),
                 glam::Quat::from_axis_angle(
-                    self.camera.front,
+                    self.filter * self.camera.front,
                     match delta.x.abs() > delta.y.abs() {
                         true => -delta.x,
                         false => delta.y,
@@ -760,9 +784,11 @@ impl EventHandler for Stove {
             ),
             Grab::Scale3D(coords) => self.actors[self.selected.unwrap()].mul_scale(
                 self.map.as_mut().unwrap(),
-                glam::Vec3::ONE
-                    + (coords.distance(glam::vec2(x, y)) - coords.distance(self.last_mouse_pos))
-                        * 0.005,
+                self.filter
+                    * (glam::Vec3::ONE
+                        + (coords.distance(glam::vec2(x, y))
+                            - coords.distance(self.last_mouse_pos))
+                            * 0.005),
             ),
         }
         self.last_mouse_pos = glam::vec2(x, y);
@@ -861,12 +887,20 @@ impl EventHandler for Stove {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
         egui().key_down_event(ctx, keycode, keymods);
-        if !egui().egui_ctx().is_pointer_over_area()
-            && !keymods.ctrl
-            && !self.held.contains(&keycode)
+        if egui().egui_ctx().is_pointer_over_area() || keymods.ctrl || self.held.contains(&keycode)
         {
-            self.held.push(keycode)
+            return;
         }
+        self.filter = match keycode {
+            KeyCode::X if keymods.shift => glam::vec3(0., 1., 1.),
+            KeyCode::Y if keymods.shift => glam::vec3(1., 0., 1.),
+            KeyCode::Z if keymods.shift => glam::vec3(1., 1., 0.),
+            KeyCode::X => glam::Vec3::X,
+            KeyCode::Y => glam::Vec3::Y,
+            KeyCode::Z => glam::Vec3::Z,
+            _ => glam::Vec3::ONE,
+        };
+        self.held.push(keycode)
     }
 
     fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
@@ -934,6 +968,7 @@ impl EventHandler for Stove {
                     self.notifs.success("location pasted");
                 }
             }
+            KeyCode::X | KeyCode::Y | KeyCode::Z => self.filter = glam::Vec3::ONE,
             _ => (),
         }
     }
