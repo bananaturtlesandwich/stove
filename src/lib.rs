@@ -442,6 +442,16 @@ impl Stove {
     }
 }
 
+fn update_dialogs(path: &std::path::Path, dialogs: [&mut egui_file::FileDialog; 3]) {
+    let mut path = path.to_path_buf();
+    if path.is_file() {
+        path.pop();
+    }
+    for dialog in dialogs {
+        dialog.set_path(path.as_path())
+    }
+}
+
 fn filter(path: &std::path::Path) -> bool {
     path.extension().and_then(std::ffi::OsStr::to_str) == Some("umap")
 }
@@ -665,81 +675,82 @@ impl EventHandler for Stove {
                     }
                 }
             });
-            if let Some(map) = self.map.as_mut() {
-                let mut open = true;
-                let mut transplanted = false;
-                if let Some((donor, actors, selected)) = self.transplant.as_mut() {
-                    egui::Window::new("transplant actor")
-                        .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
-                        .resizable(false)
-                        .collapsible(false)
-                        .open(&mut open)
-                        .show(ctx, |ui| {
-                        // putting the button below breaks the scroll area somehow
-                        ui.add_enabled_ui(!selected.is_empty(), |ui| {
-                            if ui.vertical_centered_justified(|ui| ui.button("transplant selected")).inner.clicked(){
-                                for actor in selected.iter().map(|i| &actors[*i]) {
-                                    let insert = map.asset_data.exports.len() as i32 + 1;
-                                    actor.transplant(map, donor);
-                                    self.actors.push(
-                                        actor::Actor::new(
-                                            map,
-                                            PackageIndex::new(insert),
-                                        )
-                                        .unwrap(),
-                                    );
-                                    self.notifs.success(format!("transplanted {}", actor.name));
-                                }
-                                transplanted = true;
+            let mut open = true;
+            let mut transplanted = false;
+            if let Some((map, (donor, actors, selected))) = self.map.as_mut().zip(self.transplant.as_mut()) {
+                egui::Window::new("transplant actor")
+                    .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
+                    .resizable(false)
+                    .collapsible(false)
+                    .open(&mut open)
+                    .show(ctx, |ui| {
+                    // putting the button below breaks the scroll area somehow
+                    ui.add_enabled_ui(!selected.is_empty(), |ui| {
+                        if ui.vertical_centered_justified(|ui| ui.button("transplant selected")).inner.clicked(){
+                            for actor in selected.iter().map(|i| &actors[*i]) {
+                                let insert = map.asset_data.exports.len() as i32 + 1;
+                                actor.transplant(map, donor);
+                                self.actors.push(
+                                    actor::Actor::new(
+                                        map,
+                                        PackageIndex::new(insert),
+                                    )
+                                    .unwrap(),
+                                );
+                                self.notifs.success(format!("transplanted {}", actor.name));
                             }
-                        });
-                        egui::ScrollArea::both()
-                            .auto_shrink([false; 2])
-                            .show_rows(
-                                ui,
-                                ui.text_style_height(&egui::TextStyle::Body),
-                                actors.len(),
-                                |ui, range| {
-                                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
-                                        for (i, actor) in range.clone().zip(actors[range].iter()) {
-                                            if ui.selectable_label(selected.contains(&i), &actor.name).on_hover_text(&actor.class).clicked() {
-                                                ui.input(|input| {
-                                                    match selected.iter().position(|entry| entry == &i) {
-                                                        Some(i) => {
-                                                            selected.remove(i);
-                                                        },
-                                                        None if input.modifiers.shift &&
-                                                                selected.last().is_some_and(|last| last != &i)
-                                                            => {
-                                                            let last_selected = *selected.last().unwrap();
-                                                            for i in match i < last_selected{
-                                                                true => i..last_selected,
-                                                                false => last_selected + 1..i + 1
-                                                            } {
-                                                                selected.push(i)
-                                                            }
-                                                        },
-                                                        _ => selected.push(i)
-                                                    }
-                                                })
-                                            }
-                                        }
-                                    })
-                                }
-                            );
+                            transplanted = true;
                         }
-                    );
-                }
-                if transplanted || !open {
-                    self.selected = Some(self.actors.len() - 1);
-                    self.focus();
-                    self.transplant = None;
-                }
+                    });
+                    egui::ScrollArea::both()
+                        .auto_shrink([false; 2])
+                        .show_rows(
+                            ui,
+                            ui.text_style_height(&egui::TextStyle::Body),
+                            actors.len(),
+                            |ui, range| {
+                                ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                                    for (i, actor) in range.clone().zip(actors[range].iter()) {
+                                        if ui.selectable_label(selected.contains(&i), &actor.name).on_hover_text(&actor.class).clicked() {
+                                            ui.input(|input| {
+                                                match selected.iter().position(|entry| entry == &i) {
+                                                    Some(i) => {
+                                                        selected.remove(i);
+                                                    },
+                                                    None if input.modifiers.shift &&
+                                                            selected.last().is_some_and(|last| last != &i)
+                                                        => {
+                                                        let last_selected = *selected.last().unwrap();
+                                                        for i in match i < last_selected{
+                                                            true => i..last_selected,
+                                                            false => last_selected + 1..i + 1
+                                                        } {
+                                                            selected.push(i)
+                                                        }
+                                                    },
+                                                    _ => selected.push(i)
+                                                }
+                                            })
+                                        }
+                                    }
+                                })
+                            }
+                        );
+                    }
+                );
+            }
+            if transplanted {
+                self.selected = Some(self.actors.len() - 1);
+                self.focus();
+            }
+            if transplanted || !open {
+                self.transplant = None;
             }
             self.notifs.show(ctx);
             self.open_dialog.show(ctx);
             if self.open_dialog.selected() {
                 if let Some(path) = self.open_dialog.path() {
+                    update_dialogs(path, [&mut self.save_dialog, &mut self.pak_dialog, &mut self.transplant_dialog]);
                     match asset::open(path, self.version()) {
                         Ok(asset) => {
                             self.filepath = path.to_str().unwrap_or_default().to_string();
@@ -766,6 +777,7 @@ impl EventHandler for Stove {
             self.transplant_dialog.show(ctx);
             if self.transplant_dialog.selected() {
                 if let Some(path) = self.transplant_dialog.path() {
+                    update_dialogs(path, [&mut self.open_dialog, &mut self.save_dialog, &mut self.pak_dialog]);
                     match asset::open(path, self.version()) {
                         Ok(donor) => {
                             // no need for verbose warnings here
@@ -784,13 +796,17 @@ impl EventHandler for Stove {
             }
             self.pak_dialog.show(ctx);
             if self.pak_dialog.selected() {
-                if let Some(path) = self.pak_dialog.path().and_then(|path| path.to_str().map(str::to_string)) {
-                    self.paks.push(path);
+                if let Some(path) = self.pak_dialog.path() {
+                    update_dialogs(path, [&mut self.open_dialog, &mut self.save_dialog, &mut self.transplant_dialog]);
+                    if let Some(path) = path.to_str().map(str::to_string){
+                        self.paks.push(path);
+                    }
                 }
             }
             self.save_dialog.show(ctx);
             if self.save_dialog.selected() {
                 if let Some(path) = self.save_dialog.path() {
+                    update_dialogs(path, [&mut self.open_dialog, &mut self.pak_dialog, &mut self.transplant_dialog]);
                     self.filepath = path.with_extension("umap").to_str().unwrap_or_default().to_string();
                     self.save()
                 }
