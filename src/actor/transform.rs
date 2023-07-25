@@ -22,7 +22,7 @@ impl super::Actor {
             .and_then(|norm| {
                 norm.properties.iter().rev().find_map(|prop| {
                     if let Property::StructProperty(struc) = prop {
-                        if struc.name.get_content() == LOCATION {
+                        if struc.name == LOCATION {
                             return cast!(Property, VectorProperty, &struc.value[0]);
                         }
                     }
@@ -47,7 +47,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == LOCATION)
+            .find(|prop| prop.get_name() == LOCATION)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -93,7 +93,7 @@ impl super::Actor {
             .and_then(|norm| {
                 norm.properties.iter().rev().find_map(|prop| {
                     if let Property::StructProperty(struc) = prop {
-                        if struc.name.get_content() == LOCATION {
+                        if struc.name == LOCATION {
                             return cast!(Property, VectorProperty, &struc.value[0]);
                         }
                     }
@@ -112,7 +112,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == LOCATION)
+            .find(|prop| prop.get_name() == LOCATION)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -157,7 +157,7 @@ impl super::Actor {
                     .rev()
                     .find_map(|prop| {
                         if let Property::StructProperty(struc) = prop {
-                            if struc.name.get_content() == ROTATION {
+                            if struc.name == ROTATION {
                                 return cast!(Property, RotatorProperty, &struc.value[0]);
                             }
                         }
@@ -185,7 +185,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == ROTATION)
+            .find(|prop| prop.get_name() == ROTATION)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
@@ -241,7 +241,7 @@ impl super::Actor {
             .and_then(|norm| {
                 norm.properties.iter().rev().find_map(|prop| {
                     if let Property::StructProperty(struc) = prop {
-                        if struc.name.get_content() == SCALE {
+                        if struc.name == SCALE {
                             return cast!(Property, VectorProperty, &struc.value[0]);
                         }
                     }
@@ -260,7 +260,7 @@ impl super::Actor {
         match norm
             .properties
             .iter_mut()
-            .find(|prop| prop.get_name().get_content() == SCALE)
+            .find(|prop| prop.get_name() == SCALE)
         {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {

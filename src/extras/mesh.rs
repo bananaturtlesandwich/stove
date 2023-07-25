@@ -34,7 +34,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     let Some(mesh) = asset.asset_data.exports.iter().find(|ex| {
         asset
             .get_import(ex.get_base_export().class_index)
-            .map(|import| import.object_name.get_content() == "StaticMesh")
+            .map(|import| import.object_name == "StaticMesh")
             .unwrap_or(false)
     }) else {
         return Err(io::Error::new(
@@ -49,8 +49,8 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             "failed to cast mesh data",
         ));
     };
-    let object = asset.get_object_version();
     let engine = asset.get_engine_version();
+    let object = asset.get_object_version();
     let mut data = io::Cursor::new(mesh.extras.as_slice());
     // if I don't read this it breaks
     data.read_i32::<LE>()?;

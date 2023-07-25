@@ -52,10 +52,10 @@ impl Actor {
                 package.index
             )));
         };
-        let name = norm.base_export.object_name.get_content();
+        let name = norm.base_export.object_name.get_owned_content();
         let class = asset
             .get_import(norm.base_export.class_index)
-            .map(|import| import.object_name.get_content())
+            .map(|import| import.object_name.get_owned_content())
             .unwrap_or_default();
         let draw_type = norm
             .base_export
@@ -66,23 +66,23 @@ impl Actor {
             .find(|i| {
                 asset
                     .get_import(i.get_base_export().class_index)
-                    .filter(|import| import.object_name.get_content() == "StaticMeshComponent")
+                    .filter(|import| import.object_name == "StaticMeshComponent")
                     .is_some()
             })
             .and_then(|norm| {
                 norm.properties.iter().find_map(|prop| {
                     cast!(Property, ObjectProperty, prop)
-                        .filter(|prop| prop.get_name().get_content() == "StaticMesh")
+                        .filter(|prop| prop.get_name() == "StaticMesh")
                 })
             })
             .and_then(|obj| asset.get_import(obj.value))
             .and_then(|import| asset.get_import(import.outer_index))
             .map_or(DrawType::Cube, |path| {
-                DrawType::Mesh(path.object_name.get_content())
+                DrawType::Mesh(path.object_name.get_owned_content())
             });
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
-            match prop.get_name().get_content().as_str() {
+            match prop.get_name().get_owned_content().as_str() {
                 // of course this wouldn't be able to be detected if all transforms were left default
                 "RelativeLocation" | "RelativeRotation" | "RelativeScale3D" => {
                     return Ok(Self {
@@ -109,10 +109,11 @@ impl Actor {
                 _ => continue,
             }
         }
-        Err(Error::no_data(format!(
-            "couldn't find transform component for {}",
-            norm.base_export.object_name.get_content()
-        )))
+        norm.base_export.object_name.get_content(|name| {
+            Err(Error::no_data(format!(
+                "couldn't find transform component for {name}",
+            )))
+        })
     }
 
     /// gets all exports related to the given actor
@@ -173,7 +174,7 @@ pub fn get_actors(asset: &Asset<File>) -> Vec<PackageIndex> {
 /// creates and assigns a unique name
 fn give_unique_name(orig: &mut FName, asset: &mut Asset<File>) {
     // for the cases where the number is unnecessary
-    let mut name = orig.get_content();
+    let mut name = orig.get_owned_content();
     if asset.search_name_reference(&name).is_none() {
         *orig = asset.add_fname(&name);
         return;

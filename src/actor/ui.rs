@@ -26,7 +26,7 @@ impl super::Actor {
                 let (name, id, index) = {
                     let ex = ex.get_base_export();
                     (
-                        ex.object_name.get_content(),
+                        ex.object_name.get_owned_content(),
                         ex.serial_offset,
                         -ex.class_index.index - 1,
                     )
@@ -35,7 +35,9 @@ impl super::Actor {
                     .push_id(id, |ui| ui.collapsing(name, |ui| show_export(ui, ex)))
                     .response;
                 if let Some(import) = asset.imports.get(index as usize) {
-                    response.on_hover_text(import.object_name.get_content());
+                    import
+                        .object_name
+                        .get_content(|name| response.on_hover_text(name));
                 }
             }
         }
@@ -43,15 +45,17 @@ impl super::Actor {
 }
 
 fn show_array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Response {
-    ui.push_id(arr.name.get_content(), |ui| {
-        ui.collapsing("", |ui| {
-            for (i, entry) in arr.value.iter_mut().enumerate() {
-                ui.push_id(i, |ui| show_property(ui, entry));
-            }
+    arr.name.get_content(|name| {
+        ui.push_id(name, |ui| {
+            ui.collapsing("", |ui| {
+                for (i, entry) in arr.value.iter_mut().enumerate() {
+                    ui.push_id(i, |ui| show_property(ui, entry));
+                }
+            })
+            .header_response
         })
-        .header_response
+        .response
     })
-    .response
 }
 
 // I don't want to install OrderedFloat
@@ -94,12 +98,9 @@ macro_rules! show_sampler {
 
 macro_rules! show_path {
     ($ui:ident, $val:expr) => {
-        text_edit(
+        fname_edit(
             $ui,
-            &mut $val
-                .asset_path_name
-                .get_or_insert(FName::from_slice(""))
-                .get_content(),
+            &mut $val.asset_path_name.get_or_insert(FName::from_slice("")),
         ) | text_edit($ui, $val.sub_path.get_or_insert(String::new()))
             | text_edit($ui, $val.path.get_or_insert(String::new()))
     };
@@ -107,14 +108,16 @@ macro_rules! show_path {
 
 macro_rules! show_delegate {
     ($ui:ident, $val:expr) => {
-        $ui.push_id($val.name.get_content(), |ui| {
-            ui.collapsing("", |ui| {
-                for delegate in $val.value.iter_mut() {
-                    text_edit(ui, &mut delegate.delegate.get_content());
-                }
+        $val.name.get_content(|name| {
+            $ui.push_id(name, |ui| {
+                ui.collapsing("", |ui| {
+                    for delegate in $val.value.iter_mut() {
+                        fname_edit(ui, &mut delegate.delegate);
+                    }
+                })
             })
+            .response
         })
-        .response
     };
 }
 
@@ -146,7 +149,7 @@ fn fname_edit(ui: &mut egui::Ui, name: &mut FName) -> egui::Response {
     } = name
     {
         if *number >= 0 {
-            let string = name_map.get_ref().get_name_reference(*index);
+            let string = name_map.get_ref().get_owned_name(*index);
             let f = name_map.get_mut().add_fname_with_number(&string, -1);
             *name = f;
         }
@@ -163,7 +166,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
     if let Property::ObjectProperty(_) = prop {
         return;
     }
-    match prop.get_name().get_content().as_str() {
+    match prop.get_name().get_owned_content().as_str() {
         "UCSModifiedProperties" | "UCSSerializationIndex" | "BlueprintCreatedComponents" => (),
         name => {
             ui.horizontal(|ui| {
@@ -260,8 +263,8 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     }
                     Property::SetProperty(set) => show_array_property(ui, &mut set.value),
                     Property::ArrayProperty(arr) => show_array_property(ui, arr),
-                    Property::MapProperty(map) => {
-                        ui.push_id(map.name.get_content(), |ui| {
+                    Property::MapProperty(map) => map.name.get_content(|name| {
+                        ui.push_id(name, |ui| {
                             ui.collapsing("", |ui| {
                                 for value in map.value.values_mut() {
                                     show_property(ui, value);
@@ -269,7 +272,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             })
                         })
                         .response
-                    }
+                    }),
                     Property::PerPlatformBoolProperty(bools) => {
                         ui.collapsing("", |ui| {
                             for bool in bools.value.iter_mut() {
@@ -319,8 +322,8 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
                     Property::SmartNameProperty(name) => fname_edit(ui, &mut name.display_name),
-                    Property::StructProperty(str) => {
-                        ui.push_id(str.name.get_content(), |ui| {
+                    Property::StructProperty(str) => str.name.get_content(|name| {
+                        ui.push_id(name, |ui| {
                             ui.collapsing("", |ui| {
                                 for val in str.value.iter_mut() {
                                     show_property(ui, val)
@@ -328,7 +331,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             })
                         })
                         .response
-                    }
+                    }),
                     Property::EnumProperty(enm) => {
                         fname_edit(ui, enm.value.get_or_insert(FName::from_slice("")))
                     }
