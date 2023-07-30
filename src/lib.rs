@@ -1,6 +1,7 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use miniquad::*;
+use nanoserde::{DeBin, SerBin};
 use unreal_asset::{
     engine_version::EngineVersion::{self, *},
     types::PackageIndex,
@@ -66,6 +67,33 @@ pub struct Stove {
     autoupdate: bool,
 }
 
+#[derive(DeBin, SerBin)]
+struct Persistent {
+    version: usize,
+    paks: Vec<String>,
+    distance: f32,
+    aes: String,
+    use_cache: bool,
+    script: String,
+    #[cfg(not(target_family = "wasm"))]
+    autoupdate: bool,
+}
+
+impl Default for Persistent {
+    fn default() -> Self {
+        Persistent {
+            version: 0,
+            paks: Vec::new(),
+            distance: 10000.0,
+            aes: String::new(),
+            use_cache: true,
+            script: String::new(),
+            #[cfg(not(target_family = "wasm"))]
+            autoupdate: false,
+        }
+    }
+}
+
 fn config() -> Option<std::path::PathBuf> {
     dirs::config_local_dir().map(|path| path.join("stove"))
 }
@@ -127,48 +155,26 @@ impl Stove {
                 env!("CARGO_PKG_VERSION")
             ));
         }
-        let (version, paks, distance, aes, autoupdate, use_cache, script) = config().map_or(
-            (
-                0,
-                String::new(),
-                10000.0,
-                String::new(),
-                false,
-                true,
-                String::new(),
-            ),
-            |ref cfg| {
+        let Persistent {
+            version,
+            paks,
+            distance,
+            aes,
+            use_cache,
+            script,
+            autoupdate,
+        } = config()
+            .and_then(|ref cfg| {
                 if !cfg.exists() && std::fs::create_dir_all(cfg).is_err() {
                     notifs.error("failed to create config directory");
                 }
                 if std::fs::create_dir_all(cfg.join("cache")).is_err() {
                     notifs.error("failed to create cache directory");
                 }
-                (
-                    std::fs::read_to_string(cfg.join("VERSION"))
-                        .unwrap_or_else(|_| "0".to_string())
-                        .parse::<usize>()
-                        .unwrap_or_default(),
-                    // for some reason doing lines and collect here gives the compiler a seizure
-                    std::fs::read_to_string(cfg.join("PAKS")).unwrap_or_default(),
-                    std::fs::read_to_string(cfg.join("DISTANCE"))
-                        .unwrap_or_else(|_| "10000.0".to_string())
-                        .parse()
-                        .unwrap_or(10000.0),
-                    std::fs::read_to_string(cfg.join("AES")).unwrap_or_default(),
-                    std::fs::read_to_string(cfg.join("AUTOUPDATE"))
-                        .unwrap_or_else(|_| "false".to_string())
-                        .parse::<bool>()
-                        .unwrap_or_default(),
-                    std::fs::read_to_string(cfg.join("USE_CACHE"))
-                        .unwrap_or_else(|_| "true".to_string())
-                        .parse::<bool>()
-                        .unwrap_or_default(),
-                    std::fs::read_to_string(cfg.join("SCRIPT")).unwrap_or_default(),
-                )
-            },
-        );
-        let paks = paks.lines().map(str::to_string).collect();
+                Persistent::deserialize_bin(&std::fs::read(cfg.join("CONFIG")).unwrap_or_default())
+                    .ok()
+            })
+            .unwrap_or_default();
         let mut home = dirs::home_dir();
         let mut filepath = String::new();
         let map = std::env::args().nth(1).and_then(|path| {
@@ -1043,15 +1049,17 @@ impl Drop for Stove {
         if let Some(client) = &mut self.client {
             client.close().unwrap_or_default();
         }
+        let data = Persistent {
+            version: self.version,
+            paks: self.paks.clone(),
+            distance: self.distance,
+            aes: self.aes.clone(),
+            use_cache: self.use_cache,
+            script: self.script.clone(),
+            autoupdate: self.autoupdate,
+        };
         if let Some(path) = config() {
-            std::fs::write(path.join("VERSION"), self.version.to_string()).unwrap_or_default();
-            std::fs::write(path.join("PAKS"), self.paks.join("\n")).unwrap_or_default();
-            std::fs::write(path.join("DISTANCE"), self.distance.to_string()).unwrap_or_default();
-            std::fs::write(path.join("AES"), &self.aes).unwrap_or_default();
-            std::fs::write(path.join("AUTOUPDATE"), self.autoupdate.to_string())
-                .unwrap_or_default();
-            std::fs::write(path.join("USE_CACHE"), self.use_cache.to_string()).unwrap_or_default();
-            std::fs::write(path.join("SCRIPT"), &self.script).unwrap_or_default();
+            std::fs::write(path.join("CONFIG"), data.serialize_bin()).unwrap_or_default()
         }
     }
 }

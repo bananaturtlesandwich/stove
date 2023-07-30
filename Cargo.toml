@@ -19,6 +19,7 @@ egui_file = "0.10"
 byteorder = "1.4"
 hashbrown = "0.13"
 dirs = "5.0"
+nanoserde = "0.1"
 hex = "0.4"
 
 [build-dependencies]
