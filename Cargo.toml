@@ -4,11 +4,11 @@ authors = ["spuds"]
 repository = "https://github.com/bananaturtlesandwich/stove"
 description = "an editor for cooked unreal engine 4 map files"
 readme = "README.md"
-version = "0.9.1"
+version = "0.9.2"
 edition = "2021"
 
 [dependencies]
-unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "b1d5553" }
+unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "91054ff" }
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math"] }
 miniquad = "0.3"

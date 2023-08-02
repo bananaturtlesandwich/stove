@@ -8,6 +8,7 @@ pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<Asset<File
         File::open(&file)?,
         File::open(file.as_ref().with_extension("uexp")).ok(),
         version,
+        None,
     )
 }
 

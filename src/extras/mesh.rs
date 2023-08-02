@@ -18,6 +18,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
             include_bytes!("A02_Outside_Castle.uexp").as_slice(),
         )),
         EngineVersion::VER_UE4_25,
+        None,
     )?)?;
     Ok(())
 }

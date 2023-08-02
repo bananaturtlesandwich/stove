@@ -1,6 +1,9 @@
 use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::{array_property::ArrayProperty, Property, PropertyDataTrait},
+    properties::{
+        array_property::ArrayProperty, soft_path_property::SoftObjectPathPropertyValue, Property,
+        PropertyDataTrait,
+    },
     types::fname::{FName, ToSerializedName},
     Asset,
 };
@@ -98,11 +101,22 @@ macro_rules! show_sampler {
 
 macro_rules! show_path {
     ($ui:ident, $val:expr) => {
-        fname_edit(
-            $ui,
-            &mut $val.asset_path_name.get_or_insert(FName::from_slice("")),
-        ) | text_edit($ui, $val.sub_path.get_or_insert(String::new()))
-            | text_edit($ui, $val.path.get_or_insert(String::new()))
+        match &mut $val.value {
+            SoftObjectPathPropertyValue::Old(path) => {
+                text_edit($ui, path.get_or_insert_with(|| String::new()))
+            }
+            SoftObjectPathPropertyValue::New(path) => {
+                text_edit(
+                    $ui,
+                    path.sub_path_string.get_or_insert_with(|| String::new()),
+                ) | fname_edit(
+                    $ui,
+                    path.asset_path
+                        .package_name
+                        .get_or_insert_with(|| FName::from_slice("")),
+                ) | fname_edit($ui, &mut path.asset_path.asset_name)
+            }
+        }
     };
 }
 
@@ -186,32 +200,39 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                             drag(ui, byte)
                         }
                         unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
-                            fname_edit(ui, byte.enum_type.get_or_insert(FName::from_slice("")))
-                                | fname_edit(ui, name)
+                            fname_edit(
+                                ui,
+                                byte.enum_type.get_or_insert_with(|| FName::from_slice("")),
+                            ) | fname_edit(ui, name)
                         }
                     },
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
                     Property::NameProperty(name) => fname_edit(ui, &mut name.value),
                     Property::StrProperty(str) => {
-                        text_edit(ui, str.value.get_or_insert(String::new()))
+                        text_edit(ui, str.value.get_or_insert_with(|| String::new()))
                     }
                     Property::TextProperty(txt) => text_edit(
                         ui,
-                        txt.culture_invariant_string.get_or_insert(String::new()),
+                        txt.culture_invariant_string
+                            .get_or_insert_with(|| String::new()),
                     ),
                     Property::ObjectProperty(obj) => ui.link(obj.value.index.to_string()),
                     Property::AssetObjectProperty(obj) => {
-                        text_edit(ui, obj.value.get_or_insert(String::new()))
+                        text_edit(ui, obj.value.get_or_insert_with(|| String::new()))
                     }
                     Property::SoftObjectProperty(obj) => {
-                        text_edit(ui, obj.value.sub_path_string.get_or_insert(String::new()))
-                            | fname_edit(ui, &mut obj.value.asset_path.asset_name)
+                        text_edit(
+                            ui,
+                            obj.value
+                                .sub_path_string
+                                .get_or_insert_with(|| String::new()),
+                        ) | fname_edit(ui, &mut obj.value.asset_path.asset_name)
                             | fname_edit(
                                 ui,
                                 obj.value
                                     .asset_path
                                     .package_name
-                                    .get_or_insert(FName::from_slice("")),
+                                    .get_or_insert_with(|| FName::from_slice("")),
                             )
                     }
                     Property::IntPointProperty(point) => {
@@ -333,7 +354,7 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         .response
                     }),
                     Property::EnumProperty(enm) => {
-                        fname_edit(ui, enm.value.get_or_insert(FName::from_slice("")))
+                        fname_edit(ui, enm.value.get_or_insert_with(|| FName::from_slice("")))
                     }
                     // Property::UnknownProperty(unknown) => todo!(),
                     _ => ui.link("unimplemented"),

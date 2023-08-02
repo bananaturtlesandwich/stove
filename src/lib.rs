@@ -337,6 +337,7 @@ impl Stove {
                                                 std::io::Cursor::new(mesh),
                                                 pak.get(&bulk).ok().map(std::io::Cursor::new),
                                                 self.version(),
+                                                None
                                             ) else {
                                                 continue;
                                             };
