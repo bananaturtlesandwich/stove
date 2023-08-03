@@ -58,32 +58,35 @@ impl super::Actor {
                     }
                 }
             }
-            None => norm
-                .properties
-                .push(Property::StructProperty(StructProperty {
-                    name: names.clone_resource().get_mut().add_fname(LOCATION),
-                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                        ancestry: Vec::new(),
-                    },
-                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
-                    struct_guid: Some([0; 16]),
-                    property_guid: None,
-                    duplication_index: 0,
-                    serialize_none: true,
-                    value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname(LOCATION),
+            None => {
+                let name = names.get_mut().add_fname(LOCATION);
+                let struct_type = Some(names.get_mut().add_fname("Vector"));
+                norm.properties
+                    .push(Property::StructProperty(StructProperty {
+                        name,
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
+                        struct_type,
+                        struct_guid: Some([0; 16]),
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(
-                            (-offset.x as f64).into(),
-                            (offset.z as f64).into(),
-                            (offset.y as f64).into(),
-                        ),
-                    })],
-                })),
+                        serialize_none: true,
+                        value: vec![Property::VectorProperty(VectorProperty {
+                            name: names.get_mut().add_fname(LOCATION),
+                            ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                                ancestry: Vec::new(),
+                            },
+                            property_guid: None,
+                            duplication_index: 0,
+                            value: Vector::new(
+                                (-offset.x as f64).into(),
+                                (offset.z as f64).into(),
+                                (offset.y as f64).into(),
+                            ),
+                        })],
+                    }));
+            }
         }
     }
 
@@ -123,28 +126,32 @@ impl super::Actor {
                     }
                 }
             }
-            None => norm
-                .properties
-                .push(Property::StructProperty(StructProperty {
-                    name: names.clone_resource().get_mut().add_fname(LOCATION),
-                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                        ancestry: Vec::new(),
-                    },
-                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
-                    struct_guid: Some([0; 16]),
-                    property_guid: None,
-                    duplication_index: 0,
-                    serialize_none: true,
-                    value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname(LOCATION),
+            None => {
+                let name = names.get_mut().add_fname(LOCATION);
+                let struct_type = Some(names.get_mut().add_fname("Vector"));
+
+                norm.properties
+                    .push(Property::StructProperty(StructProperty {
+                        name,
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
+                        struct_type,
+                        struct_guid: Some([0; 16]),
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(new.x.into(), new.z.into(), new.y.into()),
-                    })],
-                })),
+                        serialize_none: true,
+                        value: vec![Property::VectorProperty(VectorProperty {
+                            name: names.get_mut().add_fname(LOCATION),
+                            ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                                ancestry: Vec::new(),
+                            },
+                            property_guid: None,
+                            duplication_index: 0,
+                            value: Vector::new(new.x.into(), new.z.into(), new.y.into()),
+                        })],
+                    }));
+            }
         }
     }
 
@@ -206,32 +213,35 @@ impl super::Actor {
                     }
                 }
             }
-            None => norm
-                .properties
-                .push(Property::StructProperty(StructProperty {
-                    name: names.clone_resource().get_mut().add_fname(ROTATION),
-                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                        ancestry: Vec::new(),
-                    },
-                    struct_type: Some(names.clone_resource().get_mut().add_fname("Rotator")),
-                    struct_guid: Some([0; 16]),
-                    property_guid: None,
-                    duplication_index: 0,
-                    serialize_none: true,
-                    value: vec![Property::RotatorProperty(RotatorProperty {
-                        name: names.get_mut().add_fname(ROTATION),
+            None => {
+                let name = names.get_mut().add_fname(ROTATION);
+                let struct_type = Some(names.get_mut().add_fname("Rotator"));
+                norm.properties
+                    .push(Property::StructProperty(StructProperty {
+                        name,
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
+                        struct_type,
+                        struct_guid: Some([0; 16]),
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(
-                            (offset.x as f64).into(),
-                            (offset.z as f64).into(),
-                            (offset.y as f64).into(),
-                        ),
-                    })],
-                })),
+                        serialize_none: true,
+                        value: vec![Property::RotatorProperty(RotatorProperty {
+                            name: names.get_mut().add_fname(ROTATION),
+                            ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                                ancestry: Vec::new(),
+                            },
+                            property_guid: None,
+                            duplication_index: 0,
+                            value: Vector::new(
+                                (offset.x as f64).into(),
+                                (offset.z as f64).into(),
+                                (offset.y as f64).into(),
+                            ),
+                        })],
+                    }));
+            }
         }
     }
 
@@ -271,32 +281,35 @@ impl super::Actor {
                     }
                 }
             }
-            None => norm
-                .properties
-                .push(Property::StructProperty(StructProperty {
-                    name: names.clone_resource().get_mut().add_fname(SCALE),
-                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                        ancestry: Vec::new(),
-                    },
-                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
-                    struct_guid: Some([0; 16]),
-                    property_guid: None,
-                    duplication_index: 0,
-                    serialize_none: true,
-                    value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname(SCALE),
+            None => {
+                let name = names.get_mut().add_fname(SCALE);
+                let struct_type = Some(names.get_mut().add_fname("Vector"));
+                norm.properties
+                    .push(Property::StructProperty(StructProperty {
+                        name,
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
+                        struct_type,
+                        struct_guid: Some([0; 16]),
                         property_guid: None,
                         duplication_index: 0,
-                        value: Vector::new(
-                            (offset.x as f64).into(),
-                            (offset.z as f64).into(),
-                            (offset.y as f64).into(),
-                        ),
-                    })],
-                })),
+                        serialize_none: true,
+                        value: vec![Property::VectorProperty(VectorProperty {
+                            name: names.get_mut().add_fname(SCALE),
+                            ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                                ancestry: Vec::new(),
+                            },
+                            property_guid: None,
+                            duplication_index: 0,
+                            value: Vector::new(
+                                (offset.x as f64).into(),
+                                (offset.z as f64).into(),
+                                (offset.y as f64).into(),
+                            ),
+                        })],
+                    }));
+            }
         }
     }
 
