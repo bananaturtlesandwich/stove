@@ -1,8 +1,8 @@
 use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{
-        array_property::ArrayProperty, soft_path_property::SoftObjectPathPropertyValue, Property,
-        PropertyDataTrait,
+        array_property::ArrayProperty, int_property::BytePropertyValue,
+        soft_path_property::SoftObjectPathPropertyValue, Property, PropertyDataTrait,
     },
     types::fname::{FName, ToSerializedName},
     Asset,
@@ -11,14 +11,14 @@ use unreal_asset::{
 impl super::Actor {
     pub fn show(&self, asset: &mut Asset<std::fs::File>, ui: &mut egui::Ui) {
         ui.heading(&self.name);
-        fn show_export(ui: &mut egui::Ui, export: &mut Export) {
+        fn export(ui: &mut egui::Ui, export: &mut Export) {
             if let Some(norm) = export.get_normal_export_mut() {
                 for prop in norm.properties.iter_mut() {
-                    show_property(ui, prop);
+                    property(ui, prop);
                 }
             }
         }
-        show_export(ui, &mut asset.asset_data.exports[self.export]);
+        export(ui, &mut asset.asset_data.exports[self.export]);
         for i in asset.asset_data.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
@@ -35,7 +35,7 @@ impl super::Actor {
                     )
                 };
                 let response = ui
-                    .push_id(id, |ui| ui.collapsing(name, |ui| show_export(ui, ex)))
+                    .push_id(id, |ui| ui.collapsing(name, |ui| export(ui, ex)))
                     .response;
                 if let Some(import) = asset.imports.get(index as usize) {
                     import
@@ -47,12 +47,38 @@ impl super::Actor {
     }
 }
 
-fn show_array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Response {
+fn option<T>(
+    ui: &mut egui::Ui,
+    val: &mut Option<T>,
+    mut func: impl FnMut(&mut egui::Ui, &mut T) -> egui::Response,
+    init: impl Fn() -> T,
+) -> egui::Response {
+    ui.horizontal(|ui| {
+        if let Some(inner) = val.as_mut() {
+            func(ui, inner);
+        }
+        match val.is_some() {
+            true => {
+                if ui.button("x").clicked() {
+                    *val = None;
+                }
+            }
+            false => {
+                if ui.button("+").clicked() {
+                    *val = Some(init());
+                }
+            }
+        }
+    })
+    .response
+}
+
+fn array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Response {
     arr.name.get_content(|name| {
         ui.push_id(name, |ui| {
             ui.collapsing("", |ui| {
                 for (i, entry) in arr.value.iter_mut().enumerate() {
-                    ui.push_id(i, |ui| show_property(ui, entry));
+                    ui.push_id(i, |ui| property(ui, entry));
                 }
             })
             .header_response
@@ -62,7 +88,7 @@ fn show_array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Resp
 }
 
 // I don't want to install OrderedFloat
-macro_rules! show_vector {
+macro_rules! vector {
     ($ui:ident, $val:expr) => {
         drag($ui, &mut $val.value.x.0)
             | drag($ui, &mut $val.value.y.0)
@@ -70,7 +96,7 @@ macro_rules! show_vector {
     };
 }
 
-macro_rules! show_vector4 {
+macro_rules! vector4 {
     ($ui:ident, $val:expr) => {
         drag($ui, &mut $val.value.w.0)
             | drag($ui, &mut $val.value.x.0)
@@ -79,7 +105,7 @@ macro_rules! show_vector4 {
     };
 }
 
-macro_rules! show_sampler {
+macro_rules! sampler {
     ($ui:ident, $val:expr) => {
         $ui.collapsing("alias", |$ui| {
             for i in $val.alias.iter_mut() {
@@ -99,28 +125,25 @@ macro_rules! show_sampler {
     };
 }
 
-macro_rules! show_path {
+macro_rules! path {
     ($ui:ident, $val:expr) => {
         match &mut $val.value {
-            SoftObjectPathPropertyValue::Old(path) => {
-                text_edit($ui, path.get_or_insert_with(|| String::new()))
-            }
+            SoftObjectPathPropertyValue::Old(path) => option($ui, path, text_edit, String::new),
             SoftObjectPathPropertyValue::New(path) => {
-                text_edit(
-                    $ui,
-                    path.sub_path_string.get_or_insert_with(|| String::new()),
-                ) | fname_edit(
-                    $ui,
-                    path.asset_path
-                        .package_name
-                        .get_or_insert_with(|| FName::from_slice("")),
-                ) | fname_edit($ui, &mut path.asset_path.asset_name)
+                option($ui, &mut path.sub_path_string, text_edit, String::new)
+                    | option(
+                        $ui,
+                        &mut path.asset_path.package_name,
+                        fname_edit,
+                        FName::default,
+                    )
+                    | fname_edit($ui, &mut path.asset_path.asset_name)
             }
         }
     };
 }
 
-macro_rules! show_delegate {
+macro_rules! delegate {
     ($ui:ident, $val:expr) => {
         $val.name.get_content(|name| {
             $ui.push_id(name, |ui| {
@@ -176,7 +199,7 @@ fn fname_edit(ui: &mut egui::Ui, name: &mut FName) -> egui::Response {
     }
 }
 
-fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
+fn property(ui: &mut egui::Ui, prop: &mut Property) {
     if let Property::ObjectProperty(_) = prop {
         return;
     }
@@ -196,60 +219,52 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     Property::Int8Property(int) => drag(ui, &mut int.value),
                     Property::IntProperty(int) => drag(ui, &mut int.value),
                     Property::ByteProperty(byte) => match &mut byte.value {
-                        unreal_asset::properties::int_property::BytePropertyValue::Byte(byte) => {
-                            drag(ui, byte)
-                        }
-                        unreal_asset::properties::int_property::BytePropertyValue::FName(name) => {
-                            fname_edit(
-                                ui,
-                                byte.enum_type.get_or_insert_with(|| FName::from_slice("")),
-                            ) | fname_edit(ui, name)
+                        BytePropertyValue::Byte(byte) => drag(ui, byte),
+                        BytePropertyValue::FName(name) => {
+                            option(ui, &mut byte.enum_type, fname_edit, FName::default)
+                                | fname_edit(ui, name)
                         }
                     },
                     Property::DoubleProperty(double) => drag(ui, &mut double.value.0),
                     Property::NameProperty(name) => fname_edit(ui, &mut name.value),
                     Property::StrProperty(str) => {
-                        text_edit(ui, str.value.get_or_insert_with(|| String::new()))
+                        option(ui, &mut str.value, text_edit, String::new)
                     }
-                    Property::TextProperty(txt) => text_edit(
+                    Property::TextProperty(txt) => option(
                         ui,
-                        txt.culture_invariant_string
-                            .get_or_insert_with(|| String::new()),
+                        &mut txt.culture_invariant_string,
+                        text_edit,
+                        String::new,
                     ),
                     Property::ObjectProperty(obj) => ui.link(obj.value.index.to_string()),
                     Property::AssetObjectProperty(obj) => {
-                        text_edit(ui, obj.value.get_or_insert_with(|| String::new()))
+                        option(ui, &mut obj.value, text_edit, String::new)
                     }
                     Property::SoftObjectProperty(obj) => {
-                        text_edit(
-                            ui,
-                            obj.value
-                                .sub_path_string
-                                .get_or_insert_with(|| String::new()),
-                        ) | fname_edit(ui, &mut obj.value.asset_path.asset_name)
-                            | fname_edit(
+                        option(ui, &mut obj.value.sub_path_string, text_edit, String::new)
+                            | fname_edit(ui, &mut obj.value.asset_path.asset_name)
+                            | option(
                                 ui,
-                                obj.value
-                                    .asset_path
-                                    .package_name
-                                    .get_or_insert_with(|| FName::from_slice("")),
+                                &mut obj.value.asset_path.package_name,
+                                fname_edit,
+                                FName::default,
                             )
                     }
                     Property::IntPointProperty(point) => {
                         drag(ui, &mut point.value.x) | drag(ui, &mut point.value.y)
                     }
-                    Property::VectorProperty(vec) => show_vector!(ui, vec),
-                    Property::Vector4Property(vec) => show_vector4!(ui, vec),
+                    Property::VectorProperty(vec) => vector!(ui, vec),
+                    Property::Vector4Property(vec) => vector4!(ui, vec),
                     Property::Vector2DProperty(vec) => {
                         drag(ui, &mut vec.value.x.0) | drag(ui, &mut vec.value.y.0)
                     }
                     Property::BoxProperty(pak) => {
-                        ui.collapsing("v1", |ui| show_vector!(ui, &mut pak.v1))
+                        ui.collapsing("v1", |ui| vector!(ui, &mut pak.v1))
                             .header_response
-                            | ui.collapsing("v2", |ui| show_vector!(ui, &mut pak.v2))
+                            | ui.collapsing("v2", |ui| vector!(ui, &mut pak.v2))
                                 .header_response
                     }
-                    Property::QuatProperty(quat) => show_vector4!(ui, quat),
+                    Property::QuatProperty(quat) => vector4!(ui, quat),
                     Property::RotatorProperty(rot) => {
                         drag_angle(ui, &mut rot.value.x)
                             | drag_angle(ui, &mut rot.value.y)
@@ -282,13 +297,13 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         }
                         response
                     }
-                    Property::SetProperty(set) => show_array_property(ui, &mut set.value),
-                    Property::ArrayProperty(arr) => show_array_property(ui, arr),
+                    Property::SetProperty(set) => array_property(ui, &mut set.value),
+                    Property::ArrayProperty(arr) => array_property(ui, arr),
                     Property::MapProperty(map) => map.name.get_content(|name| {
                         ui.push_id(name, |ui| {
                             ui.collapsing("", |ui| {
                                 for value in map.value.values_mut() {
-                                    show_property(ui, value);
+                                    property(ui, value);
                                 }
                             })
                         })
@@ -325,20 +340,20 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                     // Property::ShadingModelMaterialInputProperty(_) => todo!(),
                     // Property::VectorMaterialInputProperty(_) => todo!(),
                     // Property::Vector2MaterialInputProperty(_) => todo!(),
-                    Property::WeightedRandomSamplerProperty(rand) => show_sampler!(ui, rand),
+                    Property::WeightedRandomSamplerProperty(rand) => sampler!(ui, rand),
                     Property::SkeletalMeshSamplingLODBuiltDataProperty(lod) => {
-                        show_sampler!(ui, lod.sampler_property)
+                        sampler!(ui, lod.sampler_property)
                     }
                     Property::SkeletalMeshAreaWeightedTriangleSampler(skel) => {
-                        show_sampler!(ui, skel)
+                        sampler!(ui, skel)
                     }
-                    Property::SoftAssetPathProperty(path) => show_path!(ui, path),
-                    Property::SoftObjectPathProperty(path) => show_path!(ui, path),
-                    Property::SoftClassPathProperty(path) => show_path!(ui, path),
+                    Property::SoftAssetPathProperty(path) => path!(ui, path),
+                    Property::SoftObjectPathProperty(path) => path!(ui, path),
+                    Property::SoftClassPathProperty(path) => path!(ui, path),
                     Property::DelegateProperty(del) => fname_edit(ui, &mut del.value.delegate),
-                    Property::MulticastDelegateProperty(del) => show_delegate!(ui, del),
-                    Property::MulticastSparseDelegateProperty(del) => show_delegate!(ui, del),
-                    Property::MulticastInlineDelegateProperty(del) => show_delegate!(ui, del),
+                    Property::MulticastDelegateProperty(del) => delegate!(ui, del),
+                    Property::MulticastSparseDelegateProperty(del) => delegate!(ui, del),
+                    Property::MulticastInlineDelegateProperty(del) => delegate!(ui, del),
                     // Property::RichCurveKeyProperty(_) => todo!(),
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
@@ -347,14 +362,14 @@ fn show_property(ui: &mut egui::Ui, prop: &mut Property) {
                         ui.push_id(name, |ui| {
                             ui.collapsing("", |ui| {
                                 for val in str.value.iter_mut() {
-                                    show_property(ui, val)
+                                    property(ui, val)
                                 }
                             })
                         })
                         .response
                     }),
                     Property::EnumProperty(enm) => {
-                        fname_edit(ui, enm.value.get_or_insert_with(|| FName::from_slice("")))
+                        option(ui, &mut enm.value, fname_edit, FName::default)
                     }
                     // Property::UnknownProperty(unknown) => todo!(),
                     _ => ui.link("unimplemented"),
