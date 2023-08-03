@@ -214,7 +214,6 @@ impl Stove {
                         .is_ok())
                 .then_some(cl)
             });
-        let home = dirs::home_dir();
 
         let mut stove = Self {
             camera: rendering::Camera::default(),
