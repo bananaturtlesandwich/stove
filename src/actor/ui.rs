@@ -74,17 +74,15 @@ fn option<T>(
 }
 
 fn array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) -> egui::Response {
-    arr.name.get_content(|name| {
-        ui.push_id(name, |ui| {
-            ui.collapsing("", |ui| {
-                for (i, entry) in arr.value.iter_mut().enumerate() {
-                    ui.push_id(i, |ui| property(ui, entry));
-                }
-            })
-            .header_response
+    ui.push_id(arr.name.get_owned_content(), |ui| {
+        ui.collapsing("", |ui| {
+            for (i, entry) in arr.value.iter_mut().enumerate() {
+                ui.push_id(i, |ui| property(ui, entry));
+            }
         })
-        .response
+        .header_response
     })
+    .response
 }
 
 // I don't want to install OrderedFloat
@@ -145,16 +143,14 @@ macro_rules! path {
 
 macro_rules! delegate {
     ($ui:ident, $val:expr) => {
-        $val.name.get_content(|name| {
-            $ui.push_id(name, |ui| {
-                ui.collapsing("", |ui| {
-                    for delegate in $val.value.iter_mut() {
-                        fname_edit(ui, &mut delegate.delegate);
-                    }
-                })
+        $ui.push_id($val.name.get_owned_content(), |ui| {
+            ui.collapsing("", |ui| {
+                for delegate in $val.value.iter_mut() {
+                    fname_edit(ui, &mut delegate.delegate);
+                }
             })
-            .response
         })
+        .response
     };
 }
 
@@ -299,8 +295,8 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                     }
                     Property::SetProperty(set) => array_property(ui, &mut set.value),
                     Property::ArrayProperty(arr) => array_property(ui, arr),
-                    Property::MapProperty(map) => map.name.get_content(|name| {
-                        ui.push_id(name, |ui| {
+                    Property::MapProperty(map) => {
+                        ui.push_id(map.name.get_owned_content(), |ui| {
                             ui.collapsing("", |ui| {
                                 for value in map.value.values_mut() {
                                     property(ui, value);
@@ -308,7 +304,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                             })
                         })
                         .response
-                    }),
+                    }
                     Property::PerPlatformBoolProperty(bools) => {
                         ui.collapsing("", |ui| {
                             for bool in bools.value.iter_mut() {
@@ -358,8 +354,8 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                     // Property::ViewTargetBlendParamsProperty(_) => todo!(),
                     // Property::GameplayTagContainerProperty(_) => todo!(),
                     Property::SmartNameProperty(name) => fname_edit(ui, &mut name.display_name),
-                    Property::StructProperty(str) => str.name.get_content(|name| {
-                        ui.push_id(name, |ui| {
+                    Property::StructProperty(str) => {
+                        ui.push_id(str.name.get_owned_content(), |ui| {
                             ui.collapsing("", |ui| {
                                 for val in str.value.iter_mut() {
                                     property(ui, val)
@@ -367,7 +363,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                             })
                         })
                         .response
-                    }),
+                    }
                     Property::EnumProperty(enm) => {
                         option(ui, &mut enm.value, fname_edit, FName::default)
                     }
