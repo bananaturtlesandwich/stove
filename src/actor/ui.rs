@@ -284,7 +284,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                         Property::TimeSpanProperty(time) => drag(ui, &mut time.ticks),
                         Property::DateTimeProperty(date) => drag(ui, &mut date.ticks),
                         Property::GuidProperty(guid) => {
-                            for val in guid.value.iter_mut() {
+                            for val in guid.value.0.iter_mut() {
                                 drag(ui, val)
                             }
                         }

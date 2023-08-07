@@ -34,7 +34,7 @@ pub struct Stove {
     map: Option<unreal_asset::Asset<std::fs::File>>,
     version: usize,
     actors: Vec<actor::Actor>,
-    selected: Option<usize>,
+    selected: Vec<usize>,
     cubes: rendering::Cube,
     axes: rendering::Axes,
     meshes: hashbrown::HashMap<String, rendering::Mesh>,
@@ -221,7 +221,7 @@ impl Stove {
             map,
             version,
             actors: Vec::new(),
-            selected: None,
+            selected: Vec::new(),
             cubes: rendering::Cube::new(ctx),
             axes: rendering::Axes::new(ctx),
             meshes: hashbrown::HashMap::new(),
@@ -281,7 +281,7 @@ impl Stove {
 
     fn refresh(&mut self, ctx: &mut Context) {
         self.actors.clear();
-        self.selected = None;
+        self.selected.clear();
         if let Some(map) = self.map.as_ref() {
             let key = match hex::decode(self.aes.trim_start_matches("0x")) {
                 Ok(key) if !self.aes.is_empty() => Some(key),
@@ -423,15 +423,11 @@ impl Stove {
     }
 
     fn focus(&mut self) {
-        match self.selected.zip(self.map.as_ref()) {
-            Some((selected, map)) => self.camera.set_focus(
-                self.actors[selected].location(map),
-                self.actors[selected].scale(map),
-            ),
-            None => {
-                self.notifs.error("nothing selected to focus on");
-            }
+        if self.selected.is_empty() {
+            self.notifs.error("nothing selected to focus on");
         }
+        let Some((pos, sca)) = self.avg_transform() else { return };
+        self.camera.set_focus(pos, sca)
     }
 
     fn try_open(&mut self, dialog: impl Fn(&mut Self) -> &mut egui_file::FileDialog) {
@@ -452,6 +448,47 @@ impl Stove {
             }
         }
     }
+
+    fn get_avg_base<T>(
+        &self,
+        get: impl Fn(&actor::Actor, &unreal_asset::Asset<std::fs::File>) -> T,
+        add: impl Fn(T, T) -> T,
+        div: impl Fn(T, f32) -> T,
+    ) -> Option<T> {
+        let map = self.map.as_ref()?;
+        let len = self.selected.len() as f32;
+        self.selected
+            .iter()
+            .map(|&i| get(&self.actors[i], map))
+            .reduce(add)
+            .map(|acc| div(acc, len))
+    }
+
+    fn get_avg<T: std::ops::Add<T, Output = T> + std::ops::Div<f32, Output = T>>(
+        &self,
+        get: impl Fn(&actor::Actor, &unreal_asset::Asset<std::fs::File>) -> T,
+    ) -> Option<T> {
+        self.get_avg_base(get, |a, b| a + b, |a, b| a / b)
+    }
+
+    fn avg_raw_loc(&self) -> Option<glam::DVec3> {
+        self.get_avg_base(
+            |actor, map| actor.get_raw_location(map),
+            |a, b| a + b,
+            |a, b| a / b as f64,
+        )
+    }
+
+    fn avg_transform(&self) -> Option<(glam::Vec3, glam::Vec3)> {
+        self.get_avg_base(
+            |actor, map| (actor.location(map), actor.scale(map)),
+            |(accpos, accsca), (pos, sca)| ((accpos + pos), (accsca + sca)),
+            |(pos, sca), len| {
+                let len = len as f32;
+                (pos / len, sca / len)
+            },
+        )
+    }
 }
 
 fn update_dialogs(path: &std::path::Path, dialogs: [&mut egui_file::FileDialog; 3]) {
@@ -466,6 +503,26 @@ fn update_dialogs(path: &std::path::Path, dialogs: [&mut egui_file::FileDialog; 
 
 fn filter(path: &std::path::Path) -> bool {
     path.extension().and_then(std::ffi::OsStr::to_str) == Some("umap")
+}
+
+fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
+    ui.input(
+        |input| match selected.iter().position(|entry| entry == &i) {
+            Some(i) => {
+                selected.remove(i);
+            }
+            None if input.modifiers.shift && selected.last().is_some_and(|last| last != &i) => {
+                let last_selected = *selected.last().unwrap();
+                for i in match i < last_selected {
+                    true => i..last_selected,
+                    false => last_selected + 1..i + 1,
+                } {
+                    selected.push(i)
+                }
+            }
+            _ => selected.push(i),
+        },
+    )
 }
 
 impl EventHandler for Stove {
@@ -484,18 +541,17 @@ impl EventHandler for Stove {
         if let Some(map) = self.map.as_ref() {
             self.cubes.draw(
                 mqctx,
-                &self
-                    .actors
+                self.actors
                     .iter()
-                    .map(|actor| actor.model_matrix(map))
-                    .collect::<Vec<_>>(),
-                &(
-                    vp,
-                    match self.selected {
-                        Some(i) => [1, i as i32],
-                        None => [0, 0],
-                    },
-                ),
+                    .enumerate()
+                    .map(|(i, actor)| {
+                        (
+                            actor.model_matrix(map),
+                            self.selected.contains(&i) as i32 as f32,
+                        )
+                    })
+                    .unzip(),
+                &vp,
             );
             for (actor, mesh) in self
                 .actors
@@ -507,14 +563,15 @@ impl EventHandler for Stove {
             {
                 mesh.draw(mqctx, vp * actor.model_matrix(map));
             }
-            if let Some(selected) = self.selected {
+            if !self.selected.is_empty() {
                 if self.grab != Grab::None {
-                    self.axes.draw(
-                        mqctx,
-                        &self.filter,
-                        vp * glam::Mat4::from_translation(self.actors[selected].location(map))
-                            * glam::Mat4::from_scale(self.actors[selected].scale(map)),
-                    )
+                    if let Some((loc, sca)) = self.avg_transform() {
+                        self.axes.draw(
+                            mqctx,
+                            &self.filter,
+                            vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
+                        )
+                    }
                 }
             }
         }
@@ -660,21 +717,24 @@ impl EventHandler for Stove {
                             |ui, range|{
                                 ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
                                     for i in range {
-                                        let is_selected = Some(i) == self.selected;
+                                        let is_selected = self.selected.contains(&i);
                                         if ui.selectable_label(
                                             is_selected,
                                             &self.actors[i].name
                                         )
                                         .on_hover_text(&self.actors[i].class)
-                                        .clicked(){
-                                            self.selected = (!is_selected).then_some(i);
+                                        .clicked() {
+                                            ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
+                                                self.selected.clear()
+                                            });
+                                            select(ui, &mut self.selected, i);
                                         }
                                     }
                                 )
                             ;
                         })
                     );
-                    if let Some(selected) = self.selected {
+                    if let Some(&selected) = self.selected.last() {
                         ui.add_space(10.0);
                         ui.push_id("properties", |ui| egui::ScrollArea::both()
                             .auto_shrink([false; 2])
@@ -688,7 +748,7 @@ impl EventHandler for Stove {
                 }
             });
             let mut open = true;
-            let mut transplanted = false;
+            let mut transplanted = None;
             if let Some((map, (donor, actors, selected))) = self.map.as_mut().zip(self.transplant.as_mut()) {
                 egui::Window::new("transplant actor")
                     .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
@@ -699,6 +759,7 @@ impl EventHandler for Stove {
                     // putting the button below breaks the scroll area somehow
                     ui.add_enabled_ui(!selected.is_empty(), |ui| {
                         if ui.vertical_centered_justified(|ui| ui.button("transplant selected")).inner.clicked(){
+                            transplanted = Some(map.asset_data.exports.len()..selected.len());
                             for actor in selected.iter().map(|i| &actors[*i]) {
                                 let insert = map.asset_data.exports.len() as i32 + 1;
                                 actor.transplant(map, donor);
@@ -711,7 +772,6 @@ impl EventHandler for Stove {
                                 );
                                 self.notifs.success(format!("transplanted {}", actor.name));
                             }
-                            transplanted = true;
                         }
                     });
                     egui::ScrollArea::both()
@@ -724,25 +784,7 @@ impl EventHandler for Stove {
                                 ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
                                     for (i, actor) in range.clone().zip(actors[range].iter()) {
                                         if ui.selectable_label(selected.contains(&i), &actor.name).on_hover_text(&actor.class).clicked() {
-                                            ui.input(|input| {
-                                                match selected.iter().position(|entry| entry == &i) {
-                                                    Some(i) => {
-                                                        selected.remove(i);
-                                                    },
-                                                    None if input.modifiers.shift &&
-                                                            selected.last().is_some_and(|last| last != &i)
-                                                        => {
-                                                        let last_selected = *selected.last().unwrap();
-                                                        for i in match i < last_selected{
-                                                            true => i..last_selected,
-                                                            false => last_selected + 1..i + 1
-                                                        } {
-                                                            selected.push(i)
-                                                        }
-                                                    },
-                                                    _ => selected.push(i)
-                                                }
-                                            })
+                                            select(ui, selected, i)
                                         }
                                     }
                                 })
@@ -751,11 +793,12 @@ impl EventHandler for Stove {
                     }
                 );
             }
-            if transplanted {
-                self.selected = Some(self.actors.len() - 1);
+            if let Some(len) = transplanted.as_mut() {
+                self.selected.extend(len);
                 self.focus();
+                self.transplant = None;
             }
-            if transplanted || !open {
+            if !open {
                 self.transplant = None;
             }
             self.notifs.show(ctx);
@@ -832,41 +875,43 @@ impl EventHandler for Stove {
         egui().mouse_motion_event(x, y);
         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
         self.camera.handle_mouse_motion(delta);
-        match self.grab {
-            Grab::None => (),
-            Grab::Location(dist) => self.actors[self.selected.unwrap()].add_location(
-                self.map.as_mut().unwrap(),
-                self.filter
-                    // move across the camera view plane
-                    * (
-                        self.camera.left()
-                        * -delta.x
-                        + self.camera.front.cross(self.camera.left())
-                        * delta.y
-                    )
-                    // scale by consistent distance
-                    * dist
-                    // scale to match mouse cursor
-                    * 0.1,
-            ),
-            Grab::Rotation => self.actors[self.selected.unwrap()].combine_rotation(
-                self.map.as_mut().unwrap(),
-                glam::Quat::from_axis_angle(
-                    self.filter * self.camera.front,
-                    match delta.x.abs() > delta.y.abs() {
-                        true => -delta.x,
-                        false => delta.y,
-                    } * 0.01,
+        for i in self.selected.iter().copied() {
+            match self.grab {
+                Grab::None => (),
+                Grab::Location(dist) => self.actors[i].add_location(
+                    self.map.as_mut().unwrap(),
+                    self.filter
+                        // move across the camera view plane
+                        * (
+                            self.camera.left()
+                            * -delta.x
+                            + self.camera.front.cross(self.camera.left())
+                            * delta.y
+                        )
+                        // scale by consistent distance
+                        * dist
+                        // scale to match mouse cursor
+                        * 0.1,
                 ),
-            ),
-            Grab::Scale3D(coords) => self.actors[self.selected.unwrap()].mul_scale(
-                self.map.as_mut().unwrap(),
-                glam::Vec3::ONE
-                    + self.filter
-                        * (coords.distance(glam::vec2(x, y))
-                            - coords.distance(self.last_mouse_pos))
-                        * 0.005,
-            ),
+                Grab::Rotation => self.actors[i].combine_rotation(
+                    self.map.as_mut().unwrap(),
+                    glam::Quat::from_axis_angle(
+                        self.filter * self.camera.front,
+                        match delta.x.abs() > delta.y.abs() {
+                            true => -delta.x,
+                            false => delta.y,
+                        } * 0.01,
+                    ),
+                ),
+                Grab::Scale3D(coords) => self.actors[i].mul_scale(
+                    self.map.as_mut().unwrap(),
+                    glam::Vec3::ONE
+                        + self.filter
+                            * (coords.distance(glam::vec2(x, y))
+                                - coords.distance(self.last_mouse_pos))
+                            * 0.005,
+                ),
+            }
         }
         self.last_mouse_pos = glam::vec2(x, y);
     }
@@ -906,46 +951,58 @@ impl EventHandler for Stove {
                     .min_by(|(_, x), (_, y)| x.total_cmp(y))
             })
             .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
-        match self.selected == pick && pick.is_some() {
+        match pick {
             // grabby time
-            true => {
-                if let Some((selected, map)) = self.selected.zip(self.map.as_mut()) {
+            Some(pick) if self.selected.contains(&pick) => {
+                if let Some(map) = self.map.as_mut() {
                     if self.held.contains(&KeyCode::LeftAlt)
                         || self.held.contains(&KeyCode::RightAlt)
                     {
-                        let insert = map.asset_data.exports.len() as i32 + 1;
-                        self.actors[selected].duplicate(map);
-                        self.actors.insert(
-                            selected,
-                            actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
-                        );
-                        self.notifs
-                            .success(format!("duplicated {}", &self.actors[selected].name));
+                        let insert = self.actors.len();
+                        for i in self.selected.iter().copied() {
+                            let insert = map.asset_data.exports.len() as i32 + 1;
+                            self.actors[i].duplicate(map);
+                            self.notifs
+                                .success(format!("duplicated {}", &self.actors[i].name));
+                            self.actors
+                                .push(actor::Actor::new(map, PackageIndex::new(insert)).unwrap());
+                        }
+                        let len = self.actors.len();
+                        self.selected.clear();
+                        for i in insert..len {
+                            self.selected.push(i);
+                        }
                     }
                     self.grab = match mb {
                         MouseButton::Left => Grab::Location(
-                            self.actors[selected]
-                                .location(map)
+                            self.get_avg(|actor, map| actor.location(map))
+                                .unwrap()
                                 .distance(self.camera.position),
                         ),
                         MouseButton::Right => Grab::Rotation,
                         MouseButton::Middle => Grab::Scale3D({
                             let (width, height) = ctx.screen_size();
-                            let (x, y) = self.actors[selected].coords(map, proj).into();
+                            let (x, y) = self
+                                .get_avg(|actor, map| actor.coords(map, proj))
+                                .unwrap()
+                                .into();
                             glam::vec2((x + 1.0) * width * 0.5, (1.0 - y) * height * 0.5)
                         }),
                         MouseButton::Unknown => Grab::None,
-                    }
+                    };
                 }
             }
-            false => {
-                if mb == MouseButton::Right {
-                    self.camera.enable_move()
+            Some(pick) if mb == MouseButton::Left => {
+                if !self.held.contains(&KeyCode::LeftShift)
+                    && !self.held.contains(&KeyCode::RightShift)
+                {
+                    self.selected.clear()
                 }
+                self.selected.push(pick)
             }
-        }
-        if mb == MouseButton::Left {
-            self.selected = pick;
+            None if mb == MouseButton::Left => self.selected.clear(),
+            _ if mb == MouseButton::Right => self.camera.enable_move(),
+            _ => (),
         }
     }
 
@@ -989,15 +1046,19 @@ impl EventHandler for Stove {
             return;
         }
         match keycode {
-            KeyCode::Delete => match self.selected.zip(self.map.as_mut()) {
-                Some((selected, map)) => {
-                    self.selected = None;
-                    self.actors[selected].delete(map);
-                    self.notifs
-                        .success(format!("deleted {}", &self.actors[selected].name));
-                    self.actors.remove(selected);
+            KeyCode::Delete => match self.selected.is_empty() {
+                false => {
+                    self.selected
+                        .sort_unstable_by_key(|key| std::cmp::Reverse(*key));
+                    for i in self.selected.iter().copied() {
+                        self.actors[i].delete(self.map.as_mut().unwrap());
+                        self.notifs
+                            .success(format!("deleted {}", &self.actors[i].name));
+                        self.actors.remove(i);
+                    }
+                    self.selected.clear();
                 }
-                None => {
+                true => {
                     self.notifs.error("nothing selected to delete");
                 }
             },
@@ -1026,16 +1087,25 @@ impl EventHandler for Stove {
                 }
             }
             KeyCode::C if keymods.ctrl => {
-                if let Some((selected, map)) = self.selected.zip(self.map.as_ref()) {
-                    self.locbuf = self.actors[selected].get_raw_location(map);
-                    self.notifs.success("location copied");
-                }
+                match self.avg_raw_loc() {
+                    Some(pos) => {
+                        self.locbuf = pos;
+                        self.notifs.success("location copied")
+                    }
+                    None => self.notifs.error("no actor selected to copy from"),
+                };
             }
             KeyCode::V if keymods.ctrl => {
-                if let Some((selected, map)) = self.selected.zip(self.map.as_mut()) {
-                    self.actors[selected].set_raw_location(map, self.locbuf);
-                    self.notifs.success("location pasted");
-                }
+                match self.avg_raw_loc().zip(self.map.as_mut()) {
+                    Some((pos, map)) => {
+                        let offset = (pos - self.locbuf).abs();
+                        for i in self.selected.iter().copied() {
+                            self.actors[i].add_raw_location(map, offset)
+                        }
+                        self.notifs.success("location pasted")
+                    }
+                    None => self.notifs.error("no actor selected to copy from"),
+                };
             }
             KeyCode::X | KeyCode::Y | KeyCode::Z => self.filter = glam::Vec3::ONE,
             _ => (),

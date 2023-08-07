@@ -68,7 +68,7 @@ impl super::Actor {
                             ancestry: Vec::new(),
                         },
                         struct_type,
-                        struct_guid: Some([0; 16]),
+                        struct_guid: Some([0; 16].into()),
                         property_guid: None,
                         duplication_index: 0,
                         serialize_none: true,
@@ -107,7 +107,7 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn set_raw_location(&self, map: &mut Asset<File>, new: glam::DVec3) {
+    pub fn add_raw_location(&self, map: &mut Asset<File>, offset: glam::DVec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -120,38 +120,34 @@ impl super::Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 = new.x;
-                        vec.value.y.0 = new.y;
-                        vec.value.z.0 = new.z;
+                        vec.value.x.0 += offset.x;
+                        vec.value.y.0 += offset.y;
+                        vec.value.z.0 += offset.z;
                     }
                 }
             }
-            None => {
-                let name = names.get_mut().add_fname(LOCATION);
-                let struct_type = Some(names.get_mut().add_fname("Vector"));
-
-                norm.properties
-                    .push(Property::StructProperty(StructProperty {
-                        name,
+            None => norm
+                .properties
+                .push(Property::StructProperty(StructProperty {
+                    name: names.clone_resource().get_mut().add_fname(LOCATION),
+                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
+                        ancestry: Vec::new(),
+                    },
+                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
+                    struct_guid: Some([0; 16].into()),
+                    property_guid: None,
+                    duplication_index: 0,
+                    serialize_none: true,
+                    value: vec![Property::VectorProperty(VectorProperty {
+                        name: names.get_mut().add_fname(LOCATION),
                         ancestry: unreal_asset::unversioned::ancestry::Ancestry {
                             ancestry: Vec::new(),
                         },
-                        struct_type,
-                        struct_guid: Some([0; 16]),
                         property_guid: None,
                         duplication_index: 0,
-                        serialize_none: true,
-                        value: vec![Property::VectorProperty(VectorProperty {
-                            name: names.get_mut().add_fname(LOCATION),
-                            ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                                ancestry: Vec::new(),
-                            },
-                            property_guid: None,
-                            duplication_index: 0,
-                            value: Vector::new(new.x.into(), new.z.into(), new.y.into()),
-                        })],
-                    }));
-            }
+                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
+                    })],
+                })),
         }
     }
 
@@ -223,7 +219,7 @@ impl super::Actor {
                             ancestry: Vec::new(),
                         },
                         struct_type,
-                        struct_guid: Some([0; 16]),
+                        struct_guid: Some([0; 16].into()),
                         property_guid: None,
                         duplication_index: 0,
                         serialize_none: true,
@@ -291,7 +287,7 @@ impl super::Actor {
                             ancestry: Vec::new(),
                         },
                         struct_type,
-                        struct_guid: Some([0; 16]),
+                        struct_guid: Some([0; 16].into()),
                         property_guid: None,
                         duplication_index: 0,
                         serialize_none: true,

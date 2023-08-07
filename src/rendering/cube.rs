@@ -12,10 +12,7 @@ impl Cube {
             include_str!("common.frag"),
             ShaderMeta {
                 uniforms: UniformBlockLayout {
-                    uniforms: vec![
-                        UniformDesc::new("vp", UniformType::Mat4),
-                        UniformDesc::new("selected", UniformType::Int2),
-                    ],
+                    uniforms: vec![UniformDesc::new("vp", UniformType::Mat4)],
                 },
                 images: vec![],
             },
@@ -30,10 +27,15 @@ impl Cube {
                         step_func: VertexStep::PerInstance,
                         ..Default::default()
                     },
+                    BufferLayout {
+                        step_func: VertexStep::PerInstance,
+                        ..Default::default()
+                    },
                 ],
                 &[
                     VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
                     VertexAttribute::with_buffer("inst_pos", VertexFormat::Mat4, 1),
+                    VertexAttribute::with_buffer("selected", VertexFormat::Float1, 2),
                 ],
                 shader,
                 PipelineParams {
@@ -66,6 +68,11 @@ impl Cube {
                         BufferType::VertexBuffer,
                         512 * 1024 * std::mem::size_of::<glam::Vec3>(),
                     ),
+                    Buffer::stream(
+                        ctx,
+                        BufferType::VertexBuffer,
+                        512 * 1024 * std::mem::size_of::<f32>(),
+                    ),
                 ],
                 index_buffer: Buffer::immutable(
                     ctx,
@@ -79,8 +86,14 @@ impl Cube {
         }
     }
 
-    pub fn draw(&self, ctx: &mut Context, cubes: &[glam::Mat4], uniforms: &(glam::Mat4, [i32; 2])) {
-        self.bindings.vertex_buffers[1].update(ctx, cubes);
+    pub fn draw(
+        &self,
+        ctx: &mut Context,
+        (cubes, selected): (Vec<glam::Mat4>, Vec<f32>),
+        uniforms: &glam::Mat4,
+    ) {
+        self.bindings.vertex_buffers[1].update(ctx, &cubes);
+        self.bindings.vertex_buffers[2].update(ctx, &selected);
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);
         ctx.apply_uniforms(uniforms);
