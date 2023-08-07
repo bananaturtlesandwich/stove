@@ -71,7 +71,8 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
         ));
     }
     let format = asset.get_owned_name(data.read_i32::<LE>()?);
-    // for now we'll ignore cases with more than texture format
+    // name number
+    data.read_i32::<LE>()?;
 
     // skip offset
     match engine >= EngineVersion::VER_UE4_20 {
@@ -93,14 +94,13 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
             String::from_utf16(&buf).unwrap_or_default()
         }
         len => {
-            let mut buf = Vec::with_capacity(len as usize);
+            let mut buf = vec![0; len as usize];
             data.read_exact(&mut buf)?;
             String::from_utf8(buf).unwrap_or_default()
         }
     };
     // remove the null byte
     pixel_format.pop();
-    // panic!("{format}");
     if packed & HAS_OPT_DATA == HAS_OPT_DATA {
         // extras
         data.read_u32::<LE>()?;
@@ -117,10 +117,9 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     }
     // bulk data flags
     let mut flags = BulkDataFlags::from_bits_truncate(data.read_u32::<LE>()?);
-    // element count
-    let element_count = match flags.intersects(BulkDataFlags::Size64Bit) {
-        true => data.read_i64::<LE>()?,
-        false => data.read_i32::<LE>()? as i64,
+    let len = match flags.intersects(BulkDataFlags::Size64Bit) {
+        true => data.read_i64::<LE>()? as usize,
+        false => data.read_i32::<LE>()? as usize,
     };
     // size on disk
     match flags.intersects(BulkDataFlags::Size64Bit) {
@@ -136,9 +135,9 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
         data.read_i16::<LE>()?;
         flags &= !BulkDataFlags::BadDataVersion;
     }
-    let mut buf = Vec::with_capacity(element_count as usize);
+    let mut buf = vec![0; len];
     match flags {
-        flags if element_count == 0 || flags.intersects(BulkDataFlags::Unused) => (),
+        flags if len == 0 || flags.intersects(BulkDataFlags::Unused) => (),
         flags if flags.intersects(BulkDataFlags::ForceInlinePayload) => {
             data.read_exact(&mut buf)?;
         }
@@ -156,19 +155,20 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
             bulk.seek(io::SeekFrom::Start(file_offset))?;
             bulk.read_exact(&mut buf)?;
         }
+        flags if flags.intersects(BulkDataFlags::PayloadAtEndOfFile) => {
+            let cur = data.position();
+            data.set_position(file_offset);
+            data.read_exact(&mut buf)?;
+            data.set_position(cur);
+        }
         _ => (),
     }
     // x
     let x = data.read_i32::<LE>()? as usize;
     // y
     let y = data.read_i32::<LE>()? as usize;
-    // z
-    let z = match engine >= EngineVersion::VER_UE4_20 {
-        true => data.read_i32::<LE>()?,
-        false => 1,
-    };
     // no need to read anything else
-    let mut tex = Vec::new();
+    let mut tex = vec![0; x * y];
     macro_rules! run {
         ($func: ident) => {
             texture2ddecoder::$func(&buf, x, y, &mut tex)
