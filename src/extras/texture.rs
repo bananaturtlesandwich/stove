@@ -10,7 +10,7 @@ use unreal_asset::{
 
 #[test]
 fn parse_tex() -> Result<(), unreal_asset::error::Error> {
-    get_tex_info(
+    let (x, y, bgra) = get_tex_info(
         unreal_asset::Asset::new(
             io::Cursor::new(include_bytes!("Basic_SplitRGB.uasset").as_slice()),
             Some(io::Cursor::new(
@@ -23,6 +23,22 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
             include_bytes!("Basic_SplitRGB.ubulk").as_slice(),
         )),
     )?;
+    let mut rgba: Vec<_> = bgra.into_iter().flat_map(u32::to_le_bytes).collect();
+    for i in (0..rgba.len()).step_by(4) {
+        rgba.swap(i, i + 2)
+    }
+    let mut image = png::Encoder::new(
+        std::fs::File::create("Basic_SplitRGB.png")?,
+        x as u32,
+        y as u32,
+    );
+    image.set_color(png::ColorType::Rgba);
+    image.set_depth(png::BitDepth::Eight);
+    image
+        .write_header()
+        .unwrap()
+        .write_image_data(&rgba)
+        .unwrap();
     Ok(())
 }
 
@@ -35,7 +51,7 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
 pub fn get_tex_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
     mut bulk: Option<C>,
-) -> Result<Vec<u32>, io::Error> {
+) -> Result<(usize, usize, Vec<u32>), io::Error> {
     use io::Read;
     // get the static mesh
     let Some(tex) = asset.asset_data.exports.iter().find(|ex| {
@@ -192,7 +208,7 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     }
     .map_err(|e: &str| io::Error::new(io::ErrorKind::InvalidInput, format!("{format}: {e}")))?;
     // panic!("data len: {}, tex len: {}", buf.len(), tex.len());
-    Ok(tex)
+    Ok((x, y, tex))
 }
 
 const HAS_OPT_DATA: i32 = 1 << 30;

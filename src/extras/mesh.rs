@@ -11,7 +11,8 @@ use unreal_asset::{
 
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
-    get_mesh_info(unreal_asset::Asset::new(
+    use obj_exporter::*;
+    let (verts, indices, _) = get_mesh_info(unreal_asset::Asset::new(
         io::Cursor::new(include_bytes!("A02_Outside_Castle.uasset").as_slice()),
         Some(io::Cursor::new(
             include_bytes!("A02_Outside_Castle.uexp").as_slice(),
@@ -19,6 +20,40 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
         EngineVersion::VER_UE4_25,
         None,
     )?)?;
+    export_to_file(
+        &ObjSet {
+            material_library: None,
+            objects: vec![Object {
+                name: "A02_Outside_Castle".to_string(),
+                vertices: verts
+                    .into_iter()
+                    .map(|glam::Vec3 { x, y, z }| Vertex {
+                        x: x as f64,
+                        y: y as f64,
+                        z: z as f64,
+                    })
+                    .collect(),
+                tex_vertices: vec![],
+                normals: vec![],
+                geometry: vec![Geometry {
+                    material_name: None,
+                    shapes: indices
+                        .chunks(3)
+                        .map(|face| Shape {
+                            primitive: Primitive::Triangle(
+                                (face[0] as usize, None, None),
+                                (face[1] as usize, None, None),
+                                (face[2] as usize, None, None),
+                            ),
+                            groups: vec![],
+                            smoothing_groups: vec![],
+                        })
+                        .collect(),
+                }],
+            }],
+        },
+        "A02_Outside_Castle.obj",
+    )?;
     Ok(())
 }
 

@@ -1,3 +1,4 @@
 target
-*.lock
-*.txt
+Cargo.lock
+*.obj
+*.png
