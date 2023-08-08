@@ -261,20 +261,22 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         Ok(())
     }
     fn half_to_single(half: u16) -> f32 {
+        use std::mem::transmute;
         const SHIFTED: u32 = 0x7C00 << 13;
-        const MAGIC: f32 = (113 << 23) as f32;
+        const MAGIC: f32 = unsafe { transmute::<u32, f32>(113 << 23) };
         let mut single = (half as u32 & 0x7FFF) << 13;
-        let exp = SHIFTED & single as u32;
+        let exp = SHIFTED & single;
         single += (127 - 15) << 23;
-        match exp == SHIFTED {
-            true => single += (128 - 16) << 23,
-            false => {
+        match exp {
+            exp if exp == SHIFTED => single += (128 - 16) << 23,
+            0 => {
                 single += 1 << 23;
-                single = (single as f32 - MAGIC) as u32;
+                single = unsafe { transmute::<f32, u32>(transmute::<u32, f32>(single) - MAGIC) };
             }
+            _ => (),
         }
         single |= (half as u32 & 0x8000) << 16;
-        single as f32
+        unsafe { transmute(single) }
     }
     fn read_tex_coords(
         data: &mut io::Cursor<&[u8]>,

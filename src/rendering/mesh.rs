@@ -14,6 +14,17 @@ impl Mesh {
         mats: Vec<(u32, u32, Vec<u8>)>,
         mat_data: Vec<(u32, u32)>,
     ) -> Self {
+        let mut mat_indices = Vec::with_capacity(mat_data.capacity());
+        let mut mat_data = mat_data.into_iter().peekable();
+        while let Some((mat, first)) = mat_data.next() {
+            mat_indices.push((
+                mat as usize,
+                first as usize,
+                mat_data
+                    .peek()
+                    .map_or(indices.len(), |(_, first)| *first as usize),
+            ))
+        }
         let shader = Shader::new(
             ctx,
             include_str!("mesh.vert"),
@@ -42,34 +53,30 @@ impl Mesh {
                     ..Default::default()
                 },
             ),
-            bindings: mat_data
+            bindings: mat_indices
                 .into_iter()
-                .map(|(i, first)| {
-                    let i = i as usize;
-                    let first = first as usize;
-                    Bindings {
-                        vertex_buffers: vec![
-                            Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices),
-                            Buffer::immutable(ctx, BufferType::VertexBuffer, &uvs[i]),
-                        ],
-                        index_buffer: Buffer::immutable(
-                            ctx,
-                            BufferType::IndexBuffer,
-                            &indices[0..first],
-                        ),
-                        images: vec![Texture::new(
-                            ctx,
-                            TextureAccess::Static,
-                            Some(mats[i].2.as_slice()),
-                            TextureParams {
-                                format: TextureFormat::RGBA8,
-                                wrap: TextureWrap::Clamp,
-                                filter: FilterMode::Linear,
-                                width: mats[i].0,
-                                height: mats[i].1,
-                            },
-                        )],
-                    }
+                .map(|(i, start, end)| Bindings {
+                    vertex_buffers: vec![
+                        Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices),
+                        Buffer::immutable(ctx, BufferType::VertexBuffer, &uvs[i]),
+                    ],
+                    index_buffer: Buffer::immutable(
+                        ctx,
+                        BufferType::IndexBuffer,
+                        &indices[start..end],
+                    ),
+                    images: vec![Texture::new(
+                        ctx,
+                        TextureAccess::Static,
+                        Some(mats[i].2.as_slice()),
+                        TextureParams {
+                            format: TextureFormat::RGBA8,
+                            wrap: TextureWrap::Repeat,
+                            filter: FilterMode::Linear,
+                            width: mats[i].0,
+                            height: mats[i].1,
+                        },
+                    )],
                 })
                 .collect(),
         }

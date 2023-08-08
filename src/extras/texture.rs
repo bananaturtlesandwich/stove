@@ -10,7 +10,7 @@ use unreal_asset::{
 
 #[test]
 fn parse_tex() -> Result<(), unreal_asset::error::Error> {
-    let (x, y, bgra) = get_tex_info(
+    let (x, y, rgba) = get_tex_info(
         unreal_asset::Asset::new(
             io::Cursor::new(include_bytes!("Basic_SplitRGB.uasset").as_slice()),
             Some(io::Cursor::new(
@@ -23,15 +23,7 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
             include_bytes!("Basic_SplitRGB.ubulk").as_slice(),
         )),
     )?;
-    let mut rgba: Vec<_> = bgra.into_iter().flat_map(u32::to_le_bytes).collect();
-    for i in (0..rgba.len()).step_by(4) {
-        rgba.swap(i, i + 2)
-    }
-    let mut image = png::Encoder::new(
-        std::fs::File::create("Basic_SplitRGB.png")?,
-        x as u32,
-        y as u32,
-    );
+    let mut image = png::Encoder::new(std::fs::File::create("Basic_SplitRGB.png")?, x, y);
     image.set_color(png::ColorType::Rgba);
     image.set_depth(png::BitDepth::Eight);
     image
@@ -59,7 +51,7 @@ pub fn get_tex_path<C: io::Read + io::Seek>(mat: unreal_asset::Asset<C>) -> Opti
 pub fn get_tex_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
     mut bulk: Option<C>,
-) -> Result<(u32, u32, Vec<u32>), io::Error> {
+) -> Result<(u32, u32, Vec<u8>), io::Error> {
     use io::Read;
     // get the static mesh
     let Some(tex) = asset.asset_data.exports.iter().find(|ex| {
@@ -152,7 +144,7 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     };
     let mut file_offset = data.read_u64::<LE>()?;
     if !flags.intersects(BulkDataFlags::NoOffsetFixUp) {
-        file_offset += asset.bulk_data_start_offset as u64
+        file_offset = (file_offset as i64 + asset.bulk_data_start_offset) as u64
     }
     if flags.intersects(BulkDataFlags::BadDataVersion) {
         // idk
@@ -192,10 +184,10 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     // y
     let y = data.read_i32::<LE>()? as usize;
     // no need to read anything else
-    let mut tex = vec![0; x * y];
+    let mut bgra = vec![0; x * y];
     macro_rules! run {
         ($func: ident) => {
-            texture2ddecoder::$func(&buf, x, y, &mut tex)
+            texture2ddecoder::$func(&buf, x, y, &mut bgra)
         };
     }
     match format.as_str() {
@@ -212,10 +204,19 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
         "PF_ETC1" => run!(decode_etc1),
         "PF_ETC2_RGB" => run!(decode_etc2_rgb),
         "PF_ETC2_RGBA" => run!(decode_etc2_rgba1),
-        _ => panic!("{format} not implemented"),
+        "PF_B8G8R8A8" => Ok(()),
+        "PF_G8" => Ok(bgra = buf
+            .into_iter()
+            .map(|g| u32::from_le_bytes([g; 4]))
+            .collect()),
+        _ => Err("currently unsupported soz :p"),
     }
     .map_err(|e: &str| io::Error::new(io::ErrorKind::InvalidInput, format!("{format}: {e}")))?;
-    Ok((x as u32, y as u32, tex))
+    let mut rgba: Vec<_> = bgra.into_iter().flat_map(u32::to_le_bytes).collect();
+    for i in (0..rgba.len()).step_by(4) {
+        rgba.swap(i, i + 2)
+    }
+    Ok((x as u32, y as u32, rgba))
 }
 
 const HAS_OPT_DATA: i32 = 1 << 30;

@@ -440,14 +440,7 @@ impl Stove {
                                                                 Ok(extras::get_tex_info(tex, bulk)?)
                                                             },
                                                         ) {
-                                                            Ok((x, y, data)) => (
-                                                                x,
-                                                                y,
-                                                                data.into_iter()
-                                                                    .map(u32::to_le_bytes)
-                                                                    .flatten()
-                                                                    .collect(),
-                                                            ),
+                                                            Ok(o) => o,
                                                             Err(e) => {
                                                                 self.notifs.warning(format!(
                                                                     "{}: {e}",
