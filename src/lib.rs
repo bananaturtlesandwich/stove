@@ -344,7 +344,7 @@ impl Stove {
                                         }
                                     };
                                     match info {
-                                        Ok((positions, indices)) => {
+                                        Ok((positions, indices, _)) => {
                                             self.meshes.insert(
                                                 path.to_string(),
                                                 rendering::Mesh::new(ctx, positions, indices),

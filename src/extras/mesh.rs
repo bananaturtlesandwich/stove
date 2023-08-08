@@ -29,7 +29,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 /// parses the extra data of the static mesh export to get render data
 pub fn get_mesh_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
-) -> Result<(Vec<glam::Vec3>, Vec<u32>), io::Error> {
+) -> Result<(Vec<glam::Vec3>, Vec<u32>, Vec<Vec<(f32, f32)>>), io::Error> {
     // get the static mesh
     let Some(mesh) = asset.asset_data.exports.iter().find(|ex| {
         asset
@@ -192,25 +192,41 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         }
         Ok(())
     }
+    fn half_to_single(half: u16) -> f32 {
+        const SHIFTED: u32 = 0x7C00 << 13;
+        const MAGIC: f32 = (113 << 23) as f32;
+        let mut single = (half as u32 & 0x7FFF) << 13;
+        let exp = SHIFTED & single as u32;
+        single += (127 - 15) << 23;
+        match exp == SHIFTED {
+            true => single += (128 - 16) << 23,
+            false => {
+                single += 1 << 23;
+                single = (single as f32 - MAGIC) as u32;
+            }
+        }
+        single |= (half as u32 & 0x8000) << 16;
+        single as f32
+    }
     fn read_tex_coords(
         data: &mut io::Cursor<&[u8]>,
         num_tex_coords: u32,
         precise_uvs: bool,
-    ) -> Result<(), io::Error> {
+    ) -> Result<Vec<(f32, f32)>, io::Error> {
+        let mut uvs = Vec::with_capacity(num_tex_coords as usize);
         for _ in 0..num_tex_coords {
-            for _ in 0..2 {
-                match precise_uvs {
-                    true => {
-                        data.read_f32::<LE>()?;
-                    }
-                    false => {
-                        data.read_u16::<LE>()?;
-                    }
-                }
-            }
+            uvs.push(match precise_uvs {
+                true => (data.read_f32::<LE>()?, data.read_f32::<LE>()?),
+                false => (
+                    half_to_single(data.read_u16::<LE>()?),
+                    half_to_single(data.read_u16::<LE>()?),
+                ),
+            })
         }
-        Ok(())
+        Ok(uvs)
     }
+
+    let mut uvs = Vec::with_capacity(num_verts as usize);
     match engine >= EngineVersion::VER_UE4_20 {
         true => {
             // item size
@@ -227,7 +243,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_u32::<LE>()?;
             // mesh uv
             for _ in 0..num_verts {
-                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
+                uvs.push(read_tex_coords(&mut data, num_tex_coords, precise_uvs)?);
             }
         }
         false => {
@@ -237,7 +253,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_u32::<LE>()?;
             for _ in 0..num_verts {
                 read_tangents(&mut data, precise_tangents)?;
-                read_tex_coords(&mut data, num_tex_coords, precise_uvs)?;
+                uvs.push(read_tex_coords(&mut data, num_tex_coords, precise_uvs)?);
             }
         }
     }
@@ -298,5 +314,5 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             indices
         }
     };
-    Ok((positions, indices))
+    Ok((positions, indices, uvs))
 }
