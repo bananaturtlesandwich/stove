@@ -42,6 +42,14 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
     Ok(())
 }
 
+pub fn get_tex_path<C: io::Read + io::Seek>(mat: unreal_asset::Asset<C>) -> Option<String> {
+    mat.imports
+        .iter()
+        .find(|imp| imp.class_name == "Texture2D")
+        .and_then(|imp| mat.get_import(imp.outer_index))
+        .map(|imp| imp.object_name.get_owned_content())
+}
+
 // reference implementations:
 // umodel texture export: https://github.com/gildor2/UEViewer/blob/master/Unreal/UnrealMaterial/UnTexture4.cpp#L144
 // umodel png exporter: https://github.com/gildor2/UEViewer/blob/master/Unreal/Wrappers/TexturePNG.cpp#L192
@@ -51,7 +59,7 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
 pub fn get_tex_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
     mut bulk: Option<C>,
-) -> Result<(usize, usize, Vec<u32>), io::Error> {
+) -> Result<(u32, u32, Vec<u32>), io::Error> {
     use io::Read;
     // get the static mesh
     let Some(tex) = asset.asset_data.exports.iter().find(|ex| {
@@ -204,11 +212,10 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
         "PF_ETC1" => run!(decode_etc1),
         "PF_ETC2_RGB" => run!(decode_etc2_rgb),
         "PF_ETC2_RGBA" => run!(decode_etc2_rgba1),
-        _ => unimplemented!(),
+        _ => panic!("{format} not implemented"),
     }
     .map_err(|e: &str| io::Error::new(io::ErrorKind::InvalidInput, format!("{format}: {e}")))?;
-    // panic!("data len: {}, tex len: {}", buf.len(), tex.len());
-    Ok((x, y, tex))
+    Ok((x as u32, y as u32, tex))
 }
 
 const HAS_OPT_DATA: i32 = 1 << 30;

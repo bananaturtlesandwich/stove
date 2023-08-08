@@ -7,6 +7,7 @@ use std::io;
 
 use byteorder::ReadBytesExt;
 pub use mesh::*;
+pub use texture::*;
 
 #[derive(Default)]
 pub struct StripDataFlags {

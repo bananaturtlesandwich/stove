@@ -326,6 +326,7 @@ impl Stove {
             let cache = config()
                 .filter(|_| self.use_cache)
                 .map(|path| path.join("cache"));
+            let version = self.version();
             for index in actor::get_actors(map) {
                 match actor::Actor::new(map, index) {
                     Ok(actor) => {
@@ -416,17 +417,56 @@ impl Stove {
                                 }
                                 for pak in paks.iter() {
                                     // currently doesn't read bulk data but we'll get there
-                                    match get(
-                                        pak,
-                                        cache.as_deref(),
-                                        path,
-                                        self.version(),
-                                        |asset, _| Ok(extras::get_mesh_info(asset)?),
-                                    ) {
-                                        Ok((positions, indices, ..)) => {
+                                    match get(pak, cache.as_deref(), path, version, |asset, _| {
+                                        Ok(extras::get_mesh_info(asset)?)
+                                    }) {
+                                        Ok((positions, indices, uvs, mats, mat_data)) => {
+                                            let mats = mats
+                                                .into_iter()
+                                                .map(|path| {
+                                                    match get(
+                                                        pak,
+                                                        cache.as_deref(),
+                                                        &path,
+                                                        version,
+                                                        |mat, _| Ok(extras::get_tex_path(mat)),
+                                                    ) {
+                                                        Ok(Some(path)) => match get(
+                                                            pak,
+                                                            cache.as_deref(),
+                                                            &path,
+                                                            version,
+                                                            |tex, bulk| {
+                                                                Ok(extras::get_tex_info(tex, bulk)?)
+                                                            },
+                                                        ) {
+                                                            Ok((x, y, data)) => (
+                                                                x,
+                                                                y,
+                                                                data.into_iter()
+                                                                    .map(u32::to_le_bytes)
+                                                                    .flatten()
+                                                                    .collect(),
+                                                            ),
+                                                            Err(e) => {
+                                                                self.notifs.warning(format!(
+                                                                    "{}: {e}",
+                                                                    path.split('/')
+                                                                        .last()
+                                                                        .unwrap_or_default()
+                                                                ));
+                                                                (1, 1, vec![255, 50, 125, 255])
+                                                            }
+                                                        },
+                                                        _ => (1, 1, vec![125, 50, 255, 255]),
+                                                    }
+                                                })
+                                                .collect();
                                             self.meshes.insert(
                                                 path.to_string(),
-                                                rendering::Mesh::new(ctx, positions, indices),
+                                                rendering::Mesh::new(
+                                                    ctx, positions, indices, uvs, mats, mat_data,
+                                                ),
                                             );
                                             break;
                                         }
