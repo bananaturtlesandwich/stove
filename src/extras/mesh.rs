@@ -3,16 +3,18 @@ use std::io;
 use super::*;
 use byteorder::{ReadBytesExt, LE};
 use unreal_asset::{
+    cast,
     engine_version::EngineVersion,
     exports::{ExportBaseTrait, ExportNormalTrait},
     object_version::ObjectVersion,
+    properties::{Property, PropertyDataTrait},
     reader::archive_trait::ArchiveTrait,
 };
 
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     use obj_exporter::*;
-    let (verts, indices, _) = get_mesh_info(unreal_asset::Asset::new(
+    let (verts, indices, ..) = get_mesh_info(unreal_asset::Asset::new(
         io::Cursor::new(include_bytes!("A02_Outside_Castle.uasset").as_slice()),
         Some(io::Cursor::new(
             include_bytes!("A02_Outside_Castle.uexp").as_slice(),
@@ -64,7 +66,13 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 /// parses the extra data of the static mesh export to get render data
 pub fn get_mesh_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
-) -> Result<(Vec<glam::Vec3>, Vec<u32>, Vec<Vec<(f32, f32)>>), io::Error> {
+) -> io::Result<(
+    Vec<glam::Vec3>,
+    Vec<u32>,
+    Vec<Vec<(f32, f32)>>,
+    Vec<String>,
+    Vec<(u32, u32)>,
+)> {
     // get the static mesh
     let Some(mesh) = asset.asset_data.exports.iter().find(|ex| {
         asset
@@ -84,6 +92,28 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             "failed to cast mesh data",
         ));
     };
+    let mats = mesh
+        .properties
+        .iter()
+        .find(|prop| prop.get_name() == "StaticMaterials")
+        .and_then(|prop| cast!(Property, ArrayProperty, prop))
+        .map(|arr| {
+            arr.value
+                .iter()
+                .filter_map(|prop| cast!(Property, StructProperty, prop))
+                .filter_map(|struc| {
+                    struc
+                        .value
+                        .iter()
+                        .find(|prop| prop.get_name() == "MaterialInterface")
+                })
+                .filter_map(|inter| cast!(Property, ObjectProperty, inter))
+                .filter_map(|obj| asset.get_import(obj.value))
+                .filter_map(|imp| asset.get_import(imp.outer_index))
+                .map(|imp| imp.object_name.get_owned_content())
+                .collect()
+        })
+        .unwrap_or_default();
     let engine = asset.get_engine_version();
     let object = asset.get_object_version();
     let mut data = io::Cursor::new(mesh.extras.as_slice());
@@ -125,12 +155,15 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             "mesh data is stripped for server",
         ));
     }
+    let mut mat_data = Vec::with_capacity(data.read_u32::<LE>()? as usize);
     // array of sections
-    for _ in 0..data.read_u32::<LE>()? {
-        // mat index
-        data.read_u32::<LE>()?;
-        // first index
-        data.read_u32::<LE>()?;
+    for _ in 0..mat_data.capacity() {
+        mat_data.push((
+            // mat index
+            data.read_u32::<LE>()?,
+            // first index
+            data.read_u32::<LE>()?,
+        ));
         // tri count
         data.read_u32::<LE>()?;
         // min vertex index
@@ -349,5 +382,5 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             indices
         }
     };
-    Ok((positions, indices, uvs))
+    Ok((positions, indices, uvs, mats, mat_data))
 }
