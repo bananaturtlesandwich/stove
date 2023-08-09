@@ -1,3 +1,4 @@
+use eframe::egui;
 use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{

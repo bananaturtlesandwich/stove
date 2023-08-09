@@ -1,6 +1,6 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
-use miniquad::*;
+use eframe::egui;
 use nanoserde::{DeBin, SerBin};
 use unreal_asset::{
     engine_version::EngineVersion::{self, *},
@@ -10,7 +10,7 @@ use unreal_asset::{
 mod actor;
 mod asset;
 mod extras;
-mod rendering;
+// mod rendering;
 
 #[derive(PartialEq)]
 enum Grab {
@@ -22,22 +22,16 @@ enum Grab {
     Scale3D(glam::Vec2),
 }
 
-static mut EGUI: Option<egui_miniquad::EguiMq> = None;
-
-fn egui() -> &'static mut egui_miniquad::EguiMq {
-    unsafe { EGUI.as_mut().unwrap() }
-}
-
 pub struct Stove {
-    camera: rendering::Camera,
+    // camera: rendering::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset<std::fs::File>>,
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
-    cubes: rendering::Cube,
-    axes: rendering::Axes,
-    meshes: hashbrown::HashMap<String, rendering::Mesh>,
+    // cubes: rendering::Cube,
+    // axes: rendering::Axes,
+    // meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
     transplant: Option<(
         unreal_asset::Asset<std::fs::File>,
@@ -49,13 +43,11 @@ pub struct Stove {
     transplant_dialog: egui_file::FileDialog,
     save_dialog: egui_file::FileDialog,
     pak_dialog: egui_file::FileDialog,
-    held: Vec<KeyCode>,
     last_mouse_pos: glam::Vec2,
     grab: Grab,
     paks: Vec<String>,
     distance: f32,
     fullscreen: bool,
-    size: (f32, f32),
     aes: String,
     use_cache: bool,
     script: String,
@@ -167,9 +159,7 @@ impl std::io::Seek for Wrapper {
 }
 
 impl Stove {
-    pub fn new(ctx: &mut GraphicsContext) -> Self {
-        unsafe { EGUI = Some(egui_miniquad::EguiMq::new(ctx)) };
-        ctx.set_cull_face(CullFace::Back);
+    pub fn new(ctx: &eframe::CreationContext) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -239,15 +229,15 @@ impl Stove {
             });
 
         let mut stove = Self {
-            camera: rendering::Camera::default(),
+            // camera: rendering::Camera::default(),
             notifs,
             map,
             version,
             actors: Vec::new(),
             selected: Vec::new(),
-            cubes: rendering::Cube::new(ctx),
-            axes: rendering::Axes::new(ctx),
-            meshes: hashbrown::HashMap::new(),
+            // cubes: rendering::Cube::new(ctx),
+            // axes: rendering::Axes::new(ctx),
+            // meshes: hashbrown::HashMap::new(),
             ui: true,
             transplant: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
@@ -274,13 +264,11 @@ impl Stove {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0)),
             filepath,
-            held: Vec::new(),
             last_mouse_pos: glam::Vec2::ZERO,
             grab: Grab::None,
             paks,
             distance,
             fullscreen: false,
-            size: ctx.screen_size(),
             aes,
             use_cache,
             script,
@@ -291,7 +279,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate,
         };
-        stove.refresh(ctx);
+        // stove.refresh(ctx);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -302,186 +290,186 @@ impl Stove {
         VERSIONS[self.version].0
     }
 
-    fn refresh(&mut self, ctx: &mut Context) {
-        self.actors.clear();
-        self.selected.clear();
-        if let Some(map) = self.map.as_ref() {
-            let key = match hex::decode(self.aes.trim_start_matches("0x")) {
-                Ok(key) if !self.aes.is_empty() => Some(key),
-                Ok(_) => None,
-                Err(_) => {
-                    self.notifs.error("aes key is invalid hex");
-                    None
-                }
-            };
-            let paks: Vec<_> = self
-                .paks
-                .iter()
-                .filter_map(|dir| std::fs::read_dir(dir).ok())
-                .flatten()
-                .filter_map(Result::ok)
-                .map(|dir| dir.path())
-                .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
-                .collect();
-            let cache = config()
-                .filter(|_| self.use_cache)
-                .map(|path| path.join("cache"));
-            let version = self.version();
-            for index in actor::get_actors(map) {
-                match actor::Actor::new(map, index) {
-                    Ok(actor) => {
-                        if let actor::DrawType::Mesh(path) = &actor.draw_type {
-                            if !self.meshes.contains_key(path) {
-                                fn get<T>(
-                                    pak: &unpak::Pak,
-                                    cache: Option<&std::path::Path>,
-                                    path: &str,
-                                    version: EngineVersion,
-                                    func: impl Fn(
-                                        unreal_asset::Asset<Wrapper>,
-                                        Option<Wrapper>,
-                                    )
-                                        -> Result<T, unreal_asset::error::Error>,
-                                ) -> Result<T, unreal_asset::error::Error>
-                                {
-                                    let make = |ext: &str| path.to_string() + ext;
-                                    let (mesh, exp, bulk, uptnl) = (
-                                        make(".uasset"),
-                                        make(".uexp"),
-                                        make(".ubulk"),
-                                        make(".uptnl"),
-                                    );
-                                    let cache_path = |path: &str| {
-                                        cache.unwrap().join(path.trim_start_matches('/'))
-                                    };
-                                    match cache {
-                                        Some(cache)
-                                            if cache.join(&path).exists() ||
-                                            // try to create cache if it doesn't exist
-                                            (
-                                                std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
-                                                pak.read_to_file(&mesh, cache_path(&path)).is_ok() &&
-                                                // we don't care whether these are successful in case they don't exist
-                                                pak.read_to_file(&exp, cache_path(&exp)).map_or(true,|_| true) &&
-                                                pak.read_to_file(&bulk, cache_path(&bulk)).map_or(true,|_| true) &&
-                                                pak.read_to_file(&uptnl, cache_path(&uptnl)).map_or(true,|_| true)
-                                            ) =>
-                                        {
-                                            func(
-                                                unreal_asset::Asset::new(
-                                                    Wrapper::File(std::fs::File::open(
-                                                        cache_path(&mesh),
-                                                    )?),
-                                                    std::fs::File::open(cache_path(&exp))
-                                                        .ok()
-                                                        .map(Wrapper::File),
-                                                    version,
-                                                    None,
-                                                )?,
-                                                std::fs::File::open(cache_path(&bulk))
-                                                    .ok()
-                                                    .map_or_else(
-                                                        || {
-                                                            std::fs::File::open(cache_path(&uptnl))
-                                                                .ok()
-                                                        },
-                                                        Some,
-                                                    )
-                                                    .map(Wrapper::File),
-                                            )
-                                        }
-                                        // if the cache cannot be created fall back to storing in memory
-                                        _ => func(
-                                            unreal_asset::Asset::new(
-                                                Wrapper::Bytes(std::io::Cursor::new(
-                                                    pak.get(&mesh).map_err(|_| {
-                                                        unreal_asset::error::Error::no_data(
-                                                            "files not found".to_string(),
-                                                        )
-                                                    })?,
-                                                )),
-                                                pak.get(&exp)
-                                                    .ok()
-                                                    .map(std::io::Cursor::new)
-                                                    .map(Wrapper::Bytes),
-                                                version,
-                                                None,
-                                            )?,
-                                            pak.get(&bulk)
-                                                .ok()
-                                                .map_or_else(|| pak.get(&uptnl).ok(), Some)
-                                                .map(std::io::Cursor::new)
-                                                .map(Wrapper::Bytes),
-                                        ),
-                                    }
-                                }
-                                for pak in paks.iter() {
-                                    // currently doesn't read bulk data but we'll get there
-                                    match get(pak, cache.as_deref(), path, version, |asset, _| {
-                                        Ok(extras::get_mesh_info(asset)?)
-                                    }) {
-                                        Ok((positions, indices, uvs, mats, mat_data)) => {
-                                            let mats = mats
-                                                .into_iter()
-                                                .map(|path| {
-                                                    match get(
-                                                        pak,
-                                                        cache.as_deref(),
-                                                        &path,
-                                                        version,
-                                                        |mat, _| Ok(extras::get_tex_path(mat)),
-                                                    ) {
-                                                        Ok(Some(path)) => match get(
-                                                            pak,
-                                                            cache.as_deref(),
-                                                            &path,
-                                                            version,
-                                                            |tex, bulk| {
-                                                                Ok(extras::get_tex_info(tex, bulk)?)
-                                                            },
-                                                        ) {
-                                                            Ok(o) => o,
-                                                            Err(e) => {
-                                                                self.notifs.warning(format!(
-                                                                    "{}: {e}",
-                                                                    path.split('/')
-                                                                        .last()
-                                                                        .unwrap_or_default()
-                                                                ));
-                                                                (1, 1, vec![255, 50, 125, 255])
-                                                            }
-                                                        },
-                                                        _ => (1, 1, vec![125, 50, 255, 255]),
-                                                    }
-                                                })
-                                                .collect();
-                                            self.meshes.insert(
-                                                path.to_string(),
-                                                rendering::Mesh::new(
-                                                    ctx, positions, indices, uvs, mats, mat_data,
-                                                ),
-                                            );
-                                            break;
-                                        }
-                                        Err(e) => {
-                                            self.notifs.error(format!(
-                                                "{}: {e}",
-                                                path.split('/').last().unwrap_or_default()
-                                            ));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        self.actors.push(actor);
-                    }
-                    Err(e) => {
-                        self.notifs.warning(e.to_string());
-                    }
-                }
-            }
-        }
-    }
+    // fn refresh(&mut self, ctx: &mut Context) {
+    //     self.actors.clear();
+    //     self.selected.clear();
+    //     if let Some(map) = self.map.as_ref() {
+    //         let key = match hex::decode(self.aes.trim_start_matches("0x")) {
+    //             Ok(key) if !self.aes.is_empty() => Some(key),
+    //             Ok(_) => None,
+    //             Err(_) => {
+    //                 self.notifs.error("aes key is invalid hex");
+    //                 None
+    //             }
+    //         };
+    //         let paks: Vec<_> = self
+    //             .paks
+    //             .iter()
+    //             .filter_map(|dir| std::fs::read_dir(dir).ok())
+    //             .flatten()
+    //             .filter_map(Result::ok)
+    //             .map(|dir| dir.path())
+    //             .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
+    //             .collect();
+    //         let cache = config()
+    //             .filter(|_| self.use_cache)
+    //             .map(|path| path.join("cache"));
+    //         let version = self.version();
+    //         for index in actor::get_actors(map) {
+    //             match actor::Actor::new(map, index) {
+    //                 Ok(actor) => {
+    //                     if let actor::DrawType::Mesh(path) = &actor.draw_type {
+    //                         if !self.meshes.contains_key(path) {
+    //                             fn get<T>(
+    //                                 pak: &unpak::Pak,
+    //                                 cache: Option<&std::path::Path>,
+    //                                 path: &str,
+    //                                 version: EngineVersion,
+    //                                 func: impl Fn(
+    //                                     unreal_asset::Asset<Wrapper>,
+    //                                     Option<Wrapper>,
+    //                                 )
+    //                                     -> Result<T, unreal_asset::error::Error>,
+    //                             ) -> Result<T, unreal_asset::error::Error>
+    //                             {
+    //                                 let make = |ext: &str| path.to_string() + ext;
+    //                                 let (mesh, exp, bulk, uptnl) = (
+    //                                     make(".uasset"),
+    //                                     make(".uexp"),
+    //                                     make(".ubulk"),
+    //                                     make(".uptnl"),
+    //                                 );
+    //                                 let cache_path = |path: &str| {
+    //                                     cache.unwrap().join(path.trim_start_matches('/'))
+    //                                 };
+    //                                 match cache {
+    //                                     Some(cache)
+    //                                         if cache.join(&path).exists() ||
+    //                                         // try to create cache if it doesn't exist
+    //                                         (
+    //                                             std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
+    //                                             pak.read_to_file(&mesh, cache_path(&path)).is_ok() &&
+    //                                             // we don't care whether these are successful in case they don't exist
+    //                                             pak.read_to_file(&exp, cache_path(&exp)).map_or(true,|_| true) &&
+    //                                             pak.read_to_file(&bulk, cache_path(&bulk)).map_or(true,|_| true) &&
+    //                                             pak.read_to_file(&uptnl, cache_path(&uptnl)).map_or(true,|_| true)
+    //                                         ) =>
+    //                                     {
+    //                                         func(
+    //                                             unreal_asset::Asset::new(
+    //                                                 Wrapper::File(std::fs::File::open(
+    //                                                     cache_path(&mesh),
+    //                                                 )?),
+    //                                                 std::fs::File::open(cache_path(&exp))
+    //                                                     .ok()
+    //                                                     .map(Wrapper::File),
+    //                                                 version,
+    //                                                 None,
+    //                                             )?,
+    //                                             std::fs::File::open(cache_path(&bulk))
+    //                                                 .ok()
+    //                                                 .map_or_else(
+    //                                                     || {
+    //                                                         std::fs::File::open(cache_path(&uptnl))
+    //                                                             .ok()
+    //                                                     },
+    //                                                     Some,
+    //                                                 )
+    //                                                 .map(Wrapper::File),
+    //                                         )
+    //                                     }
+    //                                     // if the cache cannot be created fall back to storing in memory
+    //                                     _ => func(
+    //                                         unreal_asset::Asset::new(
+    //                                             Wrapper::Bytes(std::io::Cursor::new(
+    //                                                 pak.get(&mesh).map_err(|_| {
+    //                                                     unreal_asset::error::Error::no_data(
+    //                                                         "files not found".to_string(),
+    //                                                     )
+    //                                                 })?,
+    //                                             )),
+    //                                             pak.get(&exp)
+    //                                                 .ok()
+    //                                                 .map(std::io::Cursor::new)
+    //                                                 .map(Wrapper::Bytes),
+    //                                             version,
+    //                                             None,
+    //                                         )?,
+    //                                         pak.get(&bulk)
+    //                                             .ok()
+    //                                             .map_or_else(|| pak.get(&uptnl).ok(), Some)
+    //                                             .map(std::io::Cursor::new)
+    //                                             .map(Wrapper::Bytes),
+    //                                     ),
+    //                                 }
+    //                             }
+    //                             for pak in paks.iter() {
+    //                                 // currently doesn't read bulk data but we'll get there
+    //                                 match get(pak, cache.as_deref(), path, version, |asset, _| {
+    //                                     Ok(extras::get_mesh_info(asset)?)
+    //                                 }) {
+    //                                     Ok((positions, indices, uvs, mats, mat_data)) => {
+    //                                         let mats = mats
+    //                                             .into_iter()
+    //                                             .map(|path| {
+    //                                                 match get(
+    //                                                     pak,
+    //                                                     cache.as_deref(),
+    //                                                     &path,
+    //                                                     version,
+    //                                                     |mat, _| Ok(extras::get_tex_path(mat)),
+    //                                                 ) {
+    //                                                     Ok(Some(path)) => match get(
+    //                                                         pak,
+    //                                                         cache.as_deref(),
+    //                                                         &path,
+    //                                                         version,
+    //                                                         |tex, bulk| {
+    //                                                             Ok(extras::get_tex_info(tex, bulk)?)
+    //                                                         },
+    //                                                     ) {
+    //                                                         Ok(o) => o,
+    //                                                         Err(e) => {
+    //                                                             self.notifs.warning(format!(
+    //                                                                 "{}: {e}",
+    //                                                                 path.split('/')
+    //                                                                     .last()
+    //                                                                     .unwrap_or_default()
+    //                                                             ));
+    //                                                             (1, 1, vec![255, 50, 125, 255])
+    //                                                         }
+    //                                                     },
+    //                                                     _ => (1, 1, vec![125, 50, 255, 255]),
+    //                                                 }
+    //                                             })
+    //                                             .collect();
+    //                                         self.meshes.insert(
+    //                                             path.to_string(),
+    //                                             rendering::Mesh::new(
+    //                                                 ctx, positions, indices, uvs, mats, mat_data,
+    //                                             ),
+    //                                         );
+    //                                         break;
+    //                                     }
+    //                                     Err(e) => {
+    //                                         self.notifs.error(format!(
+    //                                             "{}: {e}",
+    //                                             path.split('/').last().unwrap_or_default()
+    //                                         ));
+    //                                     }
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+    //                     self.actors.push(actor);
+    //                 }
+    //                 Err(e) => {
+    //                     self.notifs.warning(e.to_string());
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     fn save(&mut self) {
         match self.map.as_mut() {
@@ -528,19 +516,19 @@ impl Stove {
         }
     }
 
-    fn view_projection(&self, ctx: &Context) -> glam::Mat4 {
-        let (width, height) = ctx.screen_size();
-        glam::Mat4::perspective_lh(45_f32.to_radians(), width / height, 1.0, self.distance)
-            * self.camera.view_matrix()
-    }
+    // fn view_projection(&self, ctx: &Context) -> glam::Mat4 {
+    //     let (width, height) = ctx.screen_size();
+    //     glam::Mat4::perspective_lh(45_f32.to_radians(), width / height, 1.0, self.distance)
+    //         * self.camera.view_matrix()
+    // }
 
-    fn focus(&mut self) {
-        if self.selected.is_empty() {
-            self.notifs.error("nothing selected to focus on");
-        }
-        let Some((pos, sca)) = self.avg_transform() else { return };
-        self.camera.set_focus(pos, sca)
-    }
+    // fn focus(&mut self) {
+    //     if self.selected.is_empty() {
+    //         self.notifs.error("nothing selected to focus on");
+    //     }
+    //     let Some((pos, sca)) = self.avg_transform() else { return };
+    //     self.camera.set_focus(pos, sca)
+    // }
 
     fn try_open(&mut self, dialog: impl Fn(&mut Self) -> &mut egui_file::FileDialog) {
         macro_rules! open {
@@ -637,592 +625,634 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
     )
 }
 
-impl EventHandler for Stove {
-    fn update(&mut self, _: &mut Context) {
-        self.camera.update_times();
-        self.camera.move_cam(&self.held)
-    }
-
-    fn draw(&mut self, mqctx: &mut Context) {
-        mqctx.begin_default_pass(PassAction::Clear {
-            color: Some((0.15, 0.15, 0.15, 1.0)),
-            depth: Some(1.0),
-            stencil: None,
-        });
-        let vp = self.view_projection(mqctx);
-        if let Some(map) = self.map.as_ref() {
-            self.cubes.draw(
-                mqctx,
-                self.actors
-                    .iter()
-                    .enumerate()
-                    .map(|(i, actor)| {
-                        (
-                            actor.model_matrix(map),
-                            self.selected.contains(&i) as i32 as f32,
-                        )
-                    })
-                    .unzip(),
-                &vp,
-            );
-            for (actor, mesh) in self
-                .actors
-                .iter()
-                .filter_map(|actor| match &actor.draw_type {
-                    actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
-                    actor::DrawType::Cube => None,
-                })
-            {
-                mesh.draw(mqctx, vp * actor.model_matrix(map));
-            }
-            if !self.selected.is_empty() {
-                if self.grab != Grab::None {
-                    if let Some((loc, sca)) = self.avg_transform() {
-                        self.axes.draw(
-                            mqctx,
-                            &self.filter,
-                            vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
-                        )
+impl eframe::App for Stove {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        egui::SidePanel::left("sidepanel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.menu_button("file", |ui| {
+                    if ui.add(egui::Button::new("open").shortcut_text("ctrl + o")).clicked() {
+                        self.try_open(|stove| &mut stove.open_dialog)
                     }
-                }
-            }
-        }
-        mqctx.end_render_pass();
-        if !self.ui {
-            mqctx.commit_frame();
-            return;
-        }
-        egui().run(mqctx, |mqctx, ctx| {
-            egui::SidePanel::left("sidepanel").show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.menu_button("file", |ui| {
-                        if ui.add(egui::Button::new("open").shortcut_text("ctrl + o")).clicked() {
-                            self.try_open(|stove| &mut stove.open_dialog)
-                        }
-                        if ui.add(egui::Button::new("save").shortcut_text("ctrl + s")).clicked(){
-                            self.save()
-                        }
-                        if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift + s")).clicked(){
-                            self.open_save_dialog()
-                        }
-                    });
-                    egui::ComboBox::from_id_source("version")
-                        .show_index(ui, &mut self.version, 33, |i| VERSIONS[i].1.to_string());
-                    ui.menu_button("paks", |ui| {
-                        egui::TextEdit::singleline(&mut self.aes)
-                            .clip_text(false)
-                            .hint_text("aes key if needed")
-                            .show(ui);
-                        let mut remove_at = None;
-                        egui::ScrollArea::vertical().show_rows(
-                            ui,
-                            ui.text_style_height(&egui::TextStyle::Body),
-                            self.paks.len(),
-                            |ui, range| for i in range {
-                                ui.horizontal(|ui| {
-                                    ui.label(&self.paks[i]);
-                                    if ui.button("x").clicked(){
-                                        remove_at = Some(i);
-                                    }
-                                });
-                            }
-                        );
-                        if let Some(i) = remove_at {
-                            self.paks.remove(i);
-                        }
-                        if ui.add(egui::Button::new("add pak folder").shortcut_text("alt + o")).clicked() {
-                            self.try_open(|stove| &mut stove.pak_dialog);
-                        }
-                    });
-                    ui.menu_button("options", |ui| {
-                        ui.menu_button("about",|ui|{
-                            ui.horizontal_wrapped(|ui|{
-                                let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
-                                ui.spacing_mut().item_spacing.x = size;
-                                ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
-                                ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
-                                ui.label(egui::special_emojis::GITHUB.to_string());
-                            });
-                        });
-                        ui.menu_button("shortcuts", |ui|{
-                            let mut section = |heading: &str, bindings: &[(&str,&str)]| {
-                                ui.menu_button(heading, |ui| {
-                                    egui::Grid::new(heading).striped(true).show(ui, |ui| {
-                                        for (action, binding) in bindings {
-                                            ui.label(*action);
-                                            ui.label(*binding);
-                                            ui.end_row();
-                                        }
-                                    })
-                                })
-                            };
-                            section(
-                                "file",
-                                &[
-                                    ("open","ctrl + o"),
-                                    ("save", "ctrl + s"),
-                                    ("save as","ctrl + shift + s"),
-                                    ("add pak folder", "alt + o")
-                                ]
-                            );
-                            section(
-                                "camera",
-                                &[
-                                    ("move","w + a + s + d"),
-                                    ("rotate", "right-drag"),
-                                    ("change speed", "scroll"),
-                                ]
-                            );
-                            section(
-                                "viewport",
-                                &[
-                                    ("toggle fullscreen", "alt + enter"),
-                                    ("hide ui", "h"),
-                                    ("select", "left-click"),
-                                    ("transplant", "ctrl + t")
-                                ]
-                            );
-                            section(
-                                "actor",
-                                &[
-                                    ("focus", "f"),
-                                    ("move", "left-drag"),
-                                    ("rotate", "right-drag"),
-                                    ("scale", "middle-drag"),
-                                    ("copy location", "ctrl + c"),
-                                    ("paste location", "ctrl + v"),
-                                    ("duplicate", "alt + left-drag"),
-                                    ("delete", "delete"),
-                                    ("lock x / y / z axis", "x / y / z"),
-                                    ("lock x / y / z plane", "shift + x / y / z"),
-                                ]
-                            )
-                        });
-                        ui.horizontal(|ui|{
-                            ui.label("autoupdate:");
-                            ui.add(egui::Checkbox::without_text(&mut self.autoupdate));
-                        });
-                        ui.horizontal(|ui|{
-                            ui.label("cache meshes:");
-                            ui.add(egui::Checkbox::without_text(&mut self.use_cache));
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("render distance:");
-                            ui.add(
-                                egui::widgets::DragValue::new(&mut self.distance).clamp_range(0.0..=f32::MAX)
-                            )
-                        });
-                        ui.label("post-save commands");
-                        ui.text_edit_multiline(&mut self.script);
-                    });
+                    if ui.add(egui::Button::new("save").shortcut_text("ctrl + s")).clicked(){
+                        self.save()
+                    }
+                    if ui.add(egui::Button::new("save as").shortcut_text("ctrl + shift + s")).clicked(){
+                        self.open_save_dialog()
+                    }
                 });
-                if let Some(map) = self.map.as_mut() {
-                    ui.add_space(10.0);
-                    ui.push_id("actors", |ui| egui::ScrollArea::both()
-                        .auto_shrink([false, true])
-                        .max_height(ui.available_height() * 0.5)
-                        .show_rows(
-                            ui,
-                            ui.text_style_height(&egui::TextStyle::Body),
-                            self.actors.len(),
-                            |ui, range|{
-                                ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
-                                    for i in range {
-                                        let is_selected = self.selected.contains(&i);
-                                        if ui.selectable_label(
-                                            is_selected,
-                                            &self.actors[i].name
-                                        )
-                                        .on_hover_text(&self.actors[i].class)
-                                        .clicked() {
-                                            ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
-                                                self.selected.clear()
-                                            });
-                                            select(ui, &mut self.selected, i);
-                                        }
+                egui::ComboBox::from_id_source("version")
+                    .show_index(ui, &mut self.version, 33, |i| VERSIONS[i].1.to_string());
+                ui.menu_button("paks", |ui| {
+                    egui::TextEdit::singleline(&mut self.aes)
+                        .clip_text(false)
+                        .hint_text("aes key if needed")
+                        .show(ui);
+                    let mut remove_at = None;
+                    egui::ScrollArea::vertical().show_rows(
+                        ui,
+                        ui.text_style_height(&egui::TextStyle::Body),
+                        self.paks.len(),
+                        |ui, range| for i in range {
+                            ui.horizontal(|ui| {
+                                ui.label(&self.paks[i]);
+                                if ui.button("x").clicked(){
+                                    remove_at = Some(i);
+                                }
+                            });
+                        }
+                    );
+                    if let Some(i) = remove_at {
+                        self.paks.remove(i);
+                    }
+                    if ui.add(egui::Button::new("add pak folder").shortcut_text("alt + o")).clicked() {
+                        self.try_open(|stove| &mut stove.pak_dialog);
+                    }
+                });
+                ui.menu_button("options", |ui| {
+                    ui.menu_button("about",|ui|{
+                        ui.horizontal_wrapped(|ui|{
+                            let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
+                            ui.spacing_mut().item_spacing.x = size;
+                            ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
+                            ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                            ui.label(egui::special_emojis::GITHUB.to_string());
+                        });
+                    });
+                    ui.menu_button("shortcuts", |ui|{
+                        let mut section = |heading: &str, bindings: &[(&str,&str)]| {
+                            ui.menu_button(heading, |ui| {
+                                egui::Grid::new(heading).striped(true).show(ui, |ui| {
+                                    for (action, binding) in bindings {
+                                        ui.label(*action);
+                                        ui.label(*binding);
+                                        ui.end_row();
                                     }
-                                )
-                            ;
+                                })
+                            })
+                        };
+                        section(
+                            "file",
+                            &[
+                                ("open","ctrl + o"),
+                                ("save", "ctrl + s"),
+                                ("save as","ctrl + shift + s"),
+                                ("add pak folder", "alt + o")
+                            ]
+                        );
+                        section(
+                            "camera",
+                            &[
+                                ("move","w + a + s + d"),
+                                ("rotate", "right-drag"),
+                                ("change speed", "scroll"),
+                            ]
+                        );
+                        section(
+                            "viewport",
+                            &[
+                                ("toggle fullscreen", "alt + enter"),
+                                ("hide ui", "h"),
+                                ("select", "left-click"),
+                                ("transplant", "ctrl + t")
+                            ]
+                        );
+                        section(
+                            "actor",
+                            &[
+                                ("focus", "f"),
+                                ("move", "left-drag"),
+                                ("rotate", "right-drag"),
+                                ("scale", "middle-drag"),
+                                ("copy location", "ctrl + c"),
+                                ("paste location", "ctrl + v"),
+                                ("duplicate", "alt + left-drag"),
+                                ("delete", "delete"),
+                                ("lock x / y / z axis", "x / y / z"),
+                                ("lock x / y / z plane", "shift + x / y / z"),
+                            ]
+                        )
+                    });
+                    ui.horizontal(|ui|{
+                        ui.label("autoupdate:");
+                        ui.add(egui::Checkbox::without_text(&mut self.autoupdate));
+                    });
+                    ui.horizontal(|ui|{
+                        ui.label("cache meshes:");
+                        ui.add(egui::Checkbox::without_text(&mut self.use_cache));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("render distance:");
+                        ui.add(
+                            egui::widgets::DragValue::new(&mut self.distance)
+                                .clamp_range(0..=100000)
+                        )
+                    });
+                    ui.label("post-save commands");
+                    ui.text_edit_multiline(&mut self.script);
+                });
+            });
+            if let Some(map) = self.map.as_mut() {
+                ui.add_space(10.0);
+                ui.push_id("actors", |ui| egui::ScrollArea::both()
+                    .auto_shrink([false, true])
+                    .max_height(ui.available_height() * 0.5)
+                    .show_rows(
+                        ui,
+                        ui.text_style_height(&egui::TextStyle::Body),
+                        self.actors.len(),
+                        |ui, range|{
+                            ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
+                                for i in range {
+                                    let is_selected = self.selected.contains(&i);
+                                    if ui.selectable_label(
+                                        is_selected,
+                                        &self.actors[i].name
+                                    )
+                                    .on_hover_text(&self.actors[i].class)
+                                    .clicked() {
+                                        ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
+                                            self.selected.clear()
+                                        });
+                                        select(ui, &mut self.selected, i);
+                                    }
+                                }
+                            )
+                        ;
+                    })
+                );
+                if let Some(&selected) = self.selected.last() {
+                    ui.add_space(10.0);
+                    ui.push_id("properties", |ui| egui::ScrollArea::both()
+                        .auto_shrink([false; 2])
+                        .show(ui,|ui| {
+                            self.actors[selected].show(map, ui);
+                            // otherwise the scroll area bugs out at the bottom
+                            ui.add_space(1.0);
                         })
                     );
-                    if let Some(&selected) = self.selected.last() {
-                        ui.add_space(10.0);
-                        ui.push_id("properties", |ui| egui::ScrollArea::both()
-                            .auto_shrink([false; 2])
-                            .show(ui,|ui| {
-                                self.actors[selected].show(map, ui);
-                                // otherwise the scroll area bugs out at the bottom
-                                ui.add_space(1.0);
-                            })
-                        );
-                    }
                 }
-            });
-            let mut open = true;
-            let mut transplanted = None;
-            if let Some((map, (donor, actors, selected))) = self.map.as_mut().zip(self.transplant.as_mut()) {
-                egui::Window::new("transplant actor")
-                    .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
-                    .resizable(false)
-                    .collapsible(false)
-                    .open(&mut open)
-                    .show(ctx, |ui| {
+            }
+        });
+        let mut open = true;
+        let mut transplanted = None;
+        if let Some((map, (donor, actors, selected))) =
+            self.map.as_mut().zip(self.transplant.as_mut())
+        {
+            egui::Window::new("transplant actor")
+                .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
+                .resizable(false)
+                .collapsible(false)
+                .open(&mut open)
+                .show(ctx, |ui| {
                     // putting the button below breaks the scroll area somehow
                     ui.add_enabled_ui(!selected.is_empty(), |ui| {
-                        if ui.vertical_centered_justified(|ui| ui.button("transplant selected")).inner.clicked(){
+                        if ui
+                            .vertical_centered_justified(|ui| ui.button("transplant selected"))
+                            .inner
+                            .clicked()
+                        {
                             transplanted = Some(map.asset_data.exports.len()..selected.len());
                             for actor in selected.iter().map(|i| &actors[*i]) {
                                 let insert = map.asset_data.exports.len() as i32 + 1;
                                 actor.transplant(map, donor);
                                 self.actors.push(
-                                    actor::Actor::new(
-                                        map,
-                                        PackageIndex::new(insert),
-                                    )
-                                    .unwrap(),
+                                    actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
                                 );
                                 self.notifs.success(format!("transplanted {}", actor.name));
                             }
                         }
                     });
-                    egui::ScrollArea::both()
-                        .auto_shrink([false; 2])
-                        .show_rows(
-                            ui,
-                            ui.text_style_height(&egui::TextStyle::Body),
-                            actors.len(),
-                            |ui, range| {
-                                ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
-                                    for (i, actor) in range.clone().zip(actors[range].iter()) {
-                                        if ui.selectable_label(selected.contains(&i), &actor.name).on_hover_text(&actor.class).clicked() {
-                                            select(ui, selected, i)
-                                        }
+                    egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
+                        ui,
+                        ui.text_style_height(&egui::TextStyle::Body),
+                        actors.len(),
+                        |ui, range| {
+                            ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                                for (i, actor) in range.clone().zip(actors[range].iter()) {
+                                    if ui
+                                        .selectable_label(selected.contains(&i), &actor.name)
+                                        .on_hover_text(&actor.class)
+                                        .clicked()
+                                    {
+                                        select(ui, selected, i)
                                     }
-                                })
-                            }
-                        );
-                    }
+                                }
+                            })
+                        },
+                    );
+                });
+        }
+        if let Some(len) = transplanted.as_mut() {
+            self.selected.extend(len);
+            // self.focus();
+            self.transplant = None;
+        }
+        if !open {
+            self.transplant = None;
+        }
+        self.notifs.show(ctx);
+        self.open_dialog.show(ctx);
+        if self.open_dialog.selected() {
+            if let Some(path) = self.open_dialog.path() {
+                update_dialogs(
+                    path,
+                    [
+                        &mut self.save_dialog,
+                        &mut self.pak_dialog,
+                        &mut self.transplant_dialog,
+                    ],
                 );
-            }
-            if let Some(len) = transplanted.as_mut() {
-                self.selected.extend(len);
-                self.focus();
-                self.transplant = None;
-            }
-            if !open {
-                self.transplant = None;
-            }
-            self.notifs.show(ctx);
-            self.open_dialog.show(ctx);
-            if self.open_dialog.selected() {
-                if let Some(path) = self.open_dialog.path() {
-                    update_dialogs(path, [&mut self.save_dialog, &mut self.pak_dialog, &mut self.transplant_dialog]);
-                    match asset::open(path, self.version()) {
-                        Ok(asset) => {
-                            self.filepath = path.to_str().unwrap_or_default().to_string();
-                            #[cfg(not(target_family = "wasm"))]
-                            if let Some(client) = self.client.as_mut() {
-                                if client.set_activity(
-                                            default_activity()
-                                                .details("currently editing:")
-                                                .state(self.filepath.split('\\').last().unwrap_or_default())
-                                        ).is_err() {
-                                        client.close().unwrap_or_default();
-                                        self.client = None;
-                                    }
+                match asset::open(path, self.version()) {
+                    Ok(asset) => {
+                        self.filepath = path.to_str().unwrap_or_default().to_string();
+                        #[cfg(not(target_family = "wasm"))]
+                        if let Some(client) = self.client.as_mut() {
+                            if client
+                                .set_activity(
+                                    default_activity().details("currently editing:").state(
+                                        self.filepath.split('\\').last().unwrap_or_default(),
+                                    ),
+                                )
+                                .is_err()
+                            {
+                                client.close().unwrap_or_default();
+                                self.client = None;
                             }
-                            self.map = Some(asset);
-                            self.refresh(mqctx);
                         }
-                        Err(e) => {
-                            self.notifs.error(e.to_string());
-                        }
+                        self.map = Some(asset);
+                        // self.refresh(mqctx);
+                    }
+                    Err(e) => {
+                        self.notifs.error(e.to_string());
                     }
                 }
             }
-            self.transplant_dialog.show(ctx);
-            if self.transplant_dialog.selected() {
-                if let Some(path) = self.transplant_dialog.path() {
-                    update_dialogs(path, [&mut self.open_dialog, &mut self.save_dialog, &mut self.pak_dialog]);
-                    match asset::open(path, self.version()) {
-                        Ok(donor) => {
-                            // no need for verbose warnings here
-                            let actors: Vec<_> = actor::get_actors(&donor)
-                                .into_iter()
-                                .filter_map(|index| actor::Actor::new(&donor, index).ok())
-                                .collect();
-                            let selected = Vec::with_capacity(actors.len());
-                            self.transplant = Some((donor, actors, selected));
-                        }
-                        Err(e) => {
-                            self.notifs.error(e.to_string());
-                        }
+        }
+        self.transplant_dialog.show(ctx);
+        if self.transplant_dialog.selected() {
+            if let Some(path) = self.transplant_dialog.path() {
+                update_dialogs(
+                    path,
+                    [
+                        &mut self.open_dialog,
+                        &mut self.save_dialog,
+                        &mut self.pak_dialog,
+                    ],
+                );
+                match asset::open(path, self.version()) {
+                    Ok(donor) => {
+                        // no need for verbose warnings here
+                        let actors: Vec<_> = actor::get_actors(&donor)
+                            .into_iter()
+                            .filter_map(|index| actor::Actor::new(&donor, index).ok())
+                            .collect();
+                        let selected = Vec::with_capacity(actors.len());
+                        self.transplant = Some((donor, actors, selected));
+                    }
+                    Err(e) => {
+                        self.notifs.error(e.to_string());
                     }
                 }
             }
-            self.pak_dialog.show(ctx);
-            if self.pak_dialog.selected() {
-                if let Some(path) = self.pak_dialog.path() {
-                    update_dialogs(path, [&mut self.open_dialog, &mut self.save_dialog, &mut self.transplant_dialog]);
-                    if let Some(path) = path.to_str().map(str::to_string){
-                        self.paks.push(path);
-                    }
+        }
+        self.pak_dialog.show(ctx);
+        if self.pak_dialog.selected() {
+            if let Some(path) = self.pak_dialog.path() {
+                update_dialogs(
+                    path,
+                    [
+                        &mut self.open_dialog,
+                        &mut self.save_dialog,
+                        &mut self.transplant_dialog,
+                    ],
+                );
+                if let Some(path) = path.to_str().map(str::to_string) {
+                    self.paks.push(path);
                 }
             }
-            self.save_dialog.show(ctx);
-            if self.save_dialog.selected() {
-                if let Some(path) = self.save_dialog.path() {
-                    update_dialogs(path, [&mut self.open_dialog, &mut self.pak_dialog, &mut self.transplant_dialog]);
-                    self.filepath = path.with_extension("umap").to_str().unwrap_or_default().to_string();
-                    self.save()
-                }
+        }
+        self.save_dialog.show(ctx);
+        if self.save_dialog.selected() {
+            if let Some(path) = self.save_dialog.path() {
+                update_dialogs(
+                    path,
+                    [
+                        &mut self.open_dialog,
+                        &mut self.pak_dialog,
+                        &mut self.transplant_dialog,
+                    ],
+                );
+                self.filepath = path
+                    .with_extension("umap")
+                    .to_str()
+                    .unwrap_or_default()
+                    .to_string();
+                self.save()
             }
-        });
-        egui().draw(mqctx);
-        mqctx.commit_frame();
-    }
-
-    fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
-        egui().mouse_motion_event(x, y);
-        let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
-        self.camera.handle_mouse_motion(delta);
-        for i in self.selected.iter().copied() {
-            match self.grab {
-                Grab::None => (),
-                Grab::Location(dist) => self.actors[i].add_location(
-                    self.map.as_mut().unwrap(),
-                    self.filter
-                        // move across the camera view plane
-                        * (
-                            self.camera.left()
-                            * -delta.x
-                            + self.camera.front.cross(self.camera.left())
-                            * delta.y
-                        )
-                        // scale by consistent distance
-                        * dist
-                        // scale to match mouse cursor
-                        * 0.1,
-                ),
-                Grab::Rotation => self.actors[i].combine_rotation(
-                    self.map.as_mut().unwrap(),
-                    glam::Quat::from_axis_angle(
-                        self.filter * self.camera.front,
-                        match delta.x.abs() > delta.y.abs() {
-                            true => -delta.x,
-                            false => delta.y,
-                        } * 0.01,
-                    ),
-                ),
-                Grab::Scale3D(coords) => self.actors[i].mul_scale(
-                    self.map.as_mut().unwrap(),
-                    glam::Vec3::ONE
-                        + self.filter
-                            * (coords.distance(glam::vec2(x, y))
-                                - coords.distance(self.last_mouse_pos))
-                            * 0.005,
-                ),
-            }
-        }
-        self.last_mouse_pos = glam::vec2(x, y);
-    }
-
-    fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
-        egui().mouse_wheel_event(dx, dy);
-        // a logarithmic speed increase is better because unreal maps can get massive
-        if !egui().egui_ctx().is_pointer_over_area() {
-            self.camera.speed = (self.camera.speed as f32
-                * match dy.is_sign_negative() {
-                    true => 100.0 / -dy,
-                    false => dy / 100.0,
-                })
-            .clamp(5.0, 50000.0) as u16;
-        }
-    }
-
-    fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-        egui().mouse_button_down_event(ctx, mb, x, y);
-        if egui().egui_ctx().is_pointer_over_area() {
-            return;
-        }
-        let proj = self.view_projection(ctx);
-        // THE HACKIEST MOUSE PICKING EVER CONCEIVED
-        let pick = self
-            .map
-            .as_ref()
-            .and_then(|map| {
-                // convert mouse coordinates to NDC
-                let (width, height) = ctx.screen_size();
-                let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-                self.actors
-                    .iter()
-                    .map(|actor| mouse.distance(actor.coords(map, proj)))
-                    .enumerate()
-                    // get closest pick
-                    .min_by(|(_, x), (_, y)| x.total_cmp(y))
-            })
-            .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
-        match pick {
-            // grabby time
-            Some(pick) if self.selected.contains(&pick) => {
-                if let Some(map) = self.map.as_mut() {
-                    if self.held.contains(&KeyCode::LeftAlt)
-                        || self.held.contains(&KeyCode::RightAlt)
-                    {
-                        let insert = self.actors.len();
-                        for i in self.selected.iter().copied() {
-                            let insert = map.asset_data.exports.len() as i32 + 1;
-                            self.actors[i].duplicate(map);
-                            self.notifs
-                                .success(format!("duplicated {}", &self.actors[i].name));
-                            self.actors
-                                .push(actor::Actor::new(map, PackageIndex::new(insert)).unwrap());
-                        }
-                        let len = self.actors.len();
-                        self.selected.clear();
-                        for i in insert..len {
-                            self.selected.push(i);
-                        }
-                    }
-                    self.grab = match mb {
-                        MouseButton::Left => Grab::Location(
-                            self.get_avg(|actor, map| actor.location(map))
-                                .unwrap()
-                                .distance(self.camera.position),
-                        ),
-                        MouseButton::Right => Grab::Rotation,
-                        MouseButton::Middle => Grab::Scale3D({
-                            let (width, height) = ctx.screen_size();
-                            let (x, y) = self
-                                .get_avg(|actor, map| actor.coords(map, proj))
-                                .unwrap()
-                                .into();
-                            glam::vec2((x + 1.0) * width * 0.5, (1.0 - y) * height * 0.5)
-                        }),
-                        MouseButton::Unknown => Grab::None,
-                    };
-                }
-            }
-            Some(pick) if mb == MouseButton::Left => {
-                if !self.held.contains(&KeyCode::LeftShift)
-                    && !self.held.contains(&KeyCode::RightShift)
-                {
-                    self.selected.clear()
-                }
-                self.selected.push(pick)
-            }
-            None if mb == MouseButton::Left => self.selected.clear(),
-            _ if mb == MouseButton::Right => self.camera.enable_move(),
-            _ => (),
-        }
-    }
-
-    fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-        egui().mouse_button_up_event(ctx, mb, x, y);
-        if mb == MouseButton::Right {
-            self.camera.disable_move()
-        }
-        self.grab = Grab::None;
-    }
-
-    // boilerplate >n<
-    fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
-        egui().char_event(character);
-    }
-
-    fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
-        egui().key_down_event(ctx, keycode, keymods);
-        if egui().egui_ctx().is_pointer_over_area() || keymods.ctrl || self.held.contains(&keycode)
-        {
-            return;
-        }
-        self.filter = match keycode {
-            KeyCode::X if keymods.shift => glam::vec3(0., 1., 1.),
-            KeyCode::Y if keymods.shift => glam::vec3(1., 0., 1.),
-            KeyCode::Z if keymods.shift => glam::vec3(1., 1., 0.),
-            KeyCode::X => glam::Vec3::X,
-            KeyCode::Y => glam::Vec3::Y,
-            KeyCode::Z => glam::Vec3::Z,
-            _ => glam::Vec3::ONE,
-        };
-        self.held.push(keycode)
-    }
-
-    fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
-        egui().key_up_event(keycode, keymods);
-        if let Some(pos) = self.held.iter().position(|k| k == &keycode) {
-            self.held.remove(pos);
-        }
-        if egui().egui_ctx().wants_keyboard_input() {
-            return;
-        }
-        match keycode {
-            KeyCode::Delete => match self.selected.is_empty() {
-                false => {
-                    self.selected
-                        .sort_unstable_by_key(|key| std::cmp::Reverse(*key));
-                    for i in self.selected.iter().copied() {
-                        self.actors[i].delete(self.map.as_mut().unwrap());
-                        self.notifs
-                            .success(format!("deleted {}", &self.actors[i].name));
-                        self.actors.remove(i);
-                    }
-                    self.selected.clear();
-                }
-                true => {
-                    self.notifs.error("nothing selected to delete");
-                }
-            },
-            KeyCode::F => self.focus(),
-            KeyCode::H => self.ui = !self.ui,
-            KeyCode::T if keymods.ctrl => match self.map.is_some() {
-                true => self.try_open(|stove| &mut stove.transplant_dialog),
-                false => {
-                    self.notifs.error("no map to transplant to");
-                }
-            },
-            KeyCode::O if keymods.ctrl => self.try_open(|stove| &mut stove.open_dialog),
-            KeyCode::O if keymods.alt => self.try_open(|stove| &mut stove.pak_dialog),
-            KeyCode::S if keymods.ctrl => match keymods.shift {
-                true => self.open_save_dialog(),
-                false => self.save(),
-            },
-            KeyCode::Enter if keymods.alt => {
-                if !self.fullscreen {
-                    self.size = ctx.screen_size();
-                }
-                self.fullscreen = !self.fullscreen;
-                ctx.set_fullscreen(self.fullscreen);
-                if !self.fullscreen {
-                    ctx.set_window_size(self.size.0 as u32, self.size.1 as u32)
-                }
-            }
-            KeyCode::C if keymods.ctrl => {
-                match self.avg_raw_loc() {
-                    Some(pos) => {
-                        self.locbuf = pos;
-                        self.notifs.success("location copied")
-                    }
-                    None => self.notifs.error("no actor selected to copy from"),
-                };
-            }
-            KeyCode::V if keymods.ctrl => {
-                match self.avg_raw_loc().zip(self.map.as_mut()) {
-                    Some((pos, map)) => {
-                        let offset = (pos - self.locbuf).abs();
-                        for i in self.selected.iter().copied() {
-                            self.actors[i].add_raw_location(map, offset)
-                        }
-                        self.notifs.success("location pasted")
-                    }
-                    None => self.notifs.error("no actor selected to copy from"),
-                };
-            }
-            KeyCode::X | KeyCode::Y | KeyCode::Z => self.filter = glam::Vec3::ONE,
-            _ => (),
         }
     }
 }
+
+// impl EventHandler for Stove {
+//     fn update(&mut self, _: &mut Context) {
+//         self.camera.update_times();
+//         self.camera.move_cam(&self.held)
+//     }
+
+//     fn draw(&mut self, mqctx: &mut Context) {
+//         mqctx.begin_default_pass(PassAction::Clear {
+//             color: Some((0.15, 0.15, 0.15, 1.0)),
+//             depth: Some(1.0),
+//             stencil: None,
+//         });
+//         let vp = self.view_projection(mqctx);
+//         if let Some(map) = self.map.as_ref() {
+//             self.cubes.draw(
+//                 mqctx,
+//                 self.actors
+//                     .iter()
+//                     .enumerate()
+//                     .map(|(i, actor)| {
+//                         (
+//                             actor.model_matrix(map),
+//                             self.selected.contains(&i) as i32 as f32,
+//                         )
+//                     })
+//                     .unzip(),
+//                 &vp,
+//             );
+//             for (actor, mesh) in self
+//                 .actors
+//                 .iter()
+//                 .filter_map(|actor| match &actor.draw_type {
+//                     actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
+//                     actor::DrawType::Cube => None,
+//                 })
+//             {
+//                 mesh.draw(mqctx, vp * actor.model_matrix(map));
+//             }
+//             if !self.selected.is_empty() {
+//                 if self.grab != Grab::None {
+//                     if let Some((loc, sca)) = self.avg_transform() {
+//                         self.axes.draw(
+//                             mqctx,
+//                             &self.filter,
+//                             vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
+//                         )
+//                     }
+//                 }
+//             }
+//         }
+//         mqctx.end_render_pass();
+//         if !self.ui {
+//             mqctx.commit_frame();
+//             return;
+//         }
+//         egui().draw(mqctx);
+//         mqctx.commit_frame();
+//     }
+
+//     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
+//         egui().mouse_motion_event(x, y);
+//         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
+//         self.camera.handle_mouse_motion(delta);
+//         for i in self.selected.iter().copied() {
+//             match self.grab {
+//                 Grab::None => (),
+//                 Grab::Location(dist) => self.actors[i].add_location(
+//                     self.map.as_mut().unwrap(),
+//                     self.filter
+//                         // move across the camera view plane
+//                         * (
+//                             self.camera.left()
+//                             * -delta.x
+//                             + self.camera.front.cross(self.camera.left())
+//                             * delta.y
+//                         )
+//                         // scale by consistent distance
+//                         * dist
+//                         // scale to match mouse cursor
+//                         * 0.1,
+//                 ),
+//                 Grab::Rotation => self.actors[i].combine_rotation(
+//                     self.map.as_mut().unwrap(),
+//                     glam::Quat::from_axis_angle(
+//                         self.filter * self.camera.front,
+//                         match delta.x.abs() > delta.y.abs() {
+//                             true => -delta.x,
+//                             false => delta.y,
+//                         } * 0.01,
+//                     ),
+//                 ),
+//                 Grab::Scale3D(coords) => self.actors[i].mul_scale(
+//                     self.map.as_mut().unwrap(),
+//                     glam::Vec3::ONE
+//                         + self.filter
+//                             * (coords.distance(glam::vec2(x, y))
+//                                 - coords.distance(self.last_mouse_pos))
+//                             * 0.005,
+//                 ),
+//             }
+//         }
+//         self.last_mouse_pos = glam::vec2(x, y);
+//     }
+
+//     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
+//         egui().mouse_wheel_event(dx, dy);
+//         // a logarithmic speed increase is better because unreal maps can get massive
+//         if !egui().egui_ctx().is_pointer_over_area() {
+//             self.camera.speed = (self.camera.speed as f32
+//                 * match dy.is_sign_negative() {
+//                     true => 100.0 / -dy,
+//                     false => dy / 100.0,
+//                 })
+//             .clamp(5.0, 50000.0) as u16;
+//         }
+//     }
+
+//     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
+//         egui().mouse_button_down_event(ctx, mb, x, y);
+//         if egui().egui_ctx().is_pointer_over_area() {
+//             return;
+//         }
+//         let proj = self.view_projection(ctx);
+//         // THE HACKIEST MOUSE PICKING EVER CONCEIVED
+//         let pick = self
+//             .map
+//             .as_ref()
+//             .and_then(|map| {
+//                 // convert mouse coordinates to NDC
+//                 let (width, height) = ctx.screen_size();
+//                 let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
+//                 self.actors
+//                     .iter()
+//                     .map(|actor| mouse.distance(actor.coords(map, proj)))
+//                     .enumerate()
+//                     // get closest pick
+//                     .min_by(|(_, x), (_, y)| x.total_cmp(y))
+//             })
+//             .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
+//         match pick {
+//             // grabby time
+//             Some(pick) if self.selected.contains(&pick) => {
+//                 if let Some(map) = self.map.as_mut() {
+//                     if self.held.contains(&KeyCode::LeftAlt)
+//                         || self.held.contains(&KeyCode::RightAlt)
+//                     {
+//                         let insert = self.actors.len();
+//                         for i in self.selected.iter().copied() {
+//                             let insert = map.asset_data.exports.len() as i32 + 1;
+//                             self.actors[i].duplicate(map);
+//                             self.notifs
+//                                 .success(format!("duplicated {}", &self.actors[i].name));
+//                             self.actors
+//                                 .push(actor::Actor::new(map, PackageIndex::new(insert)).unwrap());
+//                         }
+//                         let len = self.actors.len();
+//                         self.selected.clear();
+//                         for i in insert..len {
+//                             self.selected.push(i);
+//                         }
+//                     }
+//                     self.grab = match mb {
+//                         MouseButton::Left => Grab::Location(
+//                             self.get_avg(|actor, map| actor.location(map))
+//                                 .unwrap()
+//                                 .distance(self.camera.position),
+//                         ),
+//                         MouseButton::Right => Grab::Rotation,
+//                         MouseButton::Middle => Grab::Scale3D({
+//                             let (width, height) = ctx.screen_size();
+//                             let (x, y) = self
+//                                 .get_avg(|actor, map| actor.coords(map, proj))
+//                                 .unwrap()
+//                                 .into();
+//                             glam::vec2((x + 1.0) * width * 0.5, (1.0 - y) * height * 0.5)
+//                         }),
+//                         MouseButton::Unknown => Grab::None,
+//                     };
+//                 }
+//             }
+//             Some(pick) if mb == MouseButton::Left => {
+//                 if !self.held.contains(&KeyCode::LeftShift)
+//                     && !self.held.contains(&KeyCode::RightShift)
+//                 {
+//                     self.selected.clear()
+//                 }
+//                 self.selected.push(pick)
+//             }
+//             None if mb == MouseButton::Left => self.selected.clear(),
+//             _ if mb == MouseButton::Right => self.camera.enable_move(),
+//             _ => (),
+//         }
+//     }
+
+//     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
+//         egui().mouse_button_up_event(ctx, mb, x, y);
+//         if mb == MouseButton::Right {
+//             self.camera.disable_move()
+//         }
+//         self.grab = Grab::None;
+//     }
+
+//     // boilerplate >n<
+//     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
+//         egui().char_event(character);
+//     }
+
+//     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
+//         egui().key_down_event(ctx, keycode, keymods);
+//         if egui().egui_ctx().is_pointer_over_area() || keymods.ctrl || self.held.contains(&keycode)
+//         {
+//             return;
+//         }
+//         self.filter = match keycode {
+//             KeyCode::X if keymods.shift => glam::vec3(0., 1., 1.),
+//             KeyCode::Y if keymods.shift => glam::vec3(1., 0., 1.),
+//             KeyCode::Z if keymods.shift => glam::vec3(1., 1., 0.),
+//             KeyCode::X => glam::Vec3::X,
+//             KeyCode::Y => glam::Vec3::Y,
+//             KeyCode::Z => glam::Vec3::Z,
+//             _ => glam::Vec3::ONE,
+//         };
+//         self.held.push(keycode)
+//     }
+
+//     fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
+//         egui().key_up_event(keycode, keymods);
+//         if let Some(pos) = self.held.iter().position(|k| k == &keycode) {
+//             self.held.remove(pos);
+//         }
+//         if egui().egui_ctx().wants_keyboard_input() {
+//             return;
+//         }
+//         match keycode {
+//             KeyCode::Delete => match self.selected.is_empty() {
+//                 false => {
+//                     self.selected
+//                         .sort_unstable_by_key(|key| std::cmp::Reverse(*key));
+//                     for i in self.selected.iter().copied() {
+//                         self.actors[i].delete(self.map.as_mut().unwrap());
+//                         self.notifs
+//                             .success(format!("deleted {}", &self.actors[i].name));
+//                         self.actors.remove(i);
+//                     }
+//                     self.selected.clear();
+//                 }
+//                 true => {
+//                     self.notifs.error("nothing selected to delete");
+//                 }
+//             },
+//             KeyCode::F => self.focus(),
+//             KeyCode::H => self.ui = !self.ui,
+//             KeyCode::T if keymods.ctrl => match self.map.is_some() {
+//                 true => self.try_open(|stove| &mut stove.transplant_dialog),
+//                 false => {
+//                     self.notifs.error("no map to transplant to");
+//                 }
+//             },
+//             KeyCode::O if keymods.ctrl => self.try_open(|stove| &mut stove.open_dialog),
+//             KeyCode::O if keymods.alt => self.try_open(|stove| &mut stove.pak_dialog),
+//             KeyCode::S if keymods.ctrl => match keymods.shift {
+//                 true => self.open_save_dialog(),
+//                 false => self.save(),
+//             },
+//             KeyCode::Enter if keymods.alt => {
+//                 if !self.fullscreen {
+//                     self.size = ctx.screen_size();
+//                 }
+//                 self.fullscreen = !self.fullscreen;
+//                 ctx.set_fullscreen(self.fullscreen);
+//                 if !self.fullscreen {
+//                     ctx.set_window_size(self.size.0 as u32, self.size.1 as u32)
+//                 }
+//             }
+//             KeyCode::C if keymods.ctrl => {
+//                 match self.avg_raw_loc() {
+//                     Some(pos) => {
+//                         self.locbuf = pos;
+//                         self.notifs.success("location copied")
+//                     }
+//                     None => self.notifs.error("no actor selected to copy from"),
+//                 };
+//             }
+//             KeyCode::V if keymods.ctrl => {
+//                 match self.avg_raw_loc().zip(self.map.as_mut()) {
+//                     Some((pos, map)) => {
+//                         let offset = (pos - self.locbuf).abs();
+//                         for i in self.selected.iter().copied() {
+//                             self.actors[i].add_raw_location(map, offset)
+//                         }
+//                         self.notifs.success("location pasted")
+//                     }
+//                     None => self.notifs.error("no actor selected to copy from"),
+//                 };
+//             }
+//             KeyCode::X | KeyCode::Y | KeyCode::Z => self.filter = glam::Vec3::ONE,
+//             _ => (),
+//         }
+//     }
+// }
 
 impl Drop for Stove {
     fn drop(&mut self) {

@@ -11,9 +11,7 @@ edition = "2021"
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "e0ac7fb" }
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math"] }
-miniquad = "0.3"
-egui = "0.22"
-egui-miniquad = { git = "https://github.com/not-fl3/egui-miniquad", rev = "22a34d9"}
+eframe = { version = "0.22", default-features = false, features = ["wgpu"]}
 egui-notify = "0.7"
 egui_file = "0.10"
 byteorder = "1.4"
