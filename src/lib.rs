@@ -10,7 +10,7 @@ use unreal_asset::{
 mod actor;
 mod asset;
 mod extras;
-// mod rendering;
+mod rendering;
 
 #[derive(PartialEq)]
 enum Grab {
@@ -23,7 +23,7 @@ enum Grab {
 }
 
 pub struct Stove {
-    // camera: rendering::Camera,
+    camera: rendering::Camera,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset<std::fs::File>>,
     version: usize,
@@ -229,7 +229,7 @@ impl Stove {
             });
 
         let mut stove = Self {
-            // camera: rendering::Camera::default(),
+            camera: rendering::Camera::default(),
             notifs,
             map,
             version,
@@ -522,13 +522,13 @@ impl Stove {
     //         * self.camera.view_matrix()
     // }
 
-    // fn focus(&mut self) {
-    //     if self.selected.is_empty() {
-    //         self.notifs.error("nothing selected to focus on");
-    //     }
-    //     let Some((pos, sca)) = self.avg_transform() else { return };
-    //     self.camera.set_focus(pos, sca)
-    // }
+    fn focus(&mut self) {
+        if self.selected.is_empty() {
+            self.notifs.error("nothing selected to focus on");
+        }
+        let Some((pos, sca)) = self.avg_transform() else { return };
+        self.camera.set_focus(pos, sca)
+    }
 
     fn try_open(&mut self, dialog: impl Fn(&mut Self) -> &mut egui_file::FileDialog) {
         macro_rules! open {
@@ -626,7 +626,9 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 }
 
 impl eframe::App for Stove {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        self.camera.update_times();
+        ctx.input(|input| self.camera.move_cam(input));
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("file", |ui| {
@@ -844,7 +846,7 @@ impl eframe::App for Stove {
         }
         if let Some(len) = transplanted.as_mut() {
             self.selected.extend(len);
-            // self.focus();
+            self.focus();
             self.transplant = None;
         }
         if !open {

@@ -1,5 +1,3 @@
-use miniquad::*;
-
 pub struct Camera {
     pub position: glam::Vec3,
     can_move: bool,
@@ -13,11 +11,18 @@ pub struct Camera {
     focus: Option<glam::Vec3>,
 }
 
+fn now() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64()
+}
+
 impl Default for Camera {
     fn default() -> Self {
         Self {
             delta_time: 0.0,
-            last_time: date::now(),
+            last_time: now(),
             position: glam::Vec3::ZERO,
             can_move: false,
             up: glam::Vec3::Y,
@@ -32,7 +37,7 @@ impl Default for Camera {
 
 impl Camera {
     pub fn update_times(&mut self) {
-        let time = date::now();
+        let time = now();
         self.delta_time = time - self.last_time;
         self.last_time = time;
     }
@@ -45,7 +50,7 @@ impl Camera {
         self.front.cross(self.up).normalize()
     }
 
-    pub fn move_cam(&mut self, held: &[KeyCode]) {
+    pub fn move_cam(&mut self, input: &eframe::egui::InputState) {
         match self.focus {
             Some(target) => {
                 self.position += self.delta_time as f32 * 10.0 * (target - self.position);
@@ -54,15 +59,16 @@ impl Camera {
                 }
             }
             None => {
+                use eframe::egui::Key;
                 let velocity = self.speed as f32 * self.delta_time as f32;
-                for keycode in held.iter() {
+                for keycode in input.keys_down.iter() {
                     match keycode {
-                        KeyCode::W => self.position += self.front * velocity,
-                        KeyCode::A => self.position += self.left() * velocity,
-                        KeyCode::S => self.position -= self.front * velocity,
-                        KeyCode::D => self.position -= self.left() * velocity,
-                        KeyCode::E => self.position += glam::vec3(0.0, velocity, 0.0),
-                        KeyCode::Q => self.position -= glam::vec3(0.0, velocity, 0.0),
+                        Key::W => self.position += self.front * velocity,
+                        Key::A => self.position += self.left() * velocity,
+                        Key::S => self.position -= self.front * velocity,
+                        Key::D => self.position -= self.left() * velocity,
+                        Key::E => self.position += glam::vec3(0.0, velocity, 0.0),
+                        Key::Q => self.position -= glam::vec3(0.0, velocity, 0.0),
                         _ => (),
                     }
                 }
