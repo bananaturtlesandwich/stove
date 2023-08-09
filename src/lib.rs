@@ -1,7 +1,6 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use eframe::egui;
-use nanoserde::{DeBin, SerBin};
 use unreal_asset::{
     engine_version::EngineVersion::{self, *},
     types::PackageIndex,
@@ -57,37 +56,6 @@ pub struct Stove {
     client: Option<discord_rich_presence::DiscordIpcClient>,
     #[cfg(not(target_family = "wasm"))]
     autoupdate: bool,
-}
-
-#[derive(DeBin, SerBin)]
-struct Persistent {
-    version: usize,
-    paks: Vec<String>,
-    distance: f32,
-    aes: String,
-    use_cache: bool,
-    script: String,
-    #[cfg(not(target_family = "wasm"))]
-    autoupdate: bool,
-}
-
-impl Default for Persistent {
-    fn default() -> Self {
-        Persistent {
-            version: 0,
-            paks: Vec::new(),
-            distance: 10000.0,
-            aes: String::new(),
-            use_cache: true,
-            script: String::new(),
-            #[cfg(not(target_family = "wasm"))]
-            autoupdate: false,
-        }
-    }
-}
-
-fn config() -> Option<std::path::PathBuf> {
-    dirs::config_local_dir().map(|path| path.join("stove"))
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -168,26 +136,24 @@ impl Stove {
                 env!("CARGO_PKG_VERSION")
             ));
         }
-        let Persistent {
-            version,
-            paks,
-            distance,
-            aes,
-            use_cache,
-            script,
-            autoupdate,
-        } = config()
-            .and_then(|ref cfg| {
-                if !cfg.exists() && std::fs::create_dir_all(cfg).is_err() {
-                    notifs.error("failed to create config directory");
-                }
-                if std::fs::create_dir_all(cfg.join("cache")).is_err() {
-                    notifs.error("failed to create cache directory");
-                }
-                Persistent::deserialize_bin(&std::fs::read(cfg.join("CONFIG")).unwrap_or_default())
-                    .ok()
-            })
+        let retrieve = |key: &str| ctx.storage.and_then(|storage| storage.get_string(key));
+        let version = retrieve("VERSION")
+            .and_then(|ver| ver.parse::<usize>().ok())
             .unwrap_or_default();
+        let paks = retrieve("PAKS")
+            .map(|paks| paks.split_inclusive(',').map(ToString::to_string).collect())
+            .unwrap_or_default();
+        let distance = retrieve("DIST")
+            .and_then(|dist| dist.parse().ok())
+            .unwrap_or(10000.0);
+        let aes = retrieve("AES").unwrap_or_default();
+        let use_cache = retrieve("CACHE")
+            .and_then(|cache| cache.parse().ok())
+            .unwrap_or(true);
+        let script = retrieve("SCRIPT").unwrap_or_default();
+        let autoupdate = retrieve("AUTOUPDATE")
+            .and_then(|autoupdate| autoupdate.parse().ok())
+            .unwrap_or(false);
         let mut home = dirs::home_dir();
         let mut filepath = String::new();
         let map = std::env::args().nth(1).and_then(|path| {
@@ -288,6 +254,10 @@ impl Stove {
 
     fn version(&self) -> EngineVersion {
         VERSIONS[self.version].0
+    }
+
+    fn config() -> Option<std::path::PathBuf> {
+        dirs::config_local_dir().map(|path| path.join("stove"))
     }
 
     // fn refresh(&mut self, ctx: &mut Context) {
@@ -628,7 +598,7 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 impl eframe::App for Stove {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.camera.update_times();
-        ctx.input(|input| self.camera.move_cam(input));
+        ctx.input(|input| self.handle_input(input));
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("file", |ui| {
@@ -953,6 +923,31 @@ impl eframe::App for Stove {
             }
         }
     }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("VERSION", self.version.to_string());
+        storage.set_string(
+            "PAKS",
+            self.paks
+                .iter()
+                .cloned()
+                .reduce(|acc, pak| acc + "," + &pak)
+                .unwrap_or_default(),
+        );
+        storage.set_string("DIST", self.distance.to_string());
+        storage.set_string("AES", self.aes.clone());
+        storage.set_string("CACHE", self.use_cache.to_string());
+        storage.set_string("SCRIPT", self.script.clone());
+        storage.set_string("AUTOUPDATE", self.autoupdate.to_string());
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn on_close_event(&mut self) -> bool {
+        if let Some(client) = &mut self.client {
+            return client.close().is_ok();
+        }
+        true
+    }
 }
 
 // impl EventHandler for Stove {
@@ -1013,6 +1008,12 @@ impl eframe::App for Stove {
 //         egui().draw(mqctx);
 //         mqctx.commit_frame();
 //     }
+
+impl Stove {
+    fn handle_input(&mut self, input: &egui::InputState) {
+        self.camera.move_cam(input);
+    }
+}
 
 //     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
 //         egui().mouse_motion_event(x, y);
@@ -1255,27 +1256,6 @@ impl eframe::App for Stove {
 //         }
 //     }
 // }
-
-impl Drop for Stove {
-    fn drop(&mut self) {
-        #[cfg(not(target_family = "wasm"))]
-        if let Some(client) = &mut self.client {
-            client.close().unwrap_or_default();
-        }
-        let data = Persistent {
-            version: self.version,
-            paks: self.paks.clone(),
-            distance: self.distance,
-            aes: self.aes.clone(),
-            use_cache: self.use_cache,
-            script: self.script.clone(),
-            autoupdate: self.autoupdate,
-        };
-        if let Some(path) = config() {
-            std::fs::write(path.join("CONFIG"), data.serialize_bin()).unwrap_or_default()
-        }
-    }
-}
 
 const VERSIONS: [(EngineVersion, &str); 33] = [
     (UNKNOWN, "unknown"),
