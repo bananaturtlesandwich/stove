@@ -535,6 +535,33 @@ impl Stove {
     //     }
     // }
 
+    fn open(&mut self, path: &std::path::Path) {
+        match asset::open(path, self.version()) {
+            Ok(asset) => {
+                self.filepath = path.to_str().unwrap_or_default().to_string();
+                #[cfg(not(target_family = "wasm"))]
+                if let Some(client) = self.client.as_mut() {
+                    if client
+                        .set_activity(
+                            default_activity()
+                                .details("currently editing:")
+                                .state(self.filepath.split('\\').last().unwrap_or_default()),
+                        )
+                        .is_err()
+                    {
+                        client.close().unwrap_or_default();
+                        self.client = None;
+                    }
+                }
+                self.map = Some(asset);
+                self.refresh();
+            }
+            Err(e) => {
+                self.notifs.error(e.to_string());
+            }
+        }
+    }
+
     fn save(&mut self) {
         match self.map.as_mut() {
             Some(map) => match asset::save(map, &self.filepath) {
@@ -973,39 +1000,16 @@ impl eframe::App for Stove {
         self.notifs.show(ctx);
         self.open_dialog.show(ctx);
         if self.open_dialog.selected() {
-            if let Some(path) = self.open_dialog.path() {
+            if let Some(path) = self.open_dialog.path().map(std::path::PathBuf::from) {
                 update_dialogs(
-                    path,
+                    &path,
                     [
                         &mut self.save_dialog,
                         &mut self.pak_dialog,
                         &mut self.transplant_dialog,
                     ],
                 );
-                match asset::open(path, self.version()) {
-                    Ok(asset) => {
-                        self.filepath = path.to_str().unwrap_or_default().to_string();
-                        #[cfg(not(target_family = "wasm"))]
-                        if let Some(client) = self.client.as_mut() {
-                            if client
-                                .set_activity(
-                                    default_activity().details("currently editing:").state(
-                                        self.filepath.split('\\').last().unwrap_or_default(),
-                                    ),
-                                )
-                                .is_err()
-                            {
-                                client.close().unwrap_or_default();
-                                self.client = None;
-                            }
-                        }
-                        self.map = Some(asset);
-                        self.refresh();
-                    }
-                    Err(e) => {
-                        self.notifs.error(e.to_string());
-                    }
-                }
+                self.open(&path);
             }
         }
         self.transplant_dialog.show(ctx);
@@ -1110,6 +1114,12 @@ impl Stove {
         frame: &mut eframe::Frame,
     ) {
         use egui::{Key, PointerButton};
+        if let Some(egui::DroppedFile {
+            path: Some(path), ..
+        }) = input.raw.dropped_files.first()
+        {
+            self.open(&path)
+        }
         self.camera.update_times(input.stable_dt);
         self.camera.move_cam(input);
         for event in input.events.iter() {
