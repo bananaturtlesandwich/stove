@@ -10,10 +10,11 @@ edition = "2021"
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "e0ac7fb" }
 unpak = { version = "1.0", features = ["asset-paths"] }
-glam = { version = "0.23", features = ["fast-math"] }
+glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 eframe = { version = "0.22", default-features = false, features = ["wgpu", "persistence"]}
 egui-notify = "0.7"
 egui_file = "0.10"
+bytemuck = "1.13"
 byteorder = "1.4"
 bitflags = "2.3"
 texture2ddecoder = "0.0"

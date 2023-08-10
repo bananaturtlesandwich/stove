@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use eframe::egui;
@@ -28,7 +30,7 @@ pub struct Stove {
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
-    // cubes: rendering::Cube,
+    cubes: rendering::Cube,
     // axes: rendering::Axes,
     // meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
@@ -126,8 +128,13 @@ impl std::io::Seek for Wrapper {
     }
 }
 
+fn config() -> Option<std::path::PathBuf> {
+    dirs::config_local_dir().map(|path| path.join("stove"))
+}
+
 impl Stove {
     pub fn new(ctx: &eframe::CreationContext) -> Self {
+        let Some(wgpu) = ctx.wgpu_render_state.as_ref() else { panic!("wgpu failed to initialise") };
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -201,7 +208,7 @@ impl Stove {
             version,
             actors: Vec::new(),
             selected: Vec::new(),
-            // cubes: rendering::Cube::new(ctx),
+            cubes: rendering::Cube::new(wgpu.device.as_ref()),
             // axes: rendering::Axes::new(ctx),
             // meshes: hashbrown::HashMap::new(),
             ui: true,
@@ -245,7 +252,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate,
         };
-        // stove.refresh(ctx);
+        stove.refresh();
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -256,8 +263,95 @@ impl Stove {
         VERSIONS[self.version].0
     }
 
-    fn config() -> Option<std::path::PathBuf> {
-        dirs::config_local_dir().map(|path| path.join("stove"))
+    fn refresh(&mut self) {
+        self.actors.clear();
+        self.selected.clear();
+        let Some(map) = self.map.as_ref() else {return};
+        // let key = match hex::decode(self.aes.trim_start_matches("0x")) {
+        //     Ok(key) if !self.aes.is_empty() => Some(key),
+        //     Ok(_) => None,
+        //     Err(_) => {
+        //         self.notifs.error("aes key is invalid hex");
+        //         None
+        //     }
+        // };
+        // let paks: Vec<_> = self
+        //     .paks
+        //     .iter()
+        //     .filter_map(|dir| std::fs::read_dir(dir).ok())
+        //     .flatten()
+        //     .filter_map(Result::ok)
+        //     .map(|dir| dir.path())
+        //     .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
+        //     .collect();
+        // let cache = config().map(|path| path.join("cache"));
+        for index in actor::get_actors(map) {
+            match actor::Actor::new(map, index) {
+                Ok(actor) => {
+                    // if let actor::DrawType::Mesh(path) = &actor.draw_type {
+                    //     if !self.meshes.contains_key(path) {
+                    //         let (mesh, bulk) =
+                    //             (path.to_string() + ".uasset", path.to_string() + ".uexp");
+                    //         let mesh_path = mesh.trim_start_matches('/');
+                    //         for pak in paks.iter() {
+                    //             let info = match cache.as_ref() {
+                    //                 Some(cache)
+                    //                     if self.use_cache
+                    //                         && (cache.join(mesh_path).exists() ||
+                    //                     // try to create cache if it doesn't exist
+                    //                     (
+                    //                         std::fs::create_dir_all(cache.join(mesh_path).parent().unwrap()).is_ok() &&
+                    //                         pak.read_to_file(&mesh, cache.join(mesh_path)).is_ok() &&
+                    //                         // we don't care whether this is successful in case there is no uexp
+                    //                         pak.read_to_file(&bulk, cache.join(bulk.trim_start_matches('/'))).map_or(true,|_| true)
+                    //                     )) =>
+                    //                 {
+                    //                     let Ok(mesh) =
+                    //                         asset::open(cache.join(mesh_path), self.version())
+                    //                     else {
+                    //                         continue;
+                    //                     };
+                    //                     extras::get_mesh_info(mesh)
+                    //                 }
+                    //                 // if the cache cannot be created fall back to storing in memory
+                    //                 _ => {
+                    //                     let Ok(mesh) = pak.get(&mesh) else { continue };
+                    //                     let Ok(mesh) = unreal_asset::Asset::new(
+                    //                         std::io::Cursor::new(mesh),
+                    //                         pak.get(&bulk).ok().map(std::io::Cursor::new),
+                    //                         self.version(),
+                    //                         None
+                    //                     ) else {
+                    //                         continue;
+                    //                     };
+                    //                     extras::get_mesh_info(mesh)
+                    //                 }
+                    //             };
+                    //             match info {
+                    //                 Ok((positions, indices)) => {
+                    //                     self.meshes.insert(
+                    //                         path.to_string(),
+                    //                         rendering::Mesh::new(ctx, positions, indices),
+                    //                     );
+                    //                     break;
+                    //                 }
+                    //                 Err(e) => {
+                    //                     self.notifs.error(format!(
+                    //                         "{}: {e}",
+                    //                         path.split('/').last().unwrap_or_default()
+                    //                     ));
+                    //                 }
+                    //             }
+                    //         }
+                    //     }
+                    // }
+                    self.actors.push(actor);
+                }
+                Err(e) => {
+                    self.notifs.warning(e.to_string());
+                }
+            }
+        }
     }
 
     // fn refresh(&mut self, ctx: &mut Context) {
@@ -486,11 +580,11 @@ impl Stove {
         }
     }
 
-    // fn view_projection(&self, ctx: &Context) -> glam::Mat4 {
-    //     let (width, height) = ctx.screen_size();
-    //     glam::Mat4::perspective_lh(45_f32.to_radians(), width / height, 1.0, self.distance)
-    //         * self.camera.view_matrix()
-    // }
+    fn view_projection(&self, ctx: &eframe::Frame) -> glam::Mat4 {
+        let size = ctx.info().window_info.size;
+        glam::Mat4::perspective_lh(45_f32.to_radians(), size.x / size.y, 1.0, self.distance)
+            * self.camera.view_matrix()
+    }
 
     fn focus(&mut self) {
         if self.selected.is_empty() {
@@ -596,9 +690,59 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 }
 
 impl eframe::App for Stove {
-    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        use eframe::wgpu::*;
         self.camera.update_times();
         ctx.input(|input| self.handle_input(input));
+        if let Some((map, wgpu)) = self.map.as_ref().zip(frame.wgpu_render_state()) {
+            let vp = self.view_projection(frame);
+            let mut encoder = wgpu
+                .device
+                .create_command_encoder(&CommandEncoderDescriptor { label: None });
+            self.cubes.copy(
+                self.actors
+                    .iter()
+                    .enumerate()
+                    .map(|(i, actor)| {
+                        (
+                            actor.model_matrix(map),
+                            self.selected.contains(&i) as i32 as f32,
+                        )
+                    })
+                    .unzip(),
+                &[vp],
+                &wgpu.queue,
+            );
+            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: None,
+                color_attachments: &[],
+                depth_stencil_attachment: None,
+            });
+            self.cubes.draw(&mut pass);
+            // for (actor, mesh) in self
+            //     .actors
+            //     .iter()
+            //     .filter_map(|actor| match &actor.draw_type {
+            //         actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
+            //         actor::DrawType::Cube => None,
+            //     })
+            // {
+            //     mesh.draw(mqctx, vp * actor.model_matrix(map));
+            // }
+            // if !self.selected.is_empty() {
+            //     if self.grab != Grab::None {
+            //         if let Some((loc, sca)) = self.avg_transform() {
+            //             self.axes.draw(
+            //                 mqctx,
+            //                 &self.filter,
+            //                 vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
+            //             )
+            //         }
+            //     }
+            // }
+            drop(pass);
+            wgpu.queue.submit(Some(encoder.finish()));
+        }
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("file", |ui| {
@@ -852,7 +996,7 @@ impl eframe::App for Stove {
                             }
                         }
                         self.map = Some(asset);
-                        // self.refresh(mqctx);
+                        self.refresh();
                     }
                     Err(e) => {
                         self.notifs.error(e.to_string());
@@ -948,9 +1092,13 @@ impl eframe::App for Stove {
         }
         true
     }
+
+    fn clear_color(&self, _: &egui::Visuals) -> [f32; 4] {
+        [0.15, 0.15, 0.15, 1.0]
+    }
 }
 
-// impl EventHandler for Stove {
+//  impl  Even tHandler for Stove {
 //     fn update(&mut self, _: &mut Context) {
 //         self.camera.update_times();
 //         self.camera.move_cam(&self.held)
@@ -962,44 +1110,6 @@ impl eframe::App for Stove {
 //             depth: Some(1.0),
 //             stencil: None,
 //         });
-//         let vp = self.view_projection(mqctx);
-//         if let Some(map) = self.map.as_ref() {
-//             self.cubes.draw(
-//                 mqctx,
-//                 self.actors
-//                     .iter()
-//                     .enumerate()
-//                     .map(|(i, actor)| {
-//                         (
-//                             actor.model_matrix(map),
-//                             self.selected.contains(&i) as i32 as f32,
-//                         )
-//                     })
-//                     .unzip(),
-//                 &vp,
-//             );
-//             for (actor, mesh) in self
-//                 .actors
-//                 .iter()
-//                 .filter_map(|actor| match &actor.draw_type {
-//                     actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
-//                     actor::DrawType::Cube => None,
-//                 })
-//             {
-//                 mesh.draw(mqctx, vp * actor.model_matrix(map));
-//             }
-//             if !self.selected.is_empty() {
-//                 if self.grab != Grab::None {
-//                     if let Some((loc, sca)) = self.avg_transform() {
-//                         self.axes.draw(
-//                             mqctx,
-//                             &self.filter,
-//                             vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
-//                         )
-//                     }
-//                 }
-//             }
-//         }
 //         mqctx.end_render_pass();
 //         if !self.ui {
 //             mqctx.commit_frame();
