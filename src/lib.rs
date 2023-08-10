@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use eframe::egui;
@@ -693,8 +691,7 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 
 impl eframe::App for Stove {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.camera.update_times();
-        ctx.input(|input| self.handle_input(input));
+        ctx.input(|input| self.handle_input(input, ctx, frame));
         if let Some(map) = self.map.as_ref() {
             let vp = self.view_projection(frame);
             let inst = self
@@ -746,6 +743,9 @@ impl eframe::App for Stove {
             //         }
             //     }
             // }
+        }
+        if !self.ui {
+            return;
         }
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -1102,274 +1102,256 @@ impl eframe::App for Stove {
     }
 }
 
-//  impl  Even tHandler for Stove {
-//     fn update(&mut self, _: &mut Context) {
-//         self.camera.update_times();
-//         self.camera.move_cam(&self.held)
-//     }
-
-//     fn draw(&mut self, mqctx: &mut Context) {
-//         mqctx.begin_default_pass(PassAction::Clear {
-//             color: Some((0.15, 0.15, 0.15, 1.0)),
-//             depth: Some(1.0),
-//             stencil: None,
-//         });
-//         mqctx.end_render_pass();
-//         if !self.ui {
-//             mqctx.commit_frame();
-//             return;
-//         }
-//         egui().draw(mqctx);
-//         mqctx.commit_frame();
-//     }
-
 impl Stove {
-    fn handle_input(&mut self, input: &egui::InputState) {
+    fn handle_input(
+        &mut self,
+        input: &egui::InputState,
+        ctx: &eframe::egui::Context,
+        frame: &mut eframe::Frame,
+    ) {
+        use egui::{Key, PointerButton};
+        self.camera.update_times(input.stable_dt);
         self.camera.move_cam(input);
+        for event in input.events.iter() {
+            match event {
+                egui::Event::Key {
+                    key,
+                    pressed,
+                    repeat,
+                    modifiers,
+                } => match pressed {
+                    true => {
+                        if ctx.is_pointer_over_area() || modifiers.ctrl || *repeat {
+                            return;
+                        }
+                        self.filter = match key {
+                            Key::X if modifiers.shift => glam::vec3(0., 1., 1.),
+                            Key::Y if modifiers.shift => glam::vec3(1., 0., 1.),
+                            Key::Z if modifiers.shift => glam::vec3(1., 1., 0.),
+                            Key::X => glam::Vec3::X,
+                            Key::Y => glam::Vec3::Y,
+                            Key::Z => glam::Vec3::Z,
+                            _ => glam::Vec3::ONE,
+                        };
+                    }
+                    false => {
+                        if ctx.wants_keyboard_input() {
+                            return;
+                        }
+                        match key {
+                            Key::Delete => match self.selected.is_empty() {
+                                false => {
+                                    self.selected
+                                        .sort_unstable_by_key(|key| std::cmp::Reverse(*key));
+                                    for i in self.selected.iter().copied() {
+                                        self.actors[i].delete(self.map.as_mut().unwrap());
+                                        self.notifs
+                                            .success(format!("deleted {}", &self.actors[i].name));
+                                        self.actors.remove(i);
+                                    }
+                                    self.selected.clear();
+                                }
+                                true => {
+                                    self.notifs.error("nothing selected to delete");
+                                }
+                            },
+                            Key::F => self.focus(),
+                            Key::H => self.ui = !self.ui,
+                            Key::T if modifiers.ctrl => match self.map.is_some() {
+                                true => self.try_open(|stove| &mut stove.transplant_dialog),
+                                false => {
+                                    self.notifs.error("no map to transplant to");
+                                }
+                            },
+                            Key::O if modifiers.ctrl => {
+                                self.try_open(|stove| &mut stove.open_dialog)
+                            }
+                            Key::O if modifiers.alt => self.try_open(|stove| &mut stove.pak_dialog),
+                            Key::S if modifiers.ctrl => match modifiers.shift {
+                                true => self.open_save_dialog(),
+                                false => self.save(),
+                            },
+                            Key::Enter if modifiers.alt => {
+                                self.fullscreen = !self.fullscreen;
+                                frame.set_fullscreen(self.fullscreen);
+                            }
+                            Key::C if modifiers.ctrl => {
+                                match self.avg_raw_loc() {
+                                    Some(pos) => {
+                                        self.locbuf = pos;
+                                        self.notifs.success("location copied")
+                                    }
+                                    None => self.notifs.error("no actor selected to copy from"),
+                                };
+                            }
+                            Key::V if modifiers.ctrl => {
+                                match self.avg_raw_loc().zip(self.map.as_mut()) {
+                                    Some((pos, map)) => {
+                                        let offset = (pos - self.locbuf).abs();
+                                        for i in self.selected.iter().copied() {
+                                            self.actors[i].add_raw_location(map, offset)
+                                        }
+                                        self.notifs.success("location pasted")
+                                    }
+                                    None => self.notifs.error("no actor selected to copy from"),
+                                };
+                            }
+                            Key::X | Key::Y | Key::Z => self.filter = glam::Vec3::ONE,
+                            _ => (),
+                        }
+                    }
+                },
+                egui::Event::PointerMoved(pos) => {
+                    let delta = input.pointer.delta();
+                    self.camera.handle_mouse_motion(delta);
+                    for i in self.selected.iter().copied() {
+                        match self.grab {
+                            Grab::None => (),
+                            Grab::Location(dist) => self.actors[i].add_location(
+                                self.map.as_mut().unwrap(),
+                                self.filter
+                                            // move across the camera view plane
+                                            * (
+                                                self.camera.left()
+                                                * -delta.x
+                                                + self.camera.front.cross(self.camera.left())
+                                                * delta.y
+                                            )
+                                            // scale by consistent distance
+                                            * dist
+                                            // scale to match mouse cursor
+                                            * 0.1,
+                            ),
+                            Grab::Rotation => self.actors[i].combine_rotation(
+                                self.map.as_mut().unwrap(),
+                                glam::Quat::from_axis_angle(
+                                    self.filter * self.camera.front,
+                                    match delta.x.abs() > delta.y.abs() {
+                                        true => -delta.x,
+                                        false => delta.y,
+                                    } * 0.01,
+                                ),
+                            ),
+                            Grab::Scale3D(coords) => self.actors[i].mul_scale(
+                                self.map.as_mut().unwrap(),
+                                glam::Vec3::ONE
+                                    + self.filter
+                                        * (coords.distance(glam::vec2(pos.x, pos.y))
+                                            - coords.distance(self.last_mouse_pos))
+                                        * 0.005,
+                            ),
+                        }
+                    }
+                }
+                egui::Event::PointerButton {
+                    pos,
+                    button,
+                    pressed,
+                    modifiers,
+                } => match pressed {
+                    true => {
+                        if ctx.is_pointer_over_area() {
+                            return;
+                        }
+                        let proj = self.view_projection(frame);
+                        // THE HACKIEST MOUSE PICKING EVER CONCEIVED
+                        let pick = self
+                            .map
+                            .as_ref()
+                            .and_then(|map| {
+                                // convert mouse coordinates to NDC
+                                let size = frame.info().window_info.size;
+                                let mouse = glam::vec2(
+                                    pos.x * 2.0 / size.x - 1.0,
+                                    1.0 - pos.y * 2.0 / size.y,
+                                );
+                                self.actors
+                                    .iter()
+                                    .map(|actor| mouse.distance(actor.coords(map, proj)))
+                                    .enumerate()
+                                    // get closest pick
+                                    .min_by(|(_, x), (_, y)| x.total_cmp(y))
+                            })
+                            .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
+                        match pick {
+                            // grabby time
+                            Some(pick) if self.selected.contains(&pick) => {
+                                if let Some(map) = self.map.as_mut() {
+                                    if modifiers.alt {
+                                        let insert = self.actors.len();
+                                        for i in self.selected.iter().copied() {
+                                            let insert = map.asset_data.exports.len() as i32 + 1;
+                                            self.actors[i].duplicate(map);
+                                            self.notifs.success(format!(
+                                                "duplicated {}",
+                                                &self.actors[i].name
+                                            ));
+                                            self.actors.push(
+                                                actor::Actor::new(map, PackageIndex::new(insert))
+                                                    .unwrap(),
+                                            );
+                                        }
+                                        let len = self.actors.len();
+                                        self.selected.clear();
+                                        for i in insert..len {
+                                            self.selected.push(i);
+                                        }
+                                    }
+                                    self.grab = match button {
+                                        PointerButton::Primary => Grab::Location(
+                                            self.get_avg(|actor, map| actor.location(map))
+                                                .unwrap()
+                                                .distance(self.camera.position),
+                                        ),
+                                        PointerButton::Secondary => Grab::Rotation,
+                                        PointerButton::Middle => Grab::Scale3D({
+                                            let size = frame.info().window_info.size;
+                                            let pos = self
+                                                .get_avg(|actor, map| actor.coords(map, proj))
+                                                .unwrap();
+                                            glam::vec2(
+                                                (pos.x + 1.0) * size.x * 0.5,
+                                                (1.0 - pos.y) * size.y * 0.5,
+                                            )
+                                        }),
+                                        _ => Grab::None,
+                                    };
+                                }
+                            }
+                            Some(pick) if button == &PointerButton::Primary => {
+                                if !modifiers.shift {
+                                    self.selected.clear()
+                                }
+                                self.selected.push(pick)
+                            }
+                            None if button == &PointerButton::Primary => self.selected.clear(),
+                            _ if button == &PointerButton::Secondary => self.camera.enable_move(),
+                            _ => (),
+                        }
+                    }
+                    false => {
+                        if button == &PointerButton::Secondary {
+                            self.camera.disable_move()
+                        }
+                        self.grab = Grab::None;
+                    }
+                },
+                egui::Event::Scroll(egui::Vec2 { y, .. }) => {
+                    // a logarithmic speed increase is better because unreal maps can get massive
+                    if !ctx.is_pointer_over_area() {
+                        self.camera.speed = (self.camera.speed as f32
+                            * match y.is_sign_negative() {
+                                true => 100.0 / -y,
+                                false => y / 100.0,
+                            })
+                        .clamp(5.0, 50000.0) as u16;
+                    }
+                }
+                _ => (),
+            }
+        }
     }
 }
-
-//     fn mouse_motion_event(&mut self, _: &mut Context, x: f32, y: f32) {
-//         egui().mouse_motion_event(x, y);
-//         let delta = glam::vec2(x - self.last_mouse_pos.x, y - self.last_mouse_pos.y);
-//         self.camera.handle_mouse_motion(delta);
-//         for i in self.selected.iter().copied() {
-//             match self.grab {
-//                 Grab::None => (),
-//                 Grab::Location(dist) => self.actors[i].add_location(
-//                     self.map.as_mut().unwrap(),
-//                     self.filter
-//                         // move across the camera view plane
-//                         * (
-//                             self.camera.left()
-//                             * -delta.x
-//                             + self.camera.front.cross(self.camera.left())
-//                             * delta.y
-//                         )
-//                         // scale by consistent distance
-//                         * dist
-//                         // scale to match mouse cursor
-//                         * 0.1,
-//                 ),
-//                 Grab::Rotation => self.actors[i].combine_rotation(
-//                     self.map.as_mut().unwrap(),
-//                     glam::Quat::from_axis_angle(
-//                         self.filter * self.camera.front,
-//                         match delta.x.abs() > delta.y.abs() {
-//                             true => -delta.x,
-//                             false => delta.y,
-//                         } * 0.01,
-//                     ),
-//                 ),
-//                 Grab::Scale3D(coords) => self.actors[i].mul_scale(
-//                     self.map.as_mut().unwrap(),
-//                     glam::Vec3::ONE
-//                         + self.filter
-//                             * (coords.distance(glam::vec2(x, y))
-//                                 - coords.distance(self.last_mouse_pos))
-//                             * 0.005,
-//                 ),
-//             }
-//         }
-//         self.last_mouse_pos = glam::vec2(x, y);
-//     }
-
-//     fn mouse_wheel_event(&mut self, _: &mut Context, dx: f32, dy: f32) {
-//         egui().mouse_wheel_event(dx, dy);
-//         // a logarithmic speed increase is better because unreal maps can get massive
-//         if !egui().egui_ctx().is_pointer_over_area() {
-//             self.camera.speed = (self.camera.speed as f32
-//                 * match dy.is_sign_negative() {
-//                     true => 100.0 / -dy,
-//                     false => dy / 100.0,
-//                 })
-//             .clamp(5.0, 50000.0) as u16;
-//         }
-//     }
-
-//     fn mouse_button_down_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-//         egui().mouse_button_down_event(ctx, mb, x, y);
-//         if egui().egui_ctx().is_pointer_over_area() {
-//             return;
-//         }
-//         let proj = self.view_projection(ctx);
-//         // THE HACKIEST MOUSE PICKING EVER CONCEIVED
-//         let pick = self
-//             .map
-//             .as_ref()
-//             .and_then(|map| {
-//                 // convert mouse coordinates to NDC
-//                 let (width, height) = ctx.screen_size();
-//                 let mouse = glam::vec2(x * 2.0 / width - 1.0, 1.0 - y * 2.0 / height);
-//                 self.actors
-//                     .iter()
-//                     .map(|actor| mouse.distance(actor.coords(map, proj)))
-//                     .enumerate()
-//                     // get closest pick
-//                     .min_by(|(_, x), (_, y)| x.total_cmp(y))
-//             })
-//             .and_then(|(pos, distance)| (distance < 0.05).then_some(pos));
-//         match pick {
-//             // grabby time
-//             Some(pick) if self.selected.contains(&pick) => {
-//                 if let Some(map) = self.map.as_mut() {
-//                     if self.held.contains(&KeyCode::LeftAlt)
-//                         || self.held.contains(&KeyCode::RightAlt)
-//                     {
-//                         let insert = self.actors.len();
-//                         for i in self.selected.iter().copied() {
-//                             let insert = map.asset_data.exports.len() as i32 + 1;
-//                             self.actors[i].duplicate(map);
-//                             self.notifs
-//                                 .success(format!("duplicated {}", &self.actors[i].name));
-//                             self.actors
-//                                 .push(actor::Actor::new(map, PackageIndex::new(insert)).unwrap());
-//                         }
-//                         let len = self.actors.len();
-//                         self.selected.clear();
-//                         for i in insert..len {
-//                             self.selected.push(i);
-//                         }
-//                     }
-//                     self.grab = match mb {
-//                         MouseButton::Left => Grab::Location(
-//                             self.get_avg(|actor, map| actor.location(map))
-//                                 .unwrap()
-//                                 .distance(self.camera.position),
-//                         ),
-//                         MouseButton::Right => Grab::Rotation,
-//                         MouseButton::Middle => Grab::Scale3D({
-//                             let (width, height) = ctx.screen_size();
-//                             let (x, y) = self
-//                                 .get_avg(|actor, map| actor.coords(map, proj))
-//                                 .unwrap()
-//                                 .into();
-//                             glam::vec2((x + 1.0) * width * 0.5, (1.0 - y) * height * 0.5)
-//                         }),
-//                         MouseButton::Unknown => Grab::None,
-//                     };
-//                 }
-//             }
-//             Some(pick) if mb == MouseButton::Left => {
-//                 if !self.held.contains(&KeyCode::LeftShift)
-//                     && !self.held.contains(&KeyCode::RightShift)
-//                 {
-//                     self.selected.clear()
-//                 }
-//                 self.selected.push(pick)
-//             }
-//             None if mb == MouseButton::Left => self.selected.clear(),
-//             _ if mb == MouseButton::Right => self.camera.enable_move(),
-//             _ => (),
-//         }
-//     }
-
-//     fn mouse_button_up_event(&mut self, ctx: &mut Context, mb: MouseButton, x: f32, y: f32) {
-//         egui().mouse_button_up_event(ctx, mb, x, y);
-//         if mb == MouseButton::Right {
-//             self.camera.disable_move()
-//         }
-//         self.grab = Grab::None;
-//     }
-
-//     // boilerplate >n<
-//     fn char_event(&mut self, _: &mut Context, character: char, _: KeyMods, _: bool) {
-//         egui().char_event(character);
-//     }
-
-//     fn key_down_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods, _: bool) {
-//         egui().key_down_event(ctx, keycode, keymods);
-//         if egui().egui_ctx().is_pointer_over_area() || keymods.ctrl || self.held.contains(&keycode)
-//         {
-//             return;
-//         }
-//         self.filter = match keycode {
-//             KeyCode::X if keymods.shift => glam::vec3(0., 1., 1.),
-//             KeyCode::Y if keymods.shift => glam::vec3(1., 0., 1.),
-//             KeyCode::Z if keymods.shift => glam::vec3(1., 1., 0.),
-//             KeyCode::X => glam::Vec3::X,
-//             KeyCode::Y => glam::Vec3::Y,
-//             KeyCode::Z => glam::Vec3::Z,
-//             _ => glam::Vec3::ONE,
-//         };
-//         self.held.push(keycode)
-//     }
-
-//     fn key_up_event(&mut self, ctx: &mut Context, keycode: KeyCode, keymods: KeyMods) {
-//         egui().key_up_event(keycode, keymods);
-//         if let Some(pos) = self.held.iter().position(|k| k == &keycode) {
-//             self.held.remove(pos);
-//         }
-//         if egui().egui_ctx().wants_keyboard_input() {
-//             return;
-//         }
-//         match keycode {
-//             KeyCode::Delete => match self.selected.is_empty() {
-//                 false => {
-//                     self.selected
-//                         .sort_unstable_by_key(|key| std::cmp::Reverse(*key));
-//                     for i in self.selected.iter().copied() {
-//                         self.actors[i].delete(self.map.as_mut().unwrap());
-//                         self.notifs
-//                             .success(format!("deleted {}", &self.actors[i].name));
-//                         self.actors.remove(i);
-//                     }
-//                     self.selected.clear();
-//                 }
-//                 true => {
-//                     self.notifs.error("nothing selected to delete");
-//                 }
-//             },
-//             KeyCode::F => self.focus(),
-//             KeyCode::H => self.ui = !self.ui,
-//             KeyCode::T if keymods.ctrl => match self.map.is_some() {
-//                 true => self.try_open(|stove| &mut stove.transplant_dialog),
-//                 false => {
-//                     self.notifs.error("no map to transplant to");
-//                 }
-//             },
-//             KeyCode::O if keymods.ctrl => self.try_open(|stove| &mut stove.open_dialog),
-//             KeyCode::O if keymods.alt => self.try_open(|stove| &mut stove.pak_dialog),
-//             KeyCode::S if keymods.ctrl => match keymods.shift {
-//                 true => self.open_save_dialog(),
-//                 false => self.save(),
-//             },
-//             KeyCode::Enter if keymods.alt => {
-//                 if !self.fullscreen {
-//                     self.size = ctx.screen_size();
-//                 }
-//                 self.fullscreen = !self.fullscreen;
-//                 ctx.set_fullscreen(self.fullscreen);
-//                 if !self.fullscreen {
-//                     ctx.set_window_size(self.size.0 as u32, self.size.1 as u32)
-//                 }
-//             }
-//             KeyCode::C if keymods.ctrl => {
-//                 match self.avg_raw_loc() {
-//                     Some(pos) => {
-//                         self.locbuf = pos;
-//                         self.notifs.success("location copied")
-//                     }
-//                     None => self.notifs.error("no actor selected to copy from"),
-//                 };
-//             }
-//             KeyCode::V if keymods.ctrl => {
-//                 match self.avg_raw_loc().zip(self.map.as_mut()) {
-//                     Some((pos, map)) => {
-//                         let offset = (pos - self.locbuf).abs();
-//                         for i in self.selected.iter().copied() {
-//                             self.actors[i].add_raw_location(map, offset)
-//                         }
-//                         self.notifs.success("location pasted")
-//                     }
-//                     None => self.notifs.error("no actor selected to copy from"),
-//                 };
-//             }
-//             KeyCode::X | KeyCode::Y | KeyCode::Z => self.filter = glam::Vec3::ONE,
-//             _ => (),
-//         }
-//     }
-// }
 
 const VERSIONS: [(EngineVersion, &str); 33] = [
     (UNKNOWN, "unknown"),

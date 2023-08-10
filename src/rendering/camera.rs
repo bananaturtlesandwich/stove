@@ -5,24 +5,15 @@ pub struct Camera {
     pub up: glam::Vec3,
     yaw: f32,
     pitch: f32,
-    delta_time: f64,
-    last_time: f64,
+    delta_time: f32,
     pub speed: u16,
     focus: Option<glam::Vec3>,
-}
-
-fn now() -> f64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64()
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
             delta_time: 0.0,
-            last_time: now(),
             position: glam::Vec3::ZERO,
             can_move: false,
             up: glam::Vec3::Y,
@@ -36,10 +27,8 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn update_times(&mut self) {
-        let time = now();
-        self.delta_time = time - self.last_time;
-        self.last_time = time;
+    pub fn update_times(&mut self, time: f32) {
+        self.delta_time = time
     }
 
     pub fn view_matrix(&self) -> glam::Mat4 {
@@ -53,14 +42,14 @@ impl Camera {
     pub fn move_cam(&mut self, input: &eframe::egui::InputState) {
         match self.focus {
             Some(target) => {
-                self.position += self.delta_time as f32 * 10.0 * (target - self.position);
+                self.position += self.delta_time * 10.0 * (target - self.position);
                 if self.position.distance(target) < 1.0 {
                     self.focus = None;
                 }
             }
             None => {
                 use eframe::egui::Key;
-                let velocity = self.speed as f32 * self.delta_time as f32;
+                let velocity = self.speed as f32 * self.delta_time;
                 for keycode in input.keys_down.iter() {
                     match keycode {
                         Key::W => self.position += self.front * velocity,
@@ -80,9 +69,9 @@ impl Camera {
         self.focus = Some(pos - self.front * sca.length() * 4.0)
     }
 
-    pub fn handle_mouse_motion(&mut self, delta: glam::Vec2) {
+    pub fn handle_mouse_motion(&mut self, delta: eframe::egui::Vec2) {
         if self.can_move {
-            let scale = 10.0 * self.delta_time as f32;
+            let scale = 10.0 * self.delta_time;
             self.yaw -= delta.x * scale;
             self.pitch -= delta.y * scale;
             self.pitch = self.pitch.clamp(-89.0, 89.0);
