@@ -26,7 +26,7 @@ struct Inst {
 }
 
 impl Cube {
-    pub fn new(device: &Device) -> Self {
+    pub fn new(device: &Device, format: TextureFormat) -> Self {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
             source: ShaderSource::Wgsl(include_str!("cube.wgsl").into()),
@@ -154,7 +154,7 @@ impl Cube {
                 fragment: Some(FragmentState {
                     module: &shader,
                     entry_point: "frag",
-                    targets: &[],
+                    targets: &[Some(format.into())],
                 }),
                 multiview: None,
             }),
@@ -173,7 +173,7 @@ impl Cube {
 
     pub fn copy(
         &mut self,
-        (inst, selected): (Vec<glam::Mat4>, Vec<f32>),
+        (inst, selected): &(Vec<glam::Mat4>, Vec<f32>),
         // just a slice so it's easier to cast
         vp: &[glam::Mat4],
         queue: &Queue,
@@ -185,7 +185,7 @@ impl Cube {
         self.num = selected.len() as u32;
     }
 
-    pub fn draw<'a>(&'a mut self, pass: &mut RenderPass<'a>) {
+    pub fn draw<'a>(&'a self, pass: &mut RenderPass<'a>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bindings, &[]);
         pass.set_index_buffer(self.indices.slice(..), IndexFormat::Uint16);
@@ -193,7 +193,7 @@ impl Cube {
         // again don't know a better way to do mat4 :p
         let chunk = self.inst.size() / 4;
         for i in 1..5 {
-            pass.set_vertex_buffer(1, self.inst.slice((i - 1) * chunk..i * chunk));
+            pass.set_vertex_buffer(i as u32, self.inst.slice((i - 1) * chunk..i * chunk));
         }
         pass.set_vertex_buffer(5, self.inst.slice(..));
         pass.draw_indexed(0..24, 0, 0..self.num);

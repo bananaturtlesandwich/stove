@@ -30,7 +30,6 @@ pub struct Stove {
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
-    cubes: rendering::Cube,
     // axes: rendering::Axes,
     // meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
@@ -135,6 +134,10 @@ fn config() -> Option<std::path::PathBuf> {
 impl Stove {
     pub fn new(ctx: &eframe::CreationContext) -> Self {
         let Some(wgpu) = ctx.wgpu_render_state.as_ref() else { panic!("wgpu failed to initialise") };
+        wgpu.renderer
+            .write()
+            .paint_callback_resources
+            .insert(rendering::Cube::new(&wgpu.device, wgpu.target_format));
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -208,7 +211,6 @@ impl Stove {
             version,
             actors: Vec::new(),
             selected: Vec::new(),
-            cubes: rendering::Cube::new(wgpu.device.as_ref()),
             // axes: rendering::Axes::new(ctx),
             // meshes: hashbrown::HashMap::new(),
             ui: true,
@@ -691,34 +693,38 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 
 impl eframe::App for Stove {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        use eframe::wgpu::*;
         self.camera.update_times();
         ctx.input(|input| self.handle_input(input));
-        if let Some((map, wgpu)) = self.map.as_ref().zip(frame.wgpu_render_state()) {
+        if let Some(map) = self.map.as_ref() {
             let vp = self.view_projection(frame);
-            let mut encoder = wgpu
-                .device
-                .create_command_encoder(&CommandEncoderDescriptor { label: None });
-            self.cubes.copy(
-                self.actors
-                    .iter()
-                    .enumerate()
-                    .map(|(i, actor)| {
-                        (
-                            actor.model_matrix(map),
-                            self.selected.contains(&i) as i32 as f32,
-                        )
-                    })
-                    .unzip(),
-                &[vp],
-                &wgpu.queue,
-            );
-            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
-                color_attachments: &[],
-                depth_stencil_attachment: None,
+            let inst = self
+                .actors
+                .iter()
+                .enumerate()
+                .map(|(i, actor)| {
+                    (
+                        actor.model_matrix(map),
+                        self.selected.contains(&i) as i32 as f32,
+                    )
+                })
+                .unzip();
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.painter().add(egui::PaintCallback {
+                    rect: ui.max_rect(),
+                    callback: std::sync::Arc::new(
+                        eframe::egui_wgpu::CallbackFn::new()
+                            .prepare(move |_, queue, _, res| {
+                                let cubes: &mut rendering::Cube = res.get_mut().unwrap();
+                                cubes.copy(&inst, &[vp.clone()], queue);
+                                vec![]
+                            })
+                            .paint(|_, pass, res| {
+                                let cubes: &rendering::Cube = res.get().unwrap();
+                                cubes.draw(pass);
+                            }),
+                    ),
+                });
             });
-            self.cubes.draw(&mut pass);
             // for (actor, mesh) in self
             //     .actors
             //     .iter()
@@ -740,8 +746,6 @@ impl eframe::App for Stove {
             //         }
             //     }
             // }
-            drop(pass);
-            wgpu.queue.submit(Some(encoder.finish()));
         }
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
