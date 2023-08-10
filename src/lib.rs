@@ -718,23 +718,22 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 
 impl eframe::App for Stove {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        ctx.input(|input| self.handle_input(input, ctx, frame));
-        if let Some(map) = self.map.as_ref() {
-            let vp = self.view_projection(frame);
-            let inst: Vec<_> = self
-                .actors
-                .iter()
-                .enumerate()
-                .map(|(i, actor)| {
-                    (
-                        actor.model_matrix(map),
-                        self.selected.contains(&i) as i32 as f32,
-                    )
-                })
-                .collect();
-            egui::CentralPanel::default()
-                .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
-                .show(ctx, |ui| {
+        let mut hovered = egui::CentralPanel::default()
+            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
+            .show(ctx, |ui| {
+                if let Some(map) = self.map.as_ref() {
+                    let vp = self.view_projection(frame);
+                    let inst: Vec<_> = self
+                        .actors
+                        .iter()
+                        .enumerate()
+                        .map(|(i, actor)| {
+                            (
+                                actor.model_matrix(map),
+                                self.selected.contains(&i) as i32 as f32,
+                            )
+                        })
+                        .collect();
                     ui.painter().add(egui::PaintCallback {
                         rect: ui.max_rect(),
                         callback: std::sync::Arc::new(
@@ -750,33 +749,35 @@ impl eframe::App for Stove {
                                 }),
                         ),
                     });
-                });
-            // for (actor, mesh) in self
-            //     .actors
-            //     .iter()
-            //     .filter_map(|actor| match &actor.draw_type {
-            //         actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
-            //         actor::DrawType::Cube => None,
-            //     })
-            // {
-            //     mesh.draw(mqctx, vp * actor.model_matrix(map));
-            // }
-            // if !self.selected.is_empty() {
-            //     if self.grab != Grab::None {
-            //         if let Some((loc, sca)) = self.avg_transform() {
-            //             self.axes.draw(
-            //                 mqctx,
-            //                 &self.filter,
-            //                 vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
-            //             )
-            //         }
-            //     }
-            // }
-        }
+                    // for (actor, mesh) in self
+                    //     .actors
+                    //     .iter()
+                    //     .filter_map(|actor| match &actor.draw_type {
+                    //         actor::DrawType::Mesh(key) => self.meshes.get(key).map(|mesh| (actor, mesh)),
+                    //         actor::DrawType::Cube => None,
+                    //     })
+                    // {
+                    //     mesh.draw(mqctx, vp * actor.model_matrix(map));
+                    // }
+                    // if !self.selected.is_empty() {
+                    //     if self.grab != Grab::None {
+                    //         if let Some((loc, sca)) = self.avg_transform() {
+                    //             self.axes.draw(
+                    //                 mqctx,
+                    //                 &self.filter,
+                    //                 vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
+                    //             )
+                    //         }
+                    //     }
+                    // }
+                }
+            })
+            .response
+            .hovered();
         if !self.ui {
             return;
         }
-        egui::SidePanel::left("sidepanel").show(ctx, |ui| {
+        hovered &= !egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("file", |ui| {
                     if ui.add(egui::Button::new("open").shortcut_text("ctrl + o")).clicked() {
@@ -941,7 +942,7 @@ impl eframe::App for Stove {
                     );
                 }
             }
-        });
+        }).response.hovered();
         let mut open = true;
         let mut transplanted = None;
         if let Some((map, (donor, actors, selected))) =
@@ -1076,6 +1077,7 @@ impl eframe::App for Stove {
                 self.save()
             }
         }
+        ctx.input(|input| self.handle_input(input, ctx, frame, hovered));
         ctx.request_repaint();
     }
 
@@ -1115,6 +1117,7 @@ impl Stove {
         input: &egui::InputState,
         ctx: &eframe::egui::Context,
         frame: &mut eframe::Frame,
+        hovered: bool,
     ) {
         use egui::{Key, PointerButton};
         if let Some(egui::DroppedFile {
@@ -1134,7 +1137,7 @@ impl Stove {
                     modifiers,
                 } => match pressed {
                     true => {
-                        if ctx.is_pointer_over_area() || modifiers.ctrl || *repeat {
+                        if !hovered || modifiers.ctrl || *repeat {
                             return;
                         }
                         self.filter = match key {
@@ -1263,7 +1266,7 @@ impl Stove {
                     modifiers,
                 } => match pressed {
                     true => {
-                        if ctx.is_pointer_over_area() {
+                        if !hovered {
                             return;
                         }
                         let proj = self.view_projection(frame);
@@ -1351,7 +1354,7 @@ impl Stove {
                 },
                 egui::Event::Scroll(egui::Vec2 { y, .. }) => {
                     // a logarithmic speed increase is better because unreal maps can get massive
-                    if !ctx.is_pointer_over_area() {
+                    if hovered {
                         self.camera.speed = (self.camera.speed as f32
                             * match y.is_sign_positive() {
                                 true => 100.0 / y,
