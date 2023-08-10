@@ -18,7 +18,7 @@ enum Grab {
     Location(f32),
     Rotation,
     // actor screen coords
-    Scale3D(glam::Vec2),
+    Scale(glam::Vec2),
 }
 
 pub struct Stove {
@@ -126,7 +126,7 @@ impl std::io::Seek for Wrapper {
 }
 
 fn config() -> Option<std::path::PathBuf> {
-    dirs::config_local_dir().map(|path| path.join("stove"))
+    dirs::config_dir().map(|path| path.join("stove"))
 }
 
 impl Stove {
@@ -732,23 +732,25 @@ impl eframe::App for Stove {
                     )
                 })
                 .unzip();
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.painter().add(egui::PaintCallback {
-                    rect: ui.max_rect(),
-                    callback: std::sync::Arc::new(
-                        eframe::egui_wgpu::CallbackFn::new()
-                            .prepare(move |_, queue, _, res| {
-                                let cubes: &mut rendering::Cube = res.get_mut().unwrap();
-                                cubes.copy(&inst, &[vp.clone()], queue);
-                                vec![]
-                            })
-                            .paint(|_, pass, res| {
-                                let cubes: &rendering::Cube = res.get().unwrap();
-                                cubes.draw(pass);
-                            }),
-                    ),
+            egui::CentralPanel::default()
+                .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
+                .show(ctx, |ui| {
+                    ui.painter().add(egui::PaintCallback {
+                        rect: ui.max_rect(),
+                        callback: std::sync::Arc::new(
+                            eframe::egui_wgpu::CallbackFn::new()
+                                .prepare(move |_, queue, _, res| {
+                                    let cubes: &mut rendering::Cube = res.get_mut().unwrap();
+                                    cubes.copy(&inst, &[vp.clone()], queue);
+                                    vec![]
+                                })
+                                .paint(|_, pass, res| {
+                                    let cubes: &rendering::Cube = res.get().unwrap();
+                                    cubes.draw(pass);
+                                }),
+                        ),
+                    });
                 });
-            });
             // for (actor, mesh) in self
             //     .actors
             //     .iter()
@@ -1074,6 +1076,7 @@ impl eframe::App for Stove {
                 self.save()
             }
         }
+        ctx.request_repaint();
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -1242,13 +1245,13 @@ impl Stove {
                                     } * 0.01,
                                 ),
                             ),
-                            Grab::Scale3D(coords) => self.actors[i].mul_scale(
+                            Grab::Scale(coords) => self.actors[i].mul_scale(
                                 self.map.as_mut().unwrap(),
                                 glam::Vec3::ONE
                                     + self.filter
                                         * (coords.distance(glam::vec2(pos.x, pos.y))
                                             - coords.distance(self.last_mouse_pos))
-                                        * 0.005,
+                                        * 0.004,
                             ),
                         }
                     }
@@ -1314,7 +1317,7 @@ impl Stove {
                                                 .distance(self.camera.position),
                                         ),
                                         PointerButton::Secondary => Grab::Rotation,
-                                        PointerButton::Middle => Grab::Scale3D({
+                                        PointerButton::Middle => Grab::Scale({
                                             let size = frame.info().window_info.size;
                                             let pos = self
                                                 .get_avg(|actor, map| actor.coords(map, proj))
@@ -1350,9 +1353,9 @@ impl Stove {
                     // a logarithmic speed increase is better because unreal maps can get massive
                     if !ctx.is_pointer_over_area() {
                         self.camera.speed = (self.camera.speed as f32
-                            * match y.is_sign_negative() {
-                                true => 100.0 / -y,
-                                false => y / 100.0,
+                            * match y.is_sign_positive() {
+                                true => 100.0 / y,
+                                false => -y / 100.0,
                             })
                         .clamp(5.0, 50000.0) as u16;
                     }

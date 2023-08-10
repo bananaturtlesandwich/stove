@@ -188,7 +188,7 @@ impl Cube {
     pub fn draw<'a>(&'a self, pass: &mut RenderPass<'a>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bindings, &[]);
-        pass.set_index_buffer(self.indices.slice(..), IndexFormat::Uint16);
+        pass.set_index_buffer(self.indices.slice(..), IndexFormat::Uint32);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
         // again don't know a better way to do mat4 :p
         let chunk = self.inst.size() / 4;

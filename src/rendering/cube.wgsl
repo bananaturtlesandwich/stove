@@ -8,7 +8,14 @@ struct Output {
 };
 
 @vertex
-fn vert(@location(0) pos: vec3<f32>, @location(1) instx: vec4<f32>, @location(2) insty: vec4<f32>, @location(3) instz: vec4<f32>, @location(4) instw: vec4<f32>, @location(5) selected: f32) -> Output {
+fn vert(
+    @location(0) pos: vec3<f32>,
+    @location(1) instx: vec4<f32>,
+    @location(2) insty: vec4<f32>,
+    @location(3) instz: vec4<f32>,
+    @location(4) instw: vec4<f32>,
+    @location(5) selected: f32
+) -> Output {
     var out: Output;
     let inst = mat4x4(instx, insty, instz, instw);
     out.selected = selected;
@@ -18,5 +25,5 @@ fn vert(@location(0) pos: vec3<f32>, @location(1) instx: vec4<f32>, @location(2)
 
 @fragment
 fn frag(vert: Output) -> @location(0) vec4<f32> {
-    return vec4<f32>(vert.selected, 0.0, 0.0, 1.0);
+    return vec4<f32>(vert.selected, 1.0, 0.5, 1.0);
 }
