@@ -721,7 +721,7 @@ impl eframe::App for Stove {
         ctx.input(|input| self.handle_input(input, ctx, frame));
         if let Some(map) = self.map.as_ref() {
             let vp = self.view_projection(frame);
-            let inst = self
+            let inst: Vec<_> = self
                 .actors
                 .iter()
                 .enumerate()
@@ -731,7 +731,7 @@ impl eframe::App for Stove {
                         self.selected.contains(&i) as i32 as f32,
                     )
                 })
-                .unzip();
+                .collect();
             egui::CentralPanel::default()
                 .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
                 .show(ctx, |ui| {

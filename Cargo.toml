@@ -12,6 +12,7 @@ unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package 
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 eframe = { version = "0.22", default-features = false, features = ["wgpu", "persistence"]}
+wrld = "1.0"
 egui-notify = "0.7"
 egui_file = "0.10"
 bytemuck = "1.13"

@@ -1,13 +1,10 @@
-use eframe::wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    *,
-};
+// wrld needs wgpu in scope
+use eframe::wgpu::{self, util::DeviceExt, *};
 
 pub struct Cube {
     vertices: Buffer,
     indices: Buffer,
     inst: Buffer,
-    selected: Buffer,
     pipeline: RenderPipeline,
     bindings: BindGroup,
     uniform: Buffer,
@@ -19,9 +16,30 @@ fn size_of<T>() -> u64 {
 }
 
 #[repr(C)]
-#[derive(bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
+#[derive(wrld::Desc, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
+struct Vert {
+    #[f32x3(0)]
+    pos: [f32; 3],
+}
+
+impl Vert {
+    const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { pos: [x, y, z] }
+    }
+}
+
+#[repr(C)]
+#[derive(wrld::DescInstance, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
 struct Inst {
-    inst: [[f32; 4]; 4],
+    #[f32x4(1)]
+    instx: [f32; 4],
+    #[f32x4(2)]
+    insty: [f32; 4],
+    #[f32x4(3)]
+    instz: [f32; 4],
+    #[f32x4(4)]
+    instw: [f32; 4],
+    #[f32(5)]
     selected: f32,
 }
 
@@ -55,15 +73,15 @@ impl Cube {
                 label: None,
                 contents: bytemuck::cast_slice(&[
                     // front verts
-                    glam::vec3(-0.5, -0.5, -0.5),
-                    glam::vec3(-0.5, 0.5, -0.5),
-                    glam::vec3(0.5, -0.5, -0.5),
-                    glam::vec3(0.5, 0.5, -0.5),
+                    Vert::new(-0.5, -0.5, -0.5),
+                    Vert::new(-0.5, 0.5, -0.5),
+                    Vert::new(0.5, -0.5, -0.5),
+                    Vert::new(0.5, 0.5, -0.5),
                     // back verts
-                    glam::vec3(-0.5, -0.5, 0.5),
-                    glam::vec3(-0.5, 0.5, 0.5),
-                    glam::vec3(0.5, -0.5, 0.5),
-                    glam::vec3(0.5, 0.5, 0.5),
+                    Vert::new(-0.5, -0.5, 0.5),
+                    Vert::new(-0.5, 0.5, 0.5),
+                    Vert::new(0.5, -0.5, 0.5),
+                    Vert::new(0.5, 0.5, 0.5),
                 ]),
                 usage: BufferUsages::VERTEX,
             }),
@@ -76,13 +94,7 @@ impl Cube {
             }),
             inst: device.create_buffer(&BufferDescriptor {
                 label: None,
-                size: 512 * 1024 * size_of::<glam::Mat4>(),
-                usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
-            selected: device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: 512 * 1024 * size_of::<f32>(),
+                size: 512 * 1024 * (size_of::<glam::Mat4>() + size_of::<f32>()),
                 usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
@@ -96,53 +108,7 @@ impl Cube {
                 vertex: VertexState {
                     module: &shader,
                     entry_point: "vert",
-                    buffers: &[
-                        VertexBufferLayout {
-                            array_stride: size_of::<glam::Vec3>(),
-                            step_mode: VertexStepMode::Vertex,
-                            attributes: &[VertexAttribute {
-                                format: VertexFormat::Float32x3,
-                                offset: 0,
-                                shader_location: 0,
-                            }],
-                        },
-                        VertexBufferLayout {
-                            array_stride: size_of::<glam::Mat4>(),
-                            step_mode: VertexStepMode::Instance,
-                            attributes: &[
-                                // is this the best way to do matrices?
-                                VertexAttribute {
-                                    format: VertexFormat::Float32x4,
-                                    offset: 0,
-                                    shader_location: 1,
-                                },
-                                VertexAttribute {
-                                    format: VertexFormat::Float32x4,
-                                    offset: size_of::<glam::Vec4>(),
-                                    shader_location: 2,
-                                },
-                                VertexAttribute {
-                                    format: VertexFormat::Float32x4,
-                                    offset: size_of::<glam::Vec4>() * 2,
-                                    shader_location: 3,
-                                },
-                                VertexAttribute {
-                                    format: VertexFormat::Float32x4,
-                                    offset: size_of::<glam::Vec4>() * 3,
-                                    shader_location: 4,
-                                },
-                            ],
-                        },
-                        VertexBufferLayout {
-                            array_stride: size_of::<f32>(),
-                            step_mode: VertexStepMode::Instance,
-                            attributes: &[VertexAttribute {
-                                format: VertexFormat::Float32,
-                                offset: 0,
-                                shader_location: 5,
-                            }],
-                        },
-                    ],
+                    buffers: &[Vert::desc(), Inst::desc()],
                 },
                 primitive: PrimitiveState {
                     topology: PrimitiveTopology::LineList,
@@ -173,16 +139,24 @@ impl Cube {
 
     pub fn copy(
         &mut self,
-        (inst, selected): &(Vec<glam::Mat4>, Vec<f32>),
+        inst: &[(glam::Mat4, f32)],
         // just a slice so it's easier to cast
         vp: &[glam::Mat4],
         queue: &Queue,
     ) {
-        let inst: Vec<_> = inst.into_iter().map(|mat| mat.to_cols_array_2d()).collect();
+        let inst: Vec<_> = inst
+            .into_iter()
+            .map(|(mat, selected)| Inst {
+                instx: mat.x_axis.to_array(),
+                insty: mat.y_axis.to_array(),
+                instz: mat.z_axis.to_array(),
+                instw: mat.w_axis.to_array(),
+                selected: *selected,
+            })
+            .collect();
         queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(vp));
         queue.write_buffer(&self.inst, 0, bytemuck::cast_slice(&inst));
-        queue.write_buffer(&self.selected, 0, bytemuck::cast_slice(&selected));
-        self.num = selected.len() as u32;
+        self.num = inst.len() as u32;
     }
 
     pub fn draw<'a>(&'a self, pass: &mut RenderPass<'a>) {
