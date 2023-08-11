@@ -1,15 +1,29 @@
-use eframe::wgpu::{util::DeviceExt, *};
+use eframe::wgpu::{self, util::DeviceExt, *};
 
 use super::{size_of, Vert};
 
-#[derive(Debug)]
 pub struct Mesh {
     vertices: Buffer,
     indices: Buffer,
+    inst: Buffer,
     pipeline: RenderPipeline,
     bindings: BindGroup,
     uniform: Buffer,
+    len: u32,
     num: u32,
+}
+
+#[repr(C)]
+#[derive(wrld::DescInstance, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
+struct Inst {
+    #[f32x4(1)]
+    instx: [f32; 4],
+    #[f32x4(2)]
+    insty: [f32; 4],
+    #[f32x4(3)]
+    instz: [f32; 4],
+    #[f32x4(4)]
+    instw: [f32; 4],
 }
 
 impl Mesh {
@@ -42,7 +56,7 @@ impl Mesh {
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let num = indices.len() as u32;
+        let len = indices.len() as u32;
         Self {
             vertices: device.create_buffer_init(&util::BufferInitDescriptor {
                 label: None,
@@ -54,6 +68,12 @@ impl Mesh {
                 contents: bytemuck::cast_slice(&indices),
                 usage: BufferUsages::INDEX,
             }),
+            inst: device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: 512 * 1024 * size_of::<glam::Mat4>(),
+                usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }),
             pipeline: device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: None,
                 layout: Some(&device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -64,7 +84,7 @@ impl Mesh {
                 vertex: VertexState {
                     module: &shader,
                     entry_point: "vert",
-                    buffers: &[Vert::desc()],
+                    buffers: &[Vert::desc(), Inst::desc()],
                 },
                 primitive: PrimitiveState {
                     polygon_mode: PolygonMode::Line,
@@ -89,21 +109,37 @@ impl Mesh {
                 }],
             }),
             uniform,
-            num,
+            len,
+            num: 0,
         }
     }
-}
 
-impl Mesh {
-    pub fn copy(&mut self, vp: &[glam::Mat4], queue: &Queue) {
-        queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(vp));
+    pub fn reset(&mut self) {
+        self.num = 0
     }
+
+    pub fn copy(&mut self, mat: glam::Mat4, vp: &[glam::Mat4], queue: &Queue) {
+        queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(vp));
+        queue.write_buffer(
+            &self.inst,
+            self.num as u64 * size_of::<glam::Mat4>(),
+            bytemuck::cast_slice(&[Inst {
+                instx: mat.x_axis.to_array(),
+                insty: mat.y_axis.to_array(),
+                instz: mat.z_axis.to_array(),
+                instw: mat.w_axis.to_array(),
+            }]),
+        );
+        self.num += 1;
+    }
+
     pub fn draw<'a>(&'a self, pass: &mut RenderPass<'a>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bindings, &[]);
         pass.set_index_buffer(self.indices.slice(..), IndexFormat::Uint32);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
-        pass.draw_indexed(0..self.num, 0, 0..1);
+        pass.set_vertex_buffer(1, self.inst.slice(..));
+        pass.draw_indexed(0..self.len, 0, 0..self.num);
     }
 }
 // pub struct Mesh {
