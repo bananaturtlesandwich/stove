@@ -121,13 +121,7 @@ impl Cube {
         }
     }
 
-    pub fn copy(
-        &mut self,
-        inst: &[(glam::Mat4, f32)],
-        // just a slice so it's easier to cast
-        vp: &[glam::Mat4],
-        queue: &Queue,
-    ) {
+    pub fn copy(&mut self, inst: &[(glam::Mat4, f32)], vp: &glam::Mat4, queue: &Queue) {
         let inst: Vec<_> = inst
             .into_iter()
             .map(|(mat, selected)| Inst {
@@ -138,7 +132,7 @@ impl Cube {
                 selected: *selected,
             })
             .collect();
-        queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(vp));
+        queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(vp));
         queue.write_buffer(&self.inst, 0, bytemuck::cast_slice(&inst));
         self.num = inst.len() as u32;
     }

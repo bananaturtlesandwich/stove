@@ -647,7 +647,7 @@ impl eframe::App for Stove {
                             eframe::egui_wgpu::CallbackFn::new()
                                 .prepare(move |_, queue, _, res| {
                                     let cubes: &mut rendering::Cube = res.get_mut().unwrap();
-                                    cubes.copy(&inst, &[vp], queue);
+                                    cubes.copy(&inst, &vp, queue);
                                     vec![]
                                 })
                                 .paint(|_, pass, res| {
@@ -666,8 +666,8 @@ impl eframe::App for Stove {
                                         .prepare(move |_, queue, _, res| {
                                             let axes: &mut rendering::Axes = res.get_mut().unwrap();
                                             axes.copy(
-                                                &[vp * glam::Mat4::from_translation(loc)
-                                                    * glam::Mat4::from_scale(sca)],
+                                                &(vp * glam::Mat4::from_translation(loc)
+                                                    * glam::Mat4::from_scale(sca)),
                                                 queue,
                                             );
                                             vec![]
@@ -704,7 +704,7 @@ impl eframe::App for Stove {
                                     let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> =
                                         res.get_mut().unwrap();
                                     for (model, key) in actors.iter() {
-                                        meshes.get_mut(key).unwrap().copy(*model, &[vp], queue);
+                                        meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
                                     }
                                     vec![]
                                 })

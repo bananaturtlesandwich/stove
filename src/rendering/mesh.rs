@@ -65,7 +65,7 @@ impl Mesh {
             }),
             indices: device.create_buffer_init(&util::BufferInitDescriptor {
                 label: None,
-                contents: bytemuck::cast_slice(&indices),
+                contents: bytemuck::cast_slice(indices),
                 usage: BufferUsages::INDEX,
             }),
             inst: device.create_buffer(&BufferDescriptor {
@@ -118,17 +118,17 @@ impl Mesh {
         self.num = 0
     }
 
-    pub fn copy(&mut self, mat: glam::Mat4, vp: &[glam::Mat4], queue: &Queue) {
-        queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(vp));
+    pub fn copy(&mut self, mat: glam::Mat4, vp: &glam::Mat4, queue: &Queue) {
+        queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(vp));
         queue.write_buffer(
             &self.inst,
             self.num as u64 * size_of::<glam::Mat4>(),
-            bytemuck::cast_slice(&[Inst {
+            bytemuck::bytes_of(&Inst {
                 instx: mat.x_axis.to_array(),
                 insty: mat.y_axis.to_array(),
                 instz: mat.z_axis.to_array(),
                 instw: mat.w_axis.to_array(),
-            }]),
+            }),
         );
         self.num += 1;
     }

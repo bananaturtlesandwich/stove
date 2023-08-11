@@ -92,8 +92,8 @@ impl Axes {
 }
 
 impl Axes {
-    pub fn copy(&mut self, vp: &[glam::Mat4], queue: &Queue) {
-        queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(vp));
+    pub fn copy(&mut self, vp: &glam::Mat4, queue: &Queue) {
+        queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(vp));
     }
     pub fn draw<'a>(&'a self, filter: glam::Vec3, pass: &mut RenderPass<'a>) {
         let mut draw = |range| {
