@@ -1,6 +1,6 @@
 @group(0)
 @binding(0)
-var<uniform> vp: mat4x4f;
+var<uniform> mvp: mat4x4f;
 
 struct Output {
     @location(0) orig: vec3f,
@@ -11,7 +11,7 @@ struct Output {
 fn vert(
     @location(0) pos: vec3f,
 ) -> Output {
-    return Output(pos, vp * vec4(pos, 1.0));
+    return Output(pos, mvp * vec4(pos, 1.0));
 }
 
 @fragment

@@ -1,12 +1,12 @@
 @group(0)
 @binding(0)
-var<uniform> vp: mat4x4f;
+var<uniform> mvp: mat4x4f;
 
 @vertex
 fn vert(
     @location(0) pos: vec3f,
 ) -> @builtin(position) vec4f {
-    return vp * vec4(pos, 1.0);
+    return mvp * vec4(pos, 1.0);
 }
 
 @fragment

@@ -10,6 +10,13 @@ fn main() -> Result<(), eframe::Error> {
                 height: 64,
             }),
             initial_window_size: Some(eframe::egui::vec2(800.0, 600.0)),
+            wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
+                device_descriptor: std::sync::Arc::new(|_| eframe::wgpu::DeviceDescriptor {
+                    features: eframe::wgpu::Features::POLYGON_MODE_LINE,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
             ..Default::default()
         },
         Box::new(|ctx| Box::new(stove::Stove::new(ctx))),

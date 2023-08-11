@@ -6,8 +6,6 @@ use unreal_asset::{
     types::PackageIndex,
 };
 
-use crate::actor::DrawType;
-
 mod actor;
 mod asset;
 mod extras;
@@ -647,7 +645,7 @@ impl eframe::App for Stove {
                             eframe::egui_wgpu::CallbackFn::new()
                                 .prepare(move |_, queue, _, res| {
                                     let cubes: &mut rendering::Cube = res.get_mut().unwrap();
-                                    cubes.copy(&inst, &[vp.clone()], queue);
+                                    cubes.copy(&inst, &[vp], queue);
                                     vec![]
                                 })
                                 .paint(|_, pass, res| {
@@ -680,13 +678,15 @@ impl eframe::App for Stove {
                             });
                         }
                     }
-                    for key in self
-                        .actors
-                        .iter()
-                        .filter_map(|actor| match &actor.draw_type {
-                            actor::DrawType::Mesh(key) => Some(key.clone()),
-                            actor::DrawType::Cube => None,
-                        })
+                    for (model, key) in
+                        self.actors
+                            .iter()
+                            .filter_map(|actor| match &actor.draw_type {
+                                actor::DrawType::Mesh(key) => {
+                                    Some((actor.model_matrix(map), key.clone()))
+                                }
+                                actor::DrawType::Cube => None,
+                            })
                     {
                         let cloned = key.clone();
                         ui.painter().add(egui::PaintCallback {
@@ -698,7 +698,7 @@ impl eframe::App for Stove {
                                             String,
                                             rendering::Mesh,
                                         > = res.get_mut().unwrap();
-                                        meshes.get_mut(&cloned).unwrap().copy(&[vp], queue);
+                                        meshes.get_mut(&cloned).unwrap().copy(&[vp * model], queue);
                                         vec![]
                                     })
                                     .paint(move |_, pass, res| {

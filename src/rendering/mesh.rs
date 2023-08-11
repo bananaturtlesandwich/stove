@@ -67,6 +67,7 @@ impl Mesh {
                     buffers: &[Vert::desc()],
                 },
                 primitive: PrimitiveState {
+                    polygon_mode: PolygonMode::Line,
                     cull_mode: Some(Face::Back),
                     ..Default::default()
                 },
