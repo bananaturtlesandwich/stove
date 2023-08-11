@@ -147,7 +147,7 @@ impl Stove {
             .and_then(|ver| ver.parse::<usize>().ok())
             .unwrap_or_default();
         let paks = retrieve("PAKS")
-            .map(|paks| paks.split_inclusive(',').map(ToString::to_string).collect())
+            .map(|paks| paks.split(',').map(ToString::to_string).collect())
             .unwrap_or_default();
         let distance = retrieve("DIST")
             .and_then(|dist| dist.parse().ok())
@@ -346,10 +346,13 @@ impl Stove {
                                 _ => func(
                                     unreal_asset::Asset::new(
                                         Wrapper::Bytes(std::io::Cursor::new(
-                                            pak.get(&mesh).map_err(|_| {
-                                                unreal_asset::error::Error::no_data(
-                                                    "files not found".to_string(),
-                                                )
+                                            pak.get(&mesh).map_err(|e| {
+                                                unreal_asset::error::Error::no_data(match e {
+                                                    unpak::Error::Oodle => {
+                                                        "oodle paks are unsupported atm".to_string()
+                                                    }
+                                                    e => format!("error reading pak: {e}"),
+                                                })
                                             })?,
                                         )),
                                         pak.get(&exp)
