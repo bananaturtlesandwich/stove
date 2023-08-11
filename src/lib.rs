@@ -130,10 +130,6 @@ fn config() -> Option<std::path::PathBuf> {
 impl Stove {
     pub fn new(ctx: &eframe::CreationContext) -> Self {
         let Some(wgpu) = ctx.wgpu_render_state.as_ref() else { panic!("wgpu failed to initialise") };
-        let res = &mut wgpu.renderer.write().paint_callback_resources;
-        res.insert(rendering::Cube::new(&wgpu.device, wgpu.target_format));
-        res.insert(rendering::Axes::new(&wgpu.device, wgpu.target_format));
-        res.insert(hashbrown::HashMap::<String, rendering::Mesh>::new());
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -248,7 +244,11 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate,
         };
-        stove.refresh(wgpu);
+        let res = &mut wgpu.renderer.write().paint_callback_resources;
+        res.insert(rendering::Cube::new(&wgpu.device, wgpu.target_format));
+        res.insert(rendering::Axes::new(&wgpu.device, wgpu.target_format));
+        res.insert(hashbrown::HashMap::<String, rendering::Mesh>::new());
+        stove.refresh(res, &wgpu.device, wgpu.target_format);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -259,7 +259,12 @@ impl Stove {
         VERSIONS[self.version].0
     }
 
-    fn refresh(&mut self, wgpu: &eframe::egui_wgpu::RenderState) {
+    fn refresh(
+        &mut self,
+        res: &mut type_map::concurrent::TypeMap,
+        device: &eframe::wgpu::Device,
+        format: eframe::wgpu::TextureFormat,
+    ) {
         let Some(map) = self.map.as_ref() else {return};
         self.actors.clear();
         self.selected.clear();
@@ -284,7 +289,6 @@ impl Stove {
             .filter(|_| self.use_cache)
             .map(|path| path.join("cache"));
         let version = self.version();
-        let res = &mut wgpu.renderer.write().paint_callback_resources;
         let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> = res.get_mut().unwrap();
         for index in actor::get_actors(map) {
             match actor::Actor::new(map, index) {
@@ -412,12 +416,7 @@ impl Stove {
                                     //     .collect();
                                     meshes.insert(
                                         path.to_string(),
-                                        rendering::Mesh::new(
-                                            &positions,
-                                            &indices,
-                                            &wgpu.device,
-                                            wgpu.target_format,
-                                        ),
+                                        rendering::Mesh::new(&positions, &indices, device, format),
                                     );
                                     break;
                                 }
@@ -955,7 +954,11 @@ impl eframe::App for Stove {
                     ],
                 );
                 self.open(&path);
-                self.refresh(wgpu);
+                self.refresh(
+                    &mut wgpu.renderer.write().paint_callback_resources,
+                    &wgpu.device,
+                    wgpu.target_format,
+                );
             }
         }
         self.transplant_dialog.show(ctx);
@@ -1069,7 +1072,11 @@ impl Stove {
         {
             self.open(&path);
             if let Some(wgpu) = frame.wgpu_render_state() {
-                self.refresh(wgpu)
+                self.refresh(
+                    &mut wgpu.renderer.write().paint_callback_resources,
+                    &wgpu.device,
+                    wgpu.target_format,
+                )
             }
         }
         self.camera.update_times(input.stable_dt);
