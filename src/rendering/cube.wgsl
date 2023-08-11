@@ -1,29 +1,26 @@
 @group(0)
 @binding(0)
-var<uniform> vp: mat4x4<f32>;
+var<uniform> vp: mat4x4f;
 
 struct Output {
     @location(0) selected: f32,
-    @builtin(position) position: vec4<f32>,
+    @builtin(position) position: vec4f,
 };
 
 @vertex
 fn vert(
-    @location(0) pos: vec3<f32>,
-    @location(1) instx: vec4<f32>,
-    @location(2) insty: vec4<f32>,
-    @location(3) instz: vec4<f32>,
-    @location(4) instw: vec4<f32>,
+    @location(0) pos: vec3f,
+    @location(1) instx: vec4f,
+    @location(2) insty: vec4f,
+    @location(3) instz: vec4f,
+    @location(4) instw: vec4f,
     @location(5) selected: f32
 ) -> Output {
-    var out: Output;
     let inst = mat4x4(instx, insty, instz, instw);
-    out.selected = selected;
-    out.position = vp * inst * vec4(pos.x, pos.y, pos.z, 1.0);
-    return out;
+    return Output(selected, vp * inst * vec4(pos, 1.0));
 }
 
 @fragment
-fn frag(vert: Output) -> @location(0) vec4<f32> {
-    return vec4<f32>(vert.selected, 1.0, 0.5, 1.0);
+fn frag(vert: Output) -> @location(0) vec4f {
+    return vec4(vert.selected, 1.0, 0.5, 1.0);
 }

@@ -28,7 +28,6 @@ pub struct Stove {
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
-    // axes: rendering::Axes,
     // meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
     transplant: Option<(
@@ -132,10 +131,9 @@ fn config() -> Option<std::path::PathBuf> {
 impl Stove {
     pub fn new(ctx: &eframe::CreationContext) -> Self {
         let Some(wgpu) = ctx.wgpu_render_state.as_ref() else { panic!("wgpu failed to initialise") };
-        wgpu.renderer
-            .write()
-            .paint_callback_resources
-            .insert(rendering::Cube::new(&wgpu.device, wgpu.target_format));
+        let res = &mut wgpu.renderer.write().paint_callback_resources;
+        res.insert(rendering::Cube::new(&wgpu.device, wgpu.target_format));
+        res.insert(rendering::Axes::new(&wgpu.device, wgpu.target_format));
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -209,7 +207,6 @@ impl Stove {
             version,
             actors: Vec::new(),
             selected: Vec::new(),
-            // axes: rendering::Axes::new(ctx),
             // meshes: hashbrown::HashMap::new(),
             ui: true,
             transplant: None,
@@ -749,6 +746,30 @@ impl eframe::App for Stove {
                                 }),
                         ),
                     });
+                    if self.grab != Grab::None {
+                        if let Some((loc, sca)) = self.avg_transform() {
+                            let filter = self.filter.clone();
+                            ui.painter().add(egui::PaintCallback {
+                                rect: ui.max_rect(),
+                                callback: std::sync::Arc::new(
+                                    eframe::egui_wgpu::CallbackFn::new()
+                                        .prepare(move |_, queue, _, res| {
+                                            let axes: &mut rendering::Axes = res.get_mut().unwrap();
+                                            axes.copy(
+                                                &[vp * glam::Mat4::from_translation(loc)
+                                                    * glam::Mat4::from_scale(sca)],
+                                                queue,
+                                            );
+                                            vec![]
+                                        })
+                                        .paint(move |_, pass, res| {
+                                            let axes: &rendering::Axes = res.get().unwrap();
+                                            axes.draw(filter, pass);
+                                        }),
+                                ),
+                            });
+                        }
+                    }
                     // for (actor, mesh) in self
                     //     .actors
                     //     .iter()
@@ -758,17 +779,6 @@ impl eframe::App for Stove {
                     //     })
                     // {
                     //     mesh.draw(mqctx, vp * actor.model_matrix(map));
-                    // }
-                    // if !self.selected.is_empty() {
-                    //     if self.grab != Grab::None {
-                    //         if let Some((loc, sca)) = self.avg_transform() {
-                    //             self.axes.draw(
-                    //                 mqctx,
-                    //                 &self.filter,
-                    //                 vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca),
-                    //             )
-                    //         }
-                    //     }
                     // }
                 }
             })
