@@ -11,6 +11,7 @@ use unreal_asset::{
     reader::archive_trait::ArchiveTrait,
 };
 
+// currently doesn't read bulk data but we'll get there
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     use obj_exporter::*;
