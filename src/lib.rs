@@ -28,7 +28,7 @@ pub struct Stove {
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
-    // meshes: hashbrown::HashMap<String, rendering::Mesh>,
+    meshes: hashbrown::HashMap<String, rendering::Mesh>,
     ui: bool,
     transplant: Option<(
         unreal_asset::Asset<std::fs::File>,
@@ -207,7 +207,7 @@ impl Stove {
             version,
             actors: Vec::new(),
             selected: Vec::new(),
-            // meshes: hashbrown::HashMap::new(),
+            meshes: hashbrown::HashMap::new(),
             ui: true,
             transplant: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
@@ -264,84 +264,165 @@ impl Stove {
         self.actors.clear();
         self.selected.clear();
         let Some(map) = self.map.as_ref() else {return};
-        // let key = match hex::decode(self.aes.trim_start_matches("0x")) {
-        //     Ok(key) if !self.aes.is_empty() => Some(key),
-        //     Ok(_) => None,
-        //     Err(_) => {
-        //         self.notifs.error("aes key is invalid hex");
-        //         None
-        //     }
-        // };
-        // let paks: Vec<_> = self
-        //     .paks
-        //     .iter()
-        //     .filter_map(|dir| std::fs::read_dir(dir).ok())
-        //     .flatten()
-        //     .filter_map(Result::ok)
-        //     .map(|dir| dir.path())
-        //     .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
-        //     .collect();
-        // let cache = config().map(|path| path.join("cache"));
+        let key = match hex::decode(self.aes.trim_start_matches("0x")) {
+            Ok(key) if !self.aes.is_empty() => Some(key),
+            Ok(_) => None,
+            Err(_) => {
+                self.notifs.error("aes key is invalid hex");
+                None
+            }
+        };
+        let paks: Vec<_> = self
+            .paks
+            .iter()
+            .filter_map(|dir| std::fs::read_dir(dir).ok())
+            .flatten()
+            .filter_map(Result::ok)
+            .map(|dir| dir.path())
+            .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
+            .collect();
+        let cache = config().map(|path| path.join("cache"));
+        let cache = config()
+            .filter(|_| self.use_cache)
+            .map(|path| path.join("cache"));
+        let version = self.version();
         for index in actor::get_actors(map) {
             match actor::Actor::new(map, index) {
                 Ok(actor) => {
-                    // if let actor::DrawType::Mesh(path) = &actor.draw_type {
-                    //     if !self.meshes.contains_key(path) {
-                    //         let (mesh, bulk) =
-                    //             (path.to_string() + ".uasset", path.to_string() + ".uexp");
-                    //         let mesh_path = mesh.trim_start_matches('/');
-                    //         for pak in paks.iter() {
-                    //             let info = match cache.as_ref() {
-                    //                 Some(cache)
-                    //                     if self.use_cache
-                    //                         && (cache.join(mesh_path).exists() ||
-                    //                     // try to create cache if it doesn't exist
-                    //                     (
-                    //                         std::fs::create_dir_all(cache.join(mesh_path).parent().unwrap()).is_ok() &&
-                    //                         pak.read_to_file(&mesh, cache.join(mesh_path)).is_ok() &&
-                    //                         // we don't care whether this is successful in case there is no uexp
-                    //                         pak.read_to_file(&bulk, cache.join(bulk.trim_start_matches('/'))).map_or(true,|_| true)
-                    //                     )) =>
-                    //                 {
-                    //                     let Ok(mesh) =
-                    //                         asset::open(cache.join(mesh_path), self.version())
-                    //                     else {
-                    //                         continue;
-                    //                     };
-                    //                     extras::get_mesh_info(mesh)
-                    //                 }
-                    //                 // if the cache cannot be created fall back to storing in memory
-                    //                 _ => {
-                    //                     let Ok(mesh) = pak.get(&mesh) else { continue };
-                    //                     let Ok(mesh) = unreal_asset::Asset::new(
-                    //                         std::io::Cursor::new(mesh),
-                    //                         pak.get(&bulk).ok().map(std::io::Cursor::new),
-                    //                         self.version(),
-                    //                         None
-                    //                     ) else {
-                    //                         continue;
-                    //                     };
-                    //                     extras::get_mesh_info(mesh)
-                    //                 }
-                    //             };
-                    //             match info {
-                    //                 Ok((positions, indices)) => {
-                    //                     self.meshes.insert(
-                    //                         path.to_string(),
-                    //                         rendering::Mesh::new(ctx, positions, indices),
-                    //                     );
-                    //                     break;
-                    //                 }
-                    //                 Err(e) => {
-                    //                     self.notifs.error(format!(
-                    //                         "{}: {e}",
-                    //                         path.split('/').last().unwrap_or_default()
-                    //                     ));
-                    //                 }
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    if let actor::DrawType::Mesh(path) = &actor.draw_type {
+                        if !self.meshes.contains_key(path) {
+                            fn get<T>(
+                                pak: &unpak::Pak,
+                                cache: Option<&std::path::Path>,
+                                path: &str,
+                                version: EngineVersion,
+                                func: impl Fn(
+                                    unreal_asset::Asset<Wrapper>,
+                                    Option<Wrapper>,
+                                )
+                                    -> Result<T, unreal_asset::error::Error>,
+                            ) -> Result<T, unreal_asset::error::Error> {
+                                let make = |ext: &str| path.to_string() + ext;
+                                let (mesh, exp, bulk, uptnl) = (
+                                    make(".uasset"),
+                                    make(".uexp"),
+                                    make(".ubulk"),
+                                    make(".uptnl"),
+                                );
+                                let cache_path =
+                                    |path: &str| cache.unwrap().join(path.trim_start_matches('/'));
+                                match cache {
+                                    Some(cache)
+                                        if cache.join(&path).exists() ||
+                                            // try to create cache if it doesn't exist
+                                            (
+                                                std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
+                                                pak.read_to_file(&mesh, cache_path(&path)).is_ok() &&
+                                                // we don't care whether these are successful in case they don't exist
+                                                pak.read_to_file(&exp, cache_path(&exp)).map_or(true,|_| true) &&
+                                                pak.read_to_file(&bulk, cache_path(&bulk)).map_or(true,|_| true) &&
+                                                pak.read_to_file(&uptnl, cache_path(&uptnl)).map_or(true,|_| true)
+                                            ) =>
+                                    {
+                                        func(
+                                            unreal_asset::Asset::new(
+                                                Wrapper::File(std::fs::File::open(cache_path(
+                                                    &mesh,
+                                                ))?),
+                                                std::fs::File::open(cache_path(&exp))
+                                                    .ok()
+                                                    .map(Wrapper::File),
+                                                version,
+                                                None,
+                                            )?,
+                                            std::fs::File::open(cache_path(&bulk))
+                                                .ok()
+                                                .map_or_else(
+                                                    || std::fs::File::open(cache_path(&uptnl)).ok(),
+                                                    Some,
+                                                )
+                                                .map(Wrapper::File),
+                                        )
+                                    }
+                                    // if the cache cannot be created fall back to storing in memory
+                                    _ => func(
+                                        unreal_asset::Asset::new(
+                                            Wrapper::Bytes(std::io::Cursor::new(
+                                                pak.get(&mesh).map_err(|_| {
+                                                    unreal_asset::error::Error::no_data(
+                                                        "files not found".to_string(),
+                                                    )
+                                                })?,
+                                            )),
+                                            pak.get(&exp)
+                                                .ok()
+                                                .map(std::io::Cursor::new)
+                                                .map(Wrapper::Bytes),
+                                            version,
+                                            None,
+                                        )?,
+                                        pak.get(&bulk)
+                                            .ok()
+                                            .map_or_else(|| pak.get(&uptnl).ok(), Some)
+                                            .map(std::io::Cursor::new)
+                                            .map(Wrapper::Bytes),
+                                    ),
+                                }
+                            }
+                            for pak in paks.iter() {
+                                match get(pak, cache.as_deref(), path, version, |asset, _| {
+                                    Ok(extras::get_mesh_info(asset)?)
+                                }) {
+                                    // currently doesn't read bulk data but we'll get there
+                                    Ok((positions, indices, uvs, mats, mat_data)) => {
+                                        let mats: Vec<_> = mats
+                                            .into_iter()
+                                            .map(|path| {
+                                                match get(
+                                                    pak,
+                                                    cache.as_deref(),
+                                                    &path,
+                                                    version,
+                                                    |mat, _| Ok(extras::get_tex_path(mat)),
+                                                ) {
+                                                    Ok(Some(path)) => match get(
+                                                        pak,
+                                                        cache.as_deref(),
+                                                        &path,
+                                                        version,
+                                                        |tex, bulk| {
+                                                            Ok(extras::get_tex_info(tex, bulk)?)
+                                                        },
+                                                    ) {
+                                                        Ok(o) => o,
+                                                        Err(e) => {
+                                                            self.notifs.warning(format!(
+                                                                "{}: {e}",
+                                                                path.split('/')
+                                                                    .last()
+                                                                    .unwrap_or_default()
+                                                            ));
+                                                            (1, 1, vec![255, 50, 125, 255])
+                                                        }
+                                                    },
+                                                    _ => (1, 1, vec![125, 50, 255, 255]),
+                                                }
+                                            })
+                                            .collect();
+                                        // stub for now until i get rendering finished
+                                        self.meshes.insert(path.to_string(), rendering::Mesh);
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        self.notifs.error(format!(
+                                            "{}: {e}",
+                                            path.split('/').last().unwrap_or_default()
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
                     self.actors.push(actor);
                 }
                 Err(e) => {
@@ -350,187 +431,6 @@ impl Stove {
             }
         }
     }
-
-    // fn refresh(&mut self, ctx: &mut Context) {
-    //     self.actors.clear();
-    //     self.selected.clear();
-    //     if let Some(map) = self.map.as_ref() {
-    //         let key = match hex::decode(self.aes.trim_start_matches("0x")) {
-    //             Ok(key) if !self.aes.is_empty() => Some(key),
-    //             Ok(_) => None,
-    //             Err(_) => {
-    //                 self.notifs.error("aes key is invalid hex");
-    //                 None
-    //             }
-    //         };
-    //         let paks: Vec<_> = self
-    //             .paks
-    //             .iter()
-    //             .filter_map(|dir| std::fs::read_dir(dir).ok())
-    //             .flatten()
-    //             .filter_map(Result::ok)
-    //             .map(|dir| dir.path())
-    //             .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
-    //             .collect();
-    //         let cache = config()
-    //             .filter(|_| self.use_cache)
-    //             .map(|path| path.join("cache"));
-    //         let version = self.version();
-    //         for index in actor::get_actors(map) {
-    //             match actor::Actor::new(map, index) {
-    //                 Ok(actor) => {
-    //                     if let actor::DrawType::Mesh(path) = &actor.draw_type {
-    //                         if !self.meshes.contains_key(path) {
-    //                             fn get<T>(
-    //                                 pak: &unpak::Pak,
-    //                                 cache: Option<&std::path::Path>,
-    //                                 path: &str,
-    //                                 version: EngineVersion,
-    //                                 func: impl Fn(
-    //                                     unreal_asset::Asset<Wrapper>,
-    //                                     Option<Wrapper>,
-    //                                 )
-    //                                     -> Result<T, unreal_asset::error::Error>,
-    //                             ) -> Result<T, unreal_asset::error::Error>
-    //                             {
-    //                                 let make = |ext: &str| path.to_string() + ext;
-    //                                 let (mesh, exp, bulk, uptnl) = (
-    //                                     make(".uasset"),
-    //                                     make(".uexp"),
-    //                                     make(".ubulk"),
-    //                                     make(".uptnl"),
-    //                                 );
-    //                                 let cache_path = |path: &str| {
-    //                                     cache.unwrap().join(path.trim_start_matches('/'))
-    //                                 };
-    //                                 match cache {
-    //                                     Some(cache)
-    //                                         if cache.join(&path).exists() ||
-    //                                         // try to create cache if it doesn't exist
-    //                                         (
-    //                                             std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
-    //                                             pak.read_to_file(&mesh, cache_path(&path)).is_ok() &&
-    //                                             // we don't care whether these are successful in case they don't exist
-    //                                             pak.read_to_file(&exp, cache_path(&exp)).map_or(true,|_| true) &&
-    //                                             pak.read_to_file(&bulk, cache_path(&bulk)).map_or(true,|_| true) &&
-    //                                             pak.read_to_file(&uptnl, cache_path(&uptnl)).map_or(true,|_| true)
-    //                                         ) =>
-    //                                     {
-    //                                         func(
-    //                                             unreal_asset::Asset::new(
-    //                                                 Wrapper::File(std::fs::File::open(
-    //                                                     cache_path(&mesh),
-    //                                                 )?),
-    //                                                 std::fs::File::open(cache_path(&exp))
-    //                                                     .ok()
-    //                                                     .map(Wrapper::File),
-    //                                                 version,
-    //                                                 None,
-    //                                             )?,
-    //                                             std::fs::File::open(cache_path(&bulk))
-    //                                                 .ok()
-    //                                                 .map_or_else(
-    //                                                     || {
-    //                                                         std::fs::File::open(cache_path(&uptnl))
-    //                                                             .ok()
-    //                                                     },
-    //                                                     Some,
-    //                                                 )
-    //                                                 .map(Wrapper::File),
-    //                                         )
-    //                                     }
-    //                                     // if the cache cannot be created fall back to storing in memory
-    //                                     _ => func(
-    //                                         unreal_asset::Asset::new(
-    //                                             Wrapper::Bytes(std::io::Cursor::new(
-    //                                                 pak.get(&mesh).map_err(|_| {
-    //                                                     unreal_asset::error::Error::no_data(
-    //                                                         "files not found".to_string(),
-    //                                                     )
-    //                                                 })?,
-    //                                             )),
-    //                                             pak.get(&exp)
-    //                                                 .ok()
-    //                                                 .map(std::io::Cursor::new)
-    //                                                 .map(Wrapper::Bytes),
-    //                                             version,
-    //                                             None,
-    //                                         )?,
-    //                                         pak.get(&bulk)
-    //                                             .ok()
-    //                                             .map_or_else(|| pak.get(&uptnl).ok(), Some)
-    //                                             .map(std::io::Cursor::new)
-    //                                             .map(Wrapper::Bytes),
-    //                                     ),
-    //                                 }
-    //                             }
-    //                             for pak in paks.iter() {
-    //                                 // currently doesn't read bulk data but we'll get there
-    //                                 match get(pak, cache.as_deref(), path, version, |asset, _| {
-    //                                     Ok(extras::get_mesh_info(asset)?)
-    //                                 }) {
-    //                                     Ok((positions, indices, uvs, mats, mat_data)) => {
-    //                                         let mats = mats
-    //                                             .into_iter()
-    //                                             .map(|path| {
-    //                                                 match get(
-    //                                                     pak,
-    //                                                     cache.as_deref(),
-    //                                                     &path,
-    //                                                     version,
-    //                                                     |mat, _| Ok(extras::get_tex_path(mat)),
-    //                                                 ) {
-    //                                                     Ok(Some(path)) => match get(
-    //                                                         pak,
-    //                                                         cache.as_deref(),
-    //                                                         &path,
-    //                                                         version,
-    //                                                         |tex, bulk| {
-    //                                                             Ok(extras::get_tex_info(tex, bulk)?)
-    //                                                         },
-    //                                                     ) {
-    //                                                         Ok(o) => o,
-    //                                                         Err(e) => {
-    //                                                             self.notifs.warning(format!(
-    //                                                                 "{}: {e}",
-    //                                                                 path.split('/')
-    //                                                                     .last()
-    //                                                                     .unwrap_or_default()
-    //                                                             ));
-    //                                                             (1, 1, vec![255, 50, 125, 255])
-    //                                                         }
-    //                                                     },
-    //                                                     _ => (1, 1, vec![125, 50, 255, 255]),
-    //                                                 }
-    //                                             })
-    //                                             .collect();
-    //                                         self.meshes.insert(
-    //                                             path.to_string(),
-    //                                             rendering::Mesh::new(
-    //                                                 ctx, positions, indices, uvs, mats, mat_data,
-    //                                             ),
-    //                                         );
-    //                                         break;
-    //                                     }
-    //                                     Err(e) => {
-    //                                         self.notifs.error(format!(
-    //                                             "{}: {e}",
-    //                                             path.split('/').last().unwrap_or_default()
-    //                                         ));
-    //                                     }
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                     self.actors.push(actor);
-    //                 }
-    //                 Err(e) => {
-    //                     self.notifs.warning(e.to_string());
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 
     fn open(&mut self, path: &std::path::Path) {
         match asset::open(path, self.version()) {

@@ -1,8 +1,8 @@
 mod axes;
 mod camera;
 mod cube;
-// mod mesh;
-pub use {axes::*, camera::*, cube::*};
+mod mesh;
+pub use {axes::*, camera::*, cube::*, mesh::*};
 
 fn size_of<T>() -> u64 {
     std::mem::size_of::<T>() as u64
