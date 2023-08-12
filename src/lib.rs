@@ -293,7 +293,10 @@ impl Stove {
         for index in actor::get_actors(map) {
             match actor::Actor::new(map, index) {
                 Ok(mut actor) => {
-                    let actor::DrawType::Mesh(path) = &actor.draw_type else {continue};
+                    let actor::DrawType::Mesh(path) = &actor.draw_type else {
+                        self.actors.push(actor);
+                        continue
+                    };
                     if !meshes.contains_key(path) {
                         fn get<T>(
                             pak: &unpak::Pak,
@@ -908,7 +911,8 @@ impl eframe::App for Stove {
                             .inner
                             .clicked()
                         {
-                            transplanted = Some(map.asset_data.exports.len()..selected.len());
+                            let len = self.actors.len();
+                            transplanted = Some(len..len + selected.len());
                             for actor in selected.iter().map(|i| &actors[*i]) {
                                 let insert = map.asset_data.exports.len() as i32 + 1;
                                 actor.transplant(map, donor);
@@ -1162,7 +1166,7 @@ impl Stove {
                             Key::V if modifiers.ctrl => {
                                 match self.avg_raw_loc().zip(self.map.as_mut()) {
                                     Some((pos, map)) => {
-                                        let offset = (pos - self.locbuf).abs();
+                                        let offset = self.locbuf - pos;
                                         for i in self.selected.iter().copied() {
                                             self.actors[i].add_raw_location(map, offset)
                                         }
