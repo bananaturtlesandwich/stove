@@ -326,8 +326,8 @@ impl Stove {
                             let cache_path =
                                 |path: &str| cache.unwrap().join(path.trim_start_matches('/'));
                             match cache {
-                                Some(cache)
-                                    if cache.join(&path).exists() ||
+                                Some(_)
+                                    if cache_path(&mesh).exists() ||
                                             // try to create cache if it doesn't exist
                                             (
                                                 std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
