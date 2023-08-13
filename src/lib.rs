@@ -1100,7 +1100,7 @@ impl Stove {
                     modifiers,
                 } => match pressed {
                     true => {
-                        if !hovered || modifiers.ctrl || *repeat {
+                        if !hovered || modifiers.ctrl || *repeat || ctx.wants_keyboard_input() {
                             return;
                         }
                         self.filter = match key {

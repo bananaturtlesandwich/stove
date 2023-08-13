@@ -8,7 +8,7 @@ version = "0.10.0"
 edition = "2021"
 
 [dependencies]
-unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "6e028cc" }
+unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "dfcc3e2" }
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 eframe = { version = "0.22", default-features = false, features = ["wgpu", "persistence"]}

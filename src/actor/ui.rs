@@ -137,23 +137,30 @@ fn text(ui: &mut egui::Ui, val: &mut String) {
 }
 
 fn fname(ui: &mut egui::Ui, name: &mut FName) {
-    if let FName::Backed {
-        index,
-        number,
-        name_map,
-        ..
-    } = name
-    {
-        if *number >= 0 {
-            let string = name_map.get_ref().get_owned_name(*index);
-            let f = name_map.get_mut().add_fname_with_number(&string, -1);
-            *name = f;
-        }
-    }
     match name {
         FName::Backed {
             index, name_map, ..
-        } => text(ui, name_map.get_mut().get_name_reference_mut(*index)),
+        } => {
+            let mut map = name_map.get_mut();
+            // inline text() to get the response
+            let res = egui::TextEdit::singleline(map.get_name_reference_mut(*index))
+                .clip_text(false)
+                .show(ui)
+                .response;
+            drop(map);
+            if res.gained_focus() {
+                let content = name_map.get_ref().get_owned_name(*index);
+                // create a unique fname for editing which shouldn't be used otherwise
+                let i = name_map.get_mut().add_name_reference(content, true);
+                let f = name_map.get_ref().create_fname(i, -1);
+                *name = f;
+            } else if res.lost_focus() {
+                let content = name_map.get_ref().get_owned_name(*index);
+                let i = name_map.get_mut().add_name_reference(content, false);
+                let f = name_map.get_ref().create_fname(i, 0);
+                *name = f;
+            }
+        }
         FName::Dummy { value, .. } => text(ui, value),
     }
 }
