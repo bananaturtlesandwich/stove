@@ -143,7 +143,14 @@ impl Stove {
             .and_then(|ver| ver.parse::<usize>().ok())
             .unwrap_or_default();
         let paks = retrieve("PAKS")
-            .map(|paks| paks.split(',').map(ToString::to_string).collect())
+            .map(|paks| {
+                paks.split(',')
+                    // this removes the empty string at the end
+                    .rev()
+                    .skip(1)
+                    .map(ToString::to_string)
+                    .collect()
+            })
             .unwrap_or_default();
         let distance = retrieve("DIST")
             .and_then(|dist| dist.parse().ok())

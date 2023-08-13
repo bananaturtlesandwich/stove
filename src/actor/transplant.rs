@@ -44,62 +44,18 @@ impl super::Actor {
         let mut imports = Vec::new();
         for child in children.iter_mut() {
             on_import_refs(child, |index| {
-                if let Some(import) = donor.get_import(*index) {
-                    index.index = match recipient.find_import_no_index(
-                        &import.class_package,
-                        &import.class_name,
-                        &import.object_name,
-                    ) {
-                        // sometimes e.g for GEN_VARIABLEs you want those imports
-                        Some(existing)
-                            if donor.get_import(import.outer_index).is_some_and(|imp| {
-                                recipient
-                                    .get_import(PackageIndex::new(existing))
-                                    .is_some_and(|import| {
-                                        imp.class_package.eq_content(&import.class_package)
-                                            && imp.class_name.eq_content(&import.class_name)
-                                            && imp.object_name.eq_content(&import.object_name)
-                                    })
-                            }) =>
-                        {
-                            existing
-                        }
-                        _ => {
-                            -import_offset
-                                - match imports.iter().position(|imp: &Import| {
-                                    imp.class_package.eq_content(&import.class_package)
-                                        && imp.class_name.eq_content(&import.class_name)
-                                        && imp.object_name.eq_content(&import.object_name)
-                                }) {
-                                    Some(existing) => existing + 1,
-                                    None => {
-                                        imports.push(import.clone());
-                                        // this actually pads perfectly so no need for + 1
-                                        imports.len()
-                                    }
-                                } as i32
-                        }
-                    }
-                }
-            })
-        }
-        // finally add the exports
-        recipient.asset_data.exports.append(&mut children);
-
-        // resolve all import references from exports
-        let mut i = 0;
-        // use a while loop because the vector is expanding while the operation occurs & imports.len() updates every loop
-        while i < imports.len() {
-            if let Some(parent) = donor.get_import(imports[i].outer_index) {
-                imports[i].outer_index.index = match recipient.find_import_no_index(
-                    &parent.class_package,
-                    &parent.class_name,
-                    &parent.object_name,
+                let Some(import) = donor.get_import(*index) else {return};
+                index.index = match recipient.find_import_no_index(
+                    &import.class_package,
+                    &import.class_name,
+                    &import.object_name,
                 ) {
+                    // sometimes e.g for GEN_VARIABLEs you want those imports
                     Some(existing)
-                        if donor.get_import(parent.outer_index).is_some_and(|imp| {
+                        if donor.get_import(import.outer_index).is_some_and(|imp| {
                             recipient
                                 .get_import(PackageIndex::new(existing))
+                                .and_then(|existing| recipient.get_import(existing.outer_index))
                                 .is_some_and(|import| {
                                     imp.class_package.eq_content(&import.class_package)
                                         && imp.class_name.eq_content(&import.class_name)
@@ -111,21 +67,68 @@ impl super::Actor {
                     }
                     _ => {
                         -import_offset
-                            - match imports.iter().position(|import: &Import| {
-                                import.class_package.eq_content(&parent.class_package)
-                                    && import.class_name.eq_content(&parent.class_name)
-                                    && import.object_name.eq_content(&parent.object_name)
+                            - match imports.iter().position(|imp: &Import| {
+                                imp.class_package.eq_content(&import.class_package)
+                                    && imp.class_name.eq_content(&import.class_name)
+                                    && imp.object_name.eq_content(&import.object_name)
                             }) {
                                 Some(existing) => existing + 1,
                                 None => {
-                                    imports.push(parent.clone());
+                                    imports.push(import.clone());
                                     // this actually pads perfectly so no need for + 1
                                     imports.len()
                                 }
                             } as i32
                     }
                 }
-            }
+            })
+        }
+        // finally add the exports
+        recipient.asset_data.exports.append(&mut children);
+
+        // resolve all import references from exports
+        let mut i = 0;
+        // use a while loop because the vector is expanding while the operation occurs & imports.len() updates every loop
+        while i < imports.len() {
+            let Some(parent) = donor.get_import(imports[i - 1].outer_index) else {
+                i += 1;
+                continue
+            };
+            imports[i].outer_index.index = match recipient.find_import_no_index(
+                &parent.class_package,
+                &parent.class_name,
+                &parent.object_name,
+            ) {
+                Some(existing)
+                    if donor.get_import(parent.outer_index).is_some_and(|imp| {
+                        recipient
+                            .get_import(PackageIndex::new(existing))
+                            .and_then(|existing| recipient.get_import(existing.outer_index))
+                            .is_some_and(|import| {
+                                imp.class_package.eq_content(&import.class_package)
+                                    && imp.class_name.eq_content(&import.class_name)
+                                    && imp.object_name.eq_content(&import.object_name)
+                            })
+                    }) =>
+                {
+                    existing
+                }
+                _ => {
+                    -import_offset
+                        - match imports.iter().position(|import: &Import| {
+                            import.class_package.eq_content(&parent.class_package)
+                                && import.class_name.eq_content(&parent.class_name)
+                                && import.object_name.eq_content(&parent.object_name)
+                        }) {
+                            Some(existing) => existing + 1,
+                            None => {
+                                imports.push(parent.clone());
+                                // this actually pads perfectly so no need for + 1
+                                imports.len()
+                            }
+                        } as i32
+                }
+            };
             i += 1;
         }
         recipient.imports.append(&mut imports);
