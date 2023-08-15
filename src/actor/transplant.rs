@@ -44,7 +44,9 @@ impl super::Actor {
         let mut imports = Vec::new();
         for child in children.iter_mut() {
             on_import_refs(child, |index| {
-                let Some(import) = donor.get_import(*index) else {return};
+                let Some(import) = donor.get_import(*index) else {
+                    return;
+                };
                 index.index = match recipient.find_import_no_index(
                     &import.class_package,
                     &import.class_name,
@@ -90,9 +92,9 @@ impl super::Actor {
         let mut i = 0;
         // use a while loop because the vector is expanding while the operation occurs & imports.len() updates every loop
         while i < imports.len() {
-            let Some(parent) = donor.get_import(imports[i - 1].outer_index) else {
+            let Some(parent) = donor.get_import(imports[i].outer_index) else {
                 i += 1;
-                continue
+                continue;
             };
             imports[i].outer_index.index = match recipient.find_import_no_index(
                 &parent.class_package,
