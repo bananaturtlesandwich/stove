@@ -130,7 +130,11 @@ fn config() -> Option<std::path::PathBuf> {
 }
 
 impl Stove {
-    pub fn new(ctx: egui::Context, device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        ctx: &mut egui::Context,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -271,6 +275,10 @@ impl Stove {
             stove.open_dialog.open()
         }
         stove
+    }
+
+    pub fn show_ui(&self) -> bool {
+        self.ui
     }
 
     fn version(&self) -> EngineVersion {
@@ -641,93 +649,64 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
 }
 
 impl Stove {
-    fn update(
+    pub fn scene<'a>(
+        &'a mut self,
+        queue: &wgpu::Queue,
+        pass: &mut wgpu::RenderPass<'a>,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) {
+        let Some(map) = self.map.as_ref() else {return};
+        let vp = self.view_projection(size);
+        let inst: Vec<_> = self
+            .actors
+            .iter()
+            .enumerate()
+            .map(|(i, actor)| {
+                (
+                    actor.model_matrix(map),
+                    self.selected.contains(&i) as i32 as f32,
+                )
+            })
+            .collect();
+        self.cubes.copy(&inst, &vp, queue);
+        self.cubes.draw(pass);
+        if self.grab != Grab::None {
+            if let Some((loc, sca)) = self.avg_transform() {
+                let filter = self.filter.clone();
+                self.axes.copy(
+                    &(vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca)),
+                    queue,
+                );
+                self.axes.draw(filter, pass);
+            }
+        }
+        for mesh in self.meshes.values_mut() {
+            mesh.reset()
+        }
+        let actors: Vec<_> = self
+            .actors
+            .iter()
+            .filter_map(|actor| match &actor.draw_type {
+                actor::DrawType::Mesh(key) => Some((actor.model_matrix(map), key.clone())),
+                actor::DrawType::Cube => None,
+            })
+            .collect();
+        for (model, key) in actors.iter() {
+            self.meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
+        }
+        for mesh in self.meshes.values() {
+            mesh.draw(pass)
+        }
+    }
+
+    pub fn ui(
         &mut self,
         ctx: &egui::Context,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        surface: &wgpu::Surface,
         format: wgpu::TextureFormat,
         size: &winit::dpi::PhysicalSize<u32>,
     ) {
-        let mut hovered = egui::CentralPanel::default()
-            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
-            .show(ctx, |ui| {
-                let mut encoder = device.create_command_encoder(&Default::default());
-                let view = surface
-                    .get_current_texture()
-                    .unwrap()
-                    .texture
-                    .create_view(&Default::default());
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.15,
-                                g: 0.15,
-                                b: 0.15,
-                                a: 1.0,
-                            }),
-                            store: true,
-                        },
-                    })],
-                    ..Default::default()
-                });
-                if let Some(map) = self.map.as_ref() {
-                    let vp = self.view_projection(size);
-                    let inst: Vec<_> = self
-                        .actors
-                        .iter()
-                        .enumerate()
-                        .map(|(i, actor)| {
-                            (
-                                actor.model_matrix(map),
-                                self.selected.contains(&i) as i32 as f32,
-                            )
-                        })
-                        .collect();
-                    self.cubes.copy(&inst, &vp, queue);
-                    self.cubes.draw(&mut pass);
-                    if self.grab != Grab::None {
-                        if let Some((loc, sca)) = self.avg_transform() {
-                            let filter = self.filter.clone();
-                            self.axes.copy(
-                                &(vp * glam::Mat4::from_translation(loc)
-                                    * glam::Mat4::from_scale(sca)),
-                                queue,
-                            );
-                            self.axes.draw(filter, &mut pass);
-                        }
-                    }
-                    for mesh in self.meshes.values_mut() {
-                        mesh.reset()
-                    }
-                    let actors: Vec<_> = self
-                        .actors
-                        .iter()
-                        .filter_map(|actor| match &actor.draw_type {
-                            actor::DrawType::Mesh(key) => {
-                                Some((actor.model_matrix(map), key.clone()))
-                            }
-                            actor::DrawType::Cube => None,
-                        })
-                        .collect();
-                    for (model, key) in actors.iter() {
-                        self.meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
-                    }
-                    for mesh in self.meshes.values() {
-                        mesh.draw(&mut pass)
-                    }
-                }
-            })
-            .response
-            .hovered();
-        if !self.ui {
-            return;
-        }
-        hovered &= !egui::SidePanel::left("sidepanel").show(ctx, |ui| {
+        egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("file", |ui| {
                     if ui.add(egui::Button::new("open").shortcut_text("ctrl + o")).clicked() {
@@ -892,7 +871,7 @@ impl Stove {
                     );
                 }
             }
-        }).response.hovered();
+        });
         let mut open = true;
         let mut transplanted = None;
         if let Some((map, (donor, actors, selected))) =
@@ -1029,11 +1008,11 @@ impl Stove {
                 self.save()
             }
         }
-        ctx.input(|input| self.handle_input(input, ctx, device, format, size, hovered));
+        ctx.input(|input| self.handle_input(input, ctx, device, format, size));
         ctx.request_repaint();
     }
 
-    fn store(&mut self, storage: &mut egui::util::IdTypeMap) {
+    pub fn store(&mut self, storage: &mut egui::util::IdTypeMap) {
         use egui::Id;
         storage.insert_persisted(Id::new("VERSION"), self.version);
         storage.insert_persisted(Id::new("PAKS"), self.paks.clone());
@@ -1045,11 +1024,10 @@ impl Stove {
     }
 
     #[cfg(not(target_family = "wasm"))]
-    fn on_close_event(&mut self) -> bool {
+    pub fn on_close_event(&mut self) {
         if let Some(client) = &mut self.client {
-            return client.close().is_ok();
+            client.close().unwrap()
         }
-        true
     }
 }
 
@@ -1061,7 +1039,6 @@ impl Stove {
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
         size: &winit::dpi::PhysicalSize<u32>,
-        hovered: bool,
     ) {
         use egui::{Key, PointerButton};
         if let Some(egui::DroppedFile {
@@ -1082,7 +1059,11 @@ impl Stove {
                     modifiers,
                 } => match pressed {
                     true => {
-                        if !hovered || modifiers.ctrl || *repeat || ctx.wants_keyboard_input() {
+                        if ctx.is_pointer_over_area()
+                            || modifiers.ctrl
+                            || *repeat
+                            || ctx.wants_keyboard_input()
+                        {
                             return;
                         }
                         self.filter = match key {
@@ -1211,7 +1192,7 @@ impl Stove {
                     modifiers,
                 } => match pressed {
                     true => {
-                        if !hovered {
+                        if ctx.is_pointer_over_area() {
                             return;
                         }
                         let proj = self.view_projection(&size);
@@ -1297,7 +1278,7 @@ impl Stove {
                 },
                 egui::Event::Scroll(egui::Vec2 { y, .. }) => {
                     // a logarithmic speed increase is better because unreal maps can get massive
-                    if hovered {
+                    if !ctx.is_pointer_over_area() {
                         self.camera.speed = (self.camera.speed as f32
                             * match y.is_sign_positive() {
                                 true => 100.0 / y,
