@@ -39,7 +39,7 @@ impl Camera {
         self.front.cross(self.up).normalize()
     }
 
-    pub fn move_cam(&mut self, input: &eframe::egui::InputState) {
+    pub fn move_cam(&mut self, input: &egui::InputState) {
         match self.focus {
             Some(target) => {
                 self.position += self.delta_time * 10.0 * (target - self.position);
@@ -48,7 +48,7 @@ impl Camera {
                 }
             }
             None => {
-                use eframe::egui::Key;
+                use egui::Key;
                 let velocity = self.speed as f32 * self.delta_time;
                 for keycode in input.keys_down.iter() {
                     match keycode {
@@ -69,7 +69,7 @@ impl Camera {
         self.focus = Some(pos - self.front * sca.length() * 4.0)
     }
 
-    pub fn handle_mouse_motion(&mut self, delta: eframe::egui::Vec2) {
+    pub fn handle_mouse_motion(&mut self, delta: egui::Vec2) {
         if self.can_move {
             let scale = 10.0 * self.delta_time;
             self.yaw -= delta.x * scale;

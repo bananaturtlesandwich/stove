@@ -1,6 +1,5 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
-use eframe::egui;
 use unreal_asset::{
     engine_version::EngineVersion::{self, *},
     types::PackageIndex,
@@ -23,6 +22,9 @@ enum Grab {
 
 pub struct Stove {
     camera: rendering::Camera,
+    cubes: rendering::Cube,
+    meshes: hashbrown::HashMap<String, rendering::Mesh>,
+    axes: rendering::Axes,
     notifs: egui_notify::Toasts,
     map: Option<unreal_asset::Asset<std::fs::File>>,
     version: usize,
@@ -128,8 +130,7 @@ fn config() -> Option<std::path::PathBuf> {
 }
 
 impl Stove {
-    pub fn new(ctx: &eframe::CreationContext) -> Self {
-        let Some(wgpu) = ctx.wgpu_render_state.as_ref() else { panic!("wgpu failed to initialise") };
+    pub fn new(ctx: egui::Context, device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
         if std::fs::remove_file(format!("{EXE}.old")).is_ok() {
@@ -138,31 +139,42 @@ impl Stove {
                 env!("CARGO_PKG_VERSION")
             ));
         }
-        let retrieve = |key: &str| ctx.storage.and_then(|storage| storage.get_string(key));
-        let version = retrieve("VERSION")
-            .and_then(|ver| ver.parse::<usize>().ok())
-            .unwrap_or_default();
-        let paks = retrieve("PAKS")
-            .map(|paks| {
-                paks.split(',')
-                    // this removes the empty string at the end
-                    .rev()
-                    .skip(1)
-                    .map(ToString::to_string)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let distance = retrieve("DIST")
-            .and_then(|dist| dist.parse().ok())
-            .unwrap_or(10000.0);
-        let aes = retrieve("AES").unwrap_or_default();
-        let use_cache = retrieve("CACHE")
-            .and_then(|cache| cache.parse().ok())
-            .unwrap_or(true);
-        let script = retrieve("SCRIPT").unwrap_or_default();
-        let autoupdate = retrieve("AUTOUPDATE")
-            .and_then(|autoupdate| autoupdate.parse().ok())
-            .unwrap_or(false);
+        let (
+            mut version,
+            mut paks,
+            mut distance,
+            mut aes,
+            mut use_cache,
+            mut script,
+            mut autoupdate,
+        ): (usize, Vec<String>, f32, String, bool, String, bool) = (
+            0,
+            vec![],
+            100000.0,
+            String::new(),
+            true,
+            String::new(),
+            false,
+        );
+        ctx.memory_mut(|storage| {
+            let data = &mut storage.data;
+            fn retrieve<T: egui::util::id_type_map::SerializableAny>(
+                val: &mut T,
+                key: &str,
+                data: &mut egui::util::IdTypeMap,
+            ) {
+                if let Some(inner) = data.get_persisted(egui::Id::new(key)) {
+                    *val = inner
+                }
+            }
+            retrieve(&mut version, "VERSION", data);
+            retrieve(&mut paks, "PAKS", data);
+            retrieve(&mut distance, "DIST", data);
+            retrieve(&mut aes, "AES", data);
+            retrieve(&mut use_cache, "CACHE", data);
+            retrieve(&mut script, "SCRIPT", data);
+            retrieve(&mut autoupdate, "AUTOUPDATE", data);
+        });
         let mut home = dirs::home_dir();
         let mut filepath = String::new();
         let map = std::env::args().nth(1).and_then(|path| {
@@ -205,6 +217,9 @@ impl Stove {
 
         let mut stove = Self {
             camera: rendering::Camera::default(),
+            cubes: rendering::Cube::new(device, format),
+            meshes: hashbrown::HashMap::new(),
+            axes: rendering::Axes::new(device, format),
             notifs,
             map,
             version,
@@ -251,11 +266,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate,
         };
-        let res = &mut wgpu.renderer.write().paint_callback_resources;
-        res.insert(rendering::Cube::new(&wgpu.device, wgpu.target_format));
-        res.insert(rendering::Axes::new(&wgpu.device, wgpu.target_format));
-        res.insert(hashbrown::HashMap::<String, rendering::Mesh>::new());
-        stove.refresh(res, &wgpu.device, wgpu.target_format);
+        stove.refresh(&device, format);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -266,12 +277,7 @@ impl Stove {
         VERSIONS[self.version].0
     }
 
-    fn refresh(
-        &mut self,
-        res: &mut type_map::concurrent::TypeMap,
-        device: &eframe::wgpu::Device,
-        format: eframe::wgpu::TextureFormat,
-    ) {
+    fn refresh(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
         let Some(map) = self.map.as_ref() else {return};
         self.actors.clear();
         self.selected.clear();
@@ -296,7 +302,6 @@ impl Stove {
             .filter(|_| self.use_cache)
             .map(|path| path.join("cache"));
         let version = self.version();
-        let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> = res.get_mut().unwrap();
         for index in actor::get_actors(map) {
             match actor::Actor::new(map, index) {
                 Ok(mut actor) => {
@@ -304,7 +309,7 @@ impl Stove {
                         self.actors.push(actor);
                         continue
                     };
-                    if !meshes.contains_key(path) {
+                    if !self.meshes.contains_key(path) {
                         fn get<T>(
                             pak: &unpak::Pak,
                             cache: Option<&std::path::Path>,
@@ -424,7 +429,7 @@ impl Stove {
                                     //         }
                                     //     })
                                     //     .collect();
-                                    meshes.insert(
+                                    self.meshes.insert(
                                         path.to_string(),
                                         rendering::Mesh::new(&positions, &indices, device, format),
                                     );
@@ -440,7 +445,7 @@ impl Stove {
                         }
                     }
                     // if no mesh could be found then use cube
-                    if !meshes.contains_key(path) {
+                    if !self.meshes.contains_key(path) {
                         actor.draw_type = actor::DrawType::Cube
                     }
                     self.actors.push(actor);
@@ -523,10 +528,13 @@ impl Stove {
         }
     }
 
-    fn view_projection(&self, ctx: &eframe::Frame) -> glam::Mat4 {
-        let size = ctx.info().window_info.size;
-        glam::Mat4::perspective_lh(45_f32.to_radians(), size.x / size.y, 1.0, self.distance)
-            * self.camera.view_matrix()
+    fn view_projection(&self, size: &winit::dpi::PhysicalSize<u32>) -> glam::Mat4 {
+        glam::Mat4::perspective_lh(
+            45_f32.to_radians(),
+            size.width as f32 / size.height as f32,
+            1.0,
+            self.distance,
+        ) * self.camera.view_matrix()
     }
 
     fn focus(&mut self) {
@@ -632,14 +640,43 @@ fn select(ui: &mut egui::Ui, selected: &mut Vec<usize>, i: usize) {
     )
 }
 
-impl eframe::App for Stove {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        let Some(wgpu) = frame.wgpu_render_state() else {return};
+impl Stove {
+    fn update(
+        &mut self,
+        ctx: &egui::Context,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        surface: &wgpu::Surface,
+        format: wgpu::TextureFormat,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) {
         let mut hovered = egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
             .show(ctx, |ui| {
+                let mut encoder = device.create_command_encoder(&Default::default());
+                let view = surface
+                    .get_current_texture()
+                    .unwrap()
+                    .texture
+                    .create_view(&Default::default());
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.15,
+                                g: 0.15,
+                                b: 0.15,
+                                a: 1.0,
+                            }),
+                            store: true,
+                        },
+                    })],
+                    ..Default::default()
+                });
                 if let Some(map) = self.map.as_ref() {
-                    let vp = self.view_projection(frame);
+                    let vp = self.view_projection(size);
                     let inst: Vec<_> = self
                         .actors
                         .iter()
@@ -651,49 +688,20 @@ impl eframe::App for Stove {
                             )
                         })
                         .collect();
-                    ui.painter().add(egui::PaintCallback {
-                        rect: ui.max_rect(),
-                        callback: std::sync::Arc::new(
-                            eframe::egui_wgpu::CallbackFn::new()
-                                .prepare(move |_, queue, _, res| {
-                                    let cubes: &mut rendering::Cube = res.get_mut().unwrap();
-                                    cubes.copy(&inst, &vp, queue);
-                                    vec![]
-                                })
-                                .paint(|_, pass, res| {
-                                    let cubes: &rendering::Cube = res.get().unwrap();
-                                    cubes.draw(pass);
-                                }),
-                        ),
-                    });
+                    self.cubes.copy(&inst, &vp, queue);
+                    self.cubes.draw(&mut pass);
                     if self.grab != Grab::None {
                         if let Some((loc, sca)) = self.avg_transform() {
                             let filter = self.filter.clone();
-                            ui.painter().add(egui::PaintCallback {
-                                rect: ui.max_rect(),
-                                callback: std::sync::Arc::new(
-                                    eframe::egui_wgpu::CallbackFn::new()
-                                        .prepare(move |_, queue, _, res| {
-                                            let axes: &mut rendering::Axes = res.get_mut().unwrap();
-                                            axes.copy(
-                                                &(vp * glam::Mat4::from_translation(loc)
-                                                    * glam::Mat4::from_scale(sca)),
-                                                queue,
-                                            );
-                                            vec![]
-                                        })
-                                        .paint(move |_, pass, res| {
-                                            let axes: &rendering::Axes = res.get().unwrap();
-                                            axes.draw(filter, pass);
-                                        }),
-                                ),
-                            });
+                            self.axes.copy(
+                                &(vp * glam::Mat4::from_translation(loc)
+                                    * glam::Mat4::from_scale(sca)),
+                                queue,
+                            );
+                            self.axes.draw(filter, &mut pass);
                         }
                     }
-                    let res = &mut wgpu.renderer.write().paint_callback_resources;
-                    let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> =
-                        res.get_mut().unwrap();
-                    for mesh in meshes.values_mut() {
+                    for mesh in self.meshes.values_mut() {
                         mesh.reset()
                     }
                     let actors: Vec<_> = self
@@ -706,27 +714,12 @@ impl eframe::App for Stove {
                             actor::DrawType::Cube => None,
                         })
                         .collect();
-                    ui.painter().add(egui::PaintCallback {
-                        rect: ui.max_rect(),
-                        callback: std::sync::Arc::new(
-                            eframe::egui_wgpu::CallbackFn::new()
-                                .prepare(move |_, queue, _, res| {
-                                    let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> =
-                                        res.get_mut().unwrap();
-                                    for (model, key) in actors.iter() {
-                                        meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
-                                    }
-                                    vec![]
-                                })
-                                .paint(move |_, pass, res| {
-                                    let meshes: &hashbrown::HashMap<String, rendering::Mesh> =
-                                        res.get().unwrap();
-                                    for mesh in meshes.values() {
-                                        mesh.draw(pass)
-                                    }
-                                }),
-                        ),
-                    });
+                    for (model, key) in actors.iter() {
+                        self.meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
+                    }
+                    for mesh in self.meshes.values() {
+                        mesh.draw(&mut pass)
+                    }
                 }
             })
             .response
@@ -971,11 +964,7 @@ impl eframe::App for Stove {
                     ],
                 );
                 self.open(&path);
-                self.refresh(
-                    &mut wgpu.renderer.write().paint_callback_resources,
-                    &wgpu.device,
-                    wgpu.target_format,
-                );
+                self.refresh(device, format);
             }
         }
         self.transplant_dialog.show(ctx);
@@ -1040,25 +1029,19 @@ impl eframe::App for Stove {
                 self.save()
             }
         }
-        ctx.input(|input| self.handle_input(input, ctx, frame, hovered));
+        ctx.input(|input| self.handle_input(input, ctx, device, format, size, hovered));
         ctx.request_repaint();
     }
 
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        storage.set_string("VERSION", self.version.to_string());
-        storage.set_string(
-            "PAKS",
-            self.paks
-                .iter()
-                .cloned()
-                .reduce(|acc, pak| acc + "," + &pak)
-                .unwrap_or_default(),
-        );
-        storage.set_string("DIST", self.distance.to_string());
-        storage.set_string("AES", self.aes.clone());
-        storage.set_string("CACHE", self.use_cache.to_string());
-        storage.set_string("SCRIPT", self.script.clone());
-        storage.set_string("AUTOUPDATE", self.autoupdate.to_string());
+    fn store(&mut self, storage: &mut egui::util::IdTypeMap) {
+        use egui::Id;
+        storage.insert_persisted(Id::new("VERSION"), self.version);
+        storage.insert_persisted(Id::new("PAKS"), self.paks.clone());
+        storage.insert_persisted(Id::new("DIST"), self.distance);
+        storage.insert_persisted(Id::new("AES"), self.aes.clone());
+        storage.insert_persisted(Id::new("CACHE"), self.use_cache);
+        storage.insert_persisted(Id::new("SCRIPT"), self.script.clone());
+        storage.insert_persisted(Id::new("AUTOUPDATE"), self.autoupdate);
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -1068,18 +1051,16 @@ impl eframe::App for Stove {
         }
         true
     }
-
-    fn clear_color(&self, _: &egui::Visuals) -> [f32; 4] {
-        [0.15, 0.15, 0.15, 1.0]
-    }
 }
 
 impl Stove {
     fn handle_input(
         &mut self,
         input: &egui::InputState,
-        ctx: &eframe::egui::Context,
-        frame: &mut eframe::Frame,
+        ctx: &egui::Context,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        size: &winit::dpi::PhysicalSize<u32>,
         hovered: bool,
     ) {
         use egui::{Key, PointerButton};
@@ -1088,13 +1069,7 @@ impl Stove {
         }) = input.raw.dropped_files.first()
         {
             self.open(&path);
-            if let Some(wgpu) = frame.wgpu_render_state() {
-                self.refresh(
-                    &mut wgpu.renderer.write().paint_callback_resources,
-                    &wgpu.device,
-                    wgpu.target_format,
-                )
-            }
+            self.refresh(device, format)
         }
         self.camera.update_times(input.stable_dt);
         self.camera.move_cam(input);
@@ -1159,7 +1134,7 @@ impl Stove {
                             },
                             Key::Enter if modifiers.alt => {
                                 self.fullscreen = !self.fullscreen;
-                                frame.set_fullscreen(self.fullscreen);
+                                // frame.set_fullscreen(self.fullscreen);
                             }
                             Key::C if modifiers.ctrl => {
                                 match self.avg_raw_loc() {
@@ -1239,17 +1214,16 @@ impl Stove {
                         if !hovered {
                             return;
                         }
-                        let proj = self.view_projection(frame);
+                        let proj = self.view_projection(&size);
                         // THE HACKIEST MOUSE PICKING EVER CONCEIVED
                         let pick = self
                             .map
                             .as_ref()
                             .and_then(|map| {
                                 // convert mouse coordinates to NDC
-                                let size = frame.info().window_info.size;
                                 let mouse = glam::vec2(
-                                    pos.x * 2.0 / size.x - 1.0,
-                                    1.0 - pos.y * 2.0 / size.y,
+                                    pos.x * 2.0 / size.width as f32 - 1.0,
+                                    1.0 - pos.y * 2.0 / size.height as f32,
                                 );
                                 self.actors
                                     .iter()
@@ -1291,13 +1265,12 @@ impl Stove {
                                         ),
                                         PointerButton::Secondary => Grab::Rotation,
                                         PointerButton::Middle => Grab::Scale({
-                                            let size = frame.info().window_info.size;
                                             let pos = self
                                                 .get_avg(|actor, map| actor.coords(map, proj))
                                                 .unwrap();
                                             glam::vec2(
-                                                (pos.x + 1.0) * size.x * 0.5,
-                                                (1.0 - pos.y) * size.y * 0.5,
+                                                (pos.x + 1.0) * size.width as f32 * 0.5,
+                                                (1.0 - pos.y) * size.height as f32 * 0.5,
                                             )
                                         }),
                                         _ => Grab::None,

@@ -4,11 +4,12 @@ mod cube;
 mod mesh;
 pub use {axes::*, camera::*, cube::*, mesh::*};
 
+use wgpu;
+
 fn size_of<T>() -> u64 {
     std::mem::size_of::<T>() as u64
 }
 
-use eframe::wgpu;
 #[repr(C)]
 #[derive(wrld::Desc, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
 struct Vert {
