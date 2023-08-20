@@ -1,5 +1,5 @@
 use super::{size_of, Vert};
-use eframe::wgpu::{util::DeviceExt, *};
+use wgpu::{util::DeviceExt, *};
 
 pub struct Axes {
     vertices: Buffer,

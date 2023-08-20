@@ -1,4 +1,4 @@
-use eframe::wgpu::{self, util::DeviceExt, *};
+use wgpu::{self, util::DeviceExt, *};
 
 use super::{size_of, Vert};
 

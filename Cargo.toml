@@ -11,9 +11,12 @@ edition = "2021"
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "dfcc3e2" }
 unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
-eframe = { version = "0.22", default-features = false, features = ["wgpu", "persistence"]}
-# so i can fix deadlocking when launching with args
-type-map = "0.5"
+winit = "0.28"
+egui = { version = "0.22", features = ["persistence"] }
+egui_winit_platform = "0.19"
+egui_wgpu_backend = "0.25.0"
+wgpu = "0.17"
+pollster = { version = "0.3", features = ["macro"]}
 wrld = "1.0"
 egui-notify = "0.7"
 egui_file = "0.10"
