@@ -143,18 +143,11 @@ impl Stove {
             .and_then(|ver| ver.parse::<usize>().ok())
             .unwrap_or_default();
         let paks = retrieve("PAKS")
-            .map(|paks| {
-                paks.split(',')
-                    // this removes the empty string at the end
-                    .rev()
-                    .skip(1)
-                    .map(ToString::to_string)
-                    .collect()
-            })
+            .map(|paks| paks.split(',').map(ToString::to_string).collect())
             .unwrap_or_default();
         let distance = retrieve("DIST")
             .and_then(|dist| dist.parse().ok())
-            .unwrap_or(10000.0);
+            .unwrap_or(100000.0);
         let aes = retrieve("AES").unwrap_or_default();
         let use_cache = retrieve("CACHE")
             .and_then(|cache| cache.parse().ok())
@@ -638,100 +631,77 @@ impl eframe::App for Stove {
         let mut hovered = egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(egui::Color32::from_rgb(40, 40, 40)))
             .show(ctx, |ui| {
-                if let Some(map) = self.map.as_ref() {
-                    let vp = self.view_projection(frame);
-                    let inst: Vec<_> = self
-                        .actors
-                        .iter()
-                        .enumerate()
-                        .map(|(i, actor)| {
-                            (
-                                actor.model_matrix(map),
-                                self.selected.contains(&i) as i32 as f32,
-                            )
-                        })
-                        .collect();
-                    ui.painter().add(egui::PaintCallback {
-                        rect: ui.max_rect(),
-                        callback: std::sync::Arc::new(
-                            eframe::egui_wgpu::CallbackFn::new()
-                                .prepare(move |_, queue, _, res| {
-                                    let cubes: &mut rendering::Cube = res.get_mut().unwrap();
-                                    cubes.copy(&inst, &vp, queue);
-                                    vec![]
-                                })
-                                .paint(|_, pass, res| {
-                                    let cubes: &rendering::Cube = res.get().unwrap();
-                                    cubes.draw(pass);
-                                }),
-                        ),
-                    });
-                    if self.grab != Grab::None {
-                        if let Some((loc, sca)) = self.avg_transform() {
-                            let filter = self.filter.clone();
-                            ui.painter().add(egui::PaintCallback {
-                                rect: ui.max_rect(),
-                                callback: std::sync::Arc::new(
-                                    eframe::egui_wgpu::CallbackFn::new()
-                                        .prepare(move |_, queue, _, res| {
-                                            let axes: &mut rendering::Axes = res.get_mut().unwrap();
-                                            axes.copy(
-                                                &(vp * glam::Mat4::from_translation(loc)
-                                                    * glam::Mat4::from_scale(sca)),
-                                                queue,
-                                            );
-                                            vec![]
-                                        })
-                                        .paint(move |_, pass, res| {
-                                            let axes: &rendering::Axes = res.get().unwrap();
-                                            axes.draw(filter, pass);
-                                        }),
-                                ),
-                            });
-                        }
-                    }
-                    let res = &mut wgpu.renderer.write().paint_callback_resources;
-                    let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> =
-                        res.get_mut().unwrap();
-                    for mesh in meshes.values_mut() {
-                        mesh.reset()
-                    }
-                    let actors: Vec<_> = self
-                        .actors
-                        .iter()
-                        .filter_map(|actor| match &actor.draw_type {
-                            actor::DrawType::Mesh(key) => {
-                                Some((actor.model_matrix(map), key.clone()))
-                            }
-                            actor::DrawType::Cube => None,
-                        })
-                        .collect();
-                    ui.painter().add(egui::PaintCallback {
-                        rect: ui.max_rect(),
-                        callback: std::sync::Arc::new(
-                            eframe::egui_wgpu::CallbackFn::new()
-                                .prepare(move |_, queue, _, res| {
-                                    let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> =
-                                        res.get_mut().unwrap();
-                                    for (model, key) in actors.iter() {
-                                        meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
-                                    }
-                                    vec![]
-                                })
-                                .paint(move |_, pass, res| {
-                                    let meshes: &hashbrown::HashMap<String, rendering::Mesh> =
-                                        res.get().unwrap();
-                                    for mesh in meshes.values() {
-                                        mesh.draw(pass)
-                                    }
-                                }),
-                        ),
-                    });
-                }
+                let Some(map) = self.map.as_ref() else {return};
+                let vp = self.view_projection(frame);
+                let inst: Vec<_> = self
+                    .actors
+                    .iter()
+                    .enumerate()
+                    .map(|(i, actor)| {
+                        (
+                            actor.model_matrix(map),
+                            match self.selected.contains(&i) {
+                                true => 1.0,
+                                false => 0.0,
+                            },
+                        )
+                    })
+                    .collect();
+                let axes = self.grab != Grab::None;
+                let trans = axes.then(|| self.avg_transform());
+                let filter = self.filter;
+                let actors: Vec<_> = self
+                    .actors
+                    .iter()
+                    .filter_map(|actor| match &actor.draw_type {
+                        actor::DrawType::Mesh(key) => Some((actor.model_matrix(map), key.clone())),
+                        actor::DrawType::Cube => None,
+                    })
+                    .collect();
+                ui.painter().add(egui::PaintCallback {
+                    rect: ui.max_rect(),
+                    callback: std::sync::Arc::new(
+                        eframe::egui_wgpu::CallbackFn::new()
+                            .prepare(move |_, queue, _, res| {
+                                res.get_mut::<rendering::Cube>()
+                                    .unwrap()
+                                    .copy(&inst, &vp, queue);
+                                if let Some(Some((loc, sca))) = trans {
+                                    res.get_mut::<rendering::Axes>().unwrap().copy(
+                                        &(vp * glam::Mat4::from_translation(loc)
+                                            * glam::Mat4::from_scale(sca)),
+                                        queue,
+                                    )
+                                }
+                                let meshes: &mut hashbrown::HashMap<String, rendering::Mesh> =
+                                    res.get_mut().unwrap();
+                                meshes.values_mut().for_each(rendering::Mesh::reset);
+                                for (model, key) in actors.iter() {
+                                    meshes.get_mut(key).unwrap().copy(*model, &vp, queue);
+                                }
+                                vec![]
+                            })
+                            .paint(move |_, pass, res| {
+                                res.get::<rendering::Cube>().unwrap().draw(pass);
+                                if axes {
+                                    res.get::<rendering::Axes>().unwrap().draw(filter, pass);
+                                }
+                                for mesh in res
+                                    .get::<hashbrown::HashMap<String, rendering::Mesh>>()
+                                    .unwrap()
+                                    .values()
+                                {
+                                    mesh.draw(pass)
+                                }
+                            }),
+                    ),
+                });
             })
             .response
             .hovered();
         if !self.ui {
+            ctx.input(|input| self.handle_input(input, ctx, frame, hovered));
+            ctx.request_repaint();
             return;
         }
         hovered &= !egui::SidePanel::left("sidepanel").show(ctx, |ui| {
