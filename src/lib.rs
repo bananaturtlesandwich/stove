@@ -31,6 +31,8 @@ pub struct Stove {
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
+    query: String,
+    matched: Vec<usize>,
     ui: bool,
     transplant: Option<(
         unreal_asset::Asset<std::fs::File>,
@@ -238,6 +240,8 @@ impl Stove {
             version,
             actors: Vec::new(),
             selected: Vec::new(),
+            query: String::new(),
+            matched: Vec::new(),
             ui: true,
             transplant: None,
             open_dialog: egui_file::FileDialog::open_file(home.clone())
@@ -298,6 +302,8 @@ impl Stove {
         let Some(map) = self.map.as_ref() else {return};
         self.actors.clear();
         self.selected.clear();
+        self.query.clear();
+        self.matched.clear();
         let key = match hex::decode(self.aes.trim_start_matches("0x")) {
             Ok(key) if !self.aes.is_empty() => Some(key),
             Ok(_) => None,
@@ -841,32 +847,48 @@ impl Stove {
             });
             if let Some(map) = self.map.as_mut() {
                 ui.add_space(10.0);
+                if ui.add(egui::TextEdit::singleline(&mut self.query).hint_text("🔎 search actors")).changed() {
+                    self.matched = self.actors.iter()
+                        .enumerate()
+                        .filter_map(|(i, actor)|
+                            actor.name
+                                .to_ascii_lowercase()
+                                .contains(
+                                    &self.query.to_ascii_lowercase()
+                                ).then_some(i)
+                        ).collect()
+                }
                 ui.push_id("actors", |ui| egui::ScrollArea::both()
                     .auto_shrink([false, true])
                     .max_height(ui.available_height() * 0.5)
                     .show_rows(
                         ui,
                         ui.text_style_height(&egui::TextStyle::Body),
-                        self.actors.len(),
-                        |ui, range|{
-                            ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui|
-                                for i in range {
-                                    let is_selected = self.selected.contains(&i);
-                                    if ui.selectable_label(
-                                        is_selected,
-                                        &self.actors[i].name
-                                    )
-                                    .on_hover_text(&self.actors[i].class)
-                                    .clicked() {
-                                        ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
-                                            self.selected.clear()
-                                        });
-                                        select(ui, &mut self.selected, i);
-                                    }
+                        match self.query.is_empty() {
+                            true => self.actors.len(),
+                            false => self.matched.len(),
+                        },
+                        |ui, range| ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                            let list = |i| {
+                                let is_selected = self.selected.contains(&i);
+                                if ui.selectable_label(
+                                    is_selected,
+                                    &self.actors[i].name
+                                )
+                                .on_hover_text(&self.actors[i].class)
+                                .clicked() {
+                                    ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
+                                        self.selected.clear()
+                                    });
+                                    select(ui, &mut self.selected, i);
                                 }
-                            )
-                        ;
-                    })
+                            };
+                            match self.query.is_empty() {
+                                true => range.for_each(list),
+                                false => self.matched[range].iter().copied().for_each(list),
+                            }
+                        })
+                    )
                 );
                 if let Some(&selected) = self.selected.last() {
                     ui.add_space(10.0);
