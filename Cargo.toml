@@ -13,9 +13,8 @@ unpak = { version = "1.0", features = ["asset-paths"] }
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 winit = "0.28"
 egui = { version = "0.22", features = ["persistence"] }
-egui_winit_platform = "0.19"
-egui_wgpu_backend = "0.25.0"
-wgpu = "0.17"
+egui-winit = "0.22"
+egui-wgpu = "0.22"
 pollster = { version = "0.3", features = ["macro"]}
 wrld = "1.0"
 egui-notify = "0.7"

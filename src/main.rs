@@ -1,8 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+use egui_wgpu::wgpu;
 
 #[pollster::main]
 async fn main() {
-    let start = std::time::Instant::now();
     let events = winit::event_loop::EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("stove")
@@ -47,69 +47,76 @@ async fn main() {
         view_formats: vec![],
     };
     surface.configure(&device, &config);
-    let mut platform =
-        egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor {
-            physical_width: size.width,
-            physical_height: size.height,
-            scale_factor: window.scale_factor(),
-            ..Default::default()
-        });
-    let mut ui = egui_wgpu_backend::RenderPass::new(&device, format, 1);
-    let mut app = stove::Stove::new(&mut platform.context(), &device, format);
+    let (mut tex, mut depthview, mut sampler) = make_depth(&device, &config);
+    let mut screen = egui_wgpu::renderer::ScreenDescriptor {
+        size_in_pixels: [size.width, size.height],
+        pixels_per_point: window.scale_factor() as f32,
+    };
+    let mut platform = egui_winit::State::new(&window);
+    let mut ctx = egui::Context::default();
+    let mut ui =
+        egui_wgpu::Renderer::new(&device, format, Some(wgpu::TextureFormat::Depth32Float), 1);
+    let mut app = stove::Stove::new(&mut ctx, &device, format);
     events.run(move |event, _, flow| {
         use winit::{
             event::{Event, WindowEvent},
             event_loop::ControlFlow,
         };
-        platform.handle_event(&event);
+        if let Event::WindowEvent { event, .. } = &event {
+            let _ = platform.on_event(&ctx, event);
+        }
         match event {
             Event::RedrawRequested(_) => {
                 let size = window.inner_size();
-                let show_ui = app.show_ui();
-                if show_ui {
-                    platform.update_time(start.elapsed().as_secs_f64());
-                    platform.begin_frame();
-                    app.ui(&platform.context(), &device, format, &size);
-                }
                 let frame = surface.get_current_texture().unwrap();
                 let mut encoder = device.create_command_encoder(&Default::default());
                 let view = frame.texture.create_view(&Default::default());
+                let jobs = app.show_ui().then(|| {
+                    let output = ctx.run(platform.take_egui_input(&window), |ctx| {
+                        app.ui(ctx, &device, format, &size)
+                    });
+                    let jobs = ctx.tessellate(output.shapes);
+                    platform.handle_platform_output(&window, &ctx, output.platform_output);
+                    for (tex, delta) in output.textures_delta.set {
+                        ui.update_texture(&device, &queue, tex, &delta)
+                    }
+                    for tex in output.textures_delta.free {
+                        ui.free_texture(&tex)
+                    }
+                    ui.update_buffers(&device, &queue, &mut encoder, &jobs, &screen);
+                    jobs
+                });
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: &view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.15,
-                                g: 0.15,
-                                b: 0.15,
+                                r: 0.0,
+                                g: 0.0,
+                                b: 0.0,
                                 a: 1.0,
                             }),
                             store: true,
                         },
                     })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &depthview,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: true,
+                        }),
+                        stencil_ops: None,
+                    }),
                     ..Default::default()
                 });
                 app.scene(&queue, &mut pass, &size);
-                let mut delta = Default::default();
-                if show_ui {
-                    let output = platform.end_frame(Some(&window));
-                    let jobs = platform.context().tessellate(output.shapes);
-                    let screen = egui_wgpu_backend::ScreenDescriptor {
-                        physical_width: size.width,
-                        physical_height: size.height,
-                        scale_factor: window.scale_factor() as f32,
-                    };
-                    delta = output.textures_delta;
-                    ui.add_textures(&device, &queue, &delta).unwrap();
-                    ui.update_buffers(&device, &queue, &jobs, &screen);
-                    ui.execute_with_renderpass(&mut pass, &jobs, &screen)
-                        .unwrap();
+                if let Some(jobs) = jobs {
+                    ui.render(&mut pass, &jobs, &screen)
                 }
                 drop(pass);
                 queue.submit(Some(encoder.finish()));
                 frame.present();
-                ui.remove_textures(delta).unwrap();
                 window.request_redraw();
             }
             Event::WindowEvent {
@@ -122,6 +129,11 @@ async fn main() {
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
+                (tex, depthview, sampler) = make_depth(&device, &config);
+                screen = egui_wgpu::renderer::ScreenDescriptor {
+                    size_in_pixels: [size.width, size.height],
+                    pixels_per_point: window.scale_factor() as f32,
+                };
                 #[cfg(target_os = "macos")]
                 window.request_redraw();
             }
@@ -129,13 +141,45 @@ async fn main() {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                platform
-                    .context()
-                    .memory_mut(|storage| app.store(&mut storage.data));
+                ctx.memory_mut(|storage| app.store(&mut storage.data));
                 app.on_close_event();
                 *flow = ControlFlow::Exit
             }
             _ => (),
         }
     });
+}
+
+fn make_depth(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+) -> (wgpu::Texture, wgpu::TextureView, wgpu::Sampler) {
+    let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    });
+    let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::FilterMode::Nearest,
+        compare: Some(wgpu::CompareFunction::LessEqual),
+        lod_min_clamp: 0.0,
+        lod_max_clamp: 100.0,
+        ..Default::default()
+    });
+    (tex, view, sampler)
 }

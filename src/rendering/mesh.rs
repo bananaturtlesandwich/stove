@@ -1,4 +1,4 @@
-use wgpu::{self, util::DeviceExt, *};
+use egui_wgpu::wgpu::{self, util::DeviceExt, *};
 
 use super::{size_of, Vert};
 
@@ -91,7 +91,13 @@ impl Mesh {
                     cull_mode: Some(Face::Back),
                     ..Default::default()
                 },
-                depth_stencil: None,
+                depth_stencil: Some(DepthStencilState {
+                    format: TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: CompareFunction::Less,
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
                 multisample: MultisampleState::default(),
                 fragment: Some(FragmentState {
                     module: &shader,
