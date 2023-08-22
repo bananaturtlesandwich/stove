@@ -1025,7 +1025,7 @@ impl Stove {
     }
 
     #[cfg(not(target_family = "wasm"))]
-    pub fn on_close_event(&mut self) {
+    pub fn close(&mut self) {
         if let Some(client) = &mut self.client {
             client.close().unwrap()
         }
