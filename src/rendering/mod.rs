@@ -4,7 +4,7 @@ mod cube;
 mod mesh;
 pub use {axes::*, camera::*, cube::*, mesh::*};
 
-use wgpu;
+use egui_wgpu::wgpu;
 
 fn size_of<T>() -> u64 {
     std::mem::size_of::<T>() as u64

@@ -1,6 +1,5 @@
 use super::{size_of, Vert};
-// wrld needs wgpu in scope
-use wgpu::{self, util::DeviceExt, *};
+use egui_wgpu::wgpu::{self, util::DeviceExt, *};
 
 pub struct Cube {
     vertices: Buffer,

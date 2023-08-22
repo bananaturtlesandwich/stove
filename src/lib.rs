@@ -1,5 +1,6 @@
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
+use egui_wgpu::wgpu;
 use unreal_asset::{
     engine_version::EngineVersion::{self, *},
     types::PackageIndex,
