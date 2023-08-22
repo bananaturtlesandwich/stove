@@ -36,7 +36,7 @@ async fn main() {
         .unwrap();
     let caps = surface.get_capabilities(&adapter);
     let format = caps.formats[0];
-    let size = window.inner_size();
+    let mut size = window.inner_size();
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format,
@@ -67,7 +67,6 @@ async fn main() {
         }
         match event {
             Event::RedrawRequested(_) => {
-                let size = window.inner_size();
                 let frame = surface.get_current_texture().unwrap();
                 let mut encoder = device.create_command_encoder(&Default::default());
                 let view = frame.texture.create_view(&Default::default());
@@ -119,13 +118,15 @@ async fn main() {
                 frame.present();
                 window.request_redraw();
             }
+            Event::MainEventsCleared => window.request_redraw(),
             Event::WindowEvent {
-                event: WindowEvent::Resized(size),
+                event: WindowEvent::Resized(new),
                 ..
             } => {
-                if size.width == 0 || size.height == 0 {
+                if new.width == 0 || new.height == 0 {
                     return;
                 }
+                size = new;
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
@@ -142,7 +143,7 @@ async fn main() {
                 ..
             } => {
                 ctx.memory_mut(|storage| app.store(&mut storage.data));
-                app.on_close_event();
+                app.close();
                 *flow = ControlFlow::Exit
             }
             _ => (),
