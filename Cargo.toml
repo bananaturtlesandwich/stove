@@ -16,7 +16,6 @@ egui = { version = "0.22", features = ["persistence", "serde"] }
 egui-winit = "0.22"
 egui-wgpu = "0.22"
 pollster = { version = "0.3", features = ["macro"]}
-wrld = "1.0"
 egui-notify = "0.7"
 egui_file = "0.10"
 bytemuck = "1.13"

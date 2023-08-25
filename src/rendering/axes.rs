@@ -1,4 +1,4 @@
-use super::{size_of, Vert};
+use super::size_of;
 use egui_wgpu::wgpu::{util::DeviceExt, *};
 
 pub struct Axes {
@@ -62,7 +62,7 @@ impl Axes {
                 vertex: VertexState {
                     module: &shader,
                     entry_point: "vert",
-                    buffers: &[Vert::desc()],
+                    buffers: &[super::VERT],
                 },
                 primitive: PrimitiveState {
                     topology: PrimitiveTopology::LineList,
