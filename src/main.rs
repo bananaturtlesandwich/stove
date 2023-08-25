@@ -67,7 +67,9 @@ async fn main() {
         }
         match event {
             Event::RedrawRequested(_) => {
-                let frame = surface.get_current_texture().unwrap();
+                let Ok(frame) = surface.get_current_texture() else {
+                    return;
+                };
                 let mut encoder = device.create_command_encoder(&Default::default());
                 let view = frame.texture.create_view(&Default::default());
                 let jobs = app.show_ui().then(|| {

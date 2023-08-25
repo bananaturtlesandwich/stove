@@ -272,12 +272,12 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             exp if exp == SHIFTED => single += (128 - 16) << 23,
             0 => {
                 single += 1 << 23;
-                single = unsafe { transmute::<f32, u32>(transmute::<u32, f32>(single) - MAGIC) };
+                single = (f32::from_bits(single) - MAGIC).to_bits();
             }
             _ => (),
         }
         single |= (half as u32 & 0x8000) << 16;
-        unsafe { transmute(single) }
+        f32::from_bits(single)
     }
     fn read_tex_coords(
         data: &mut io::Cursor<&[u8]>,

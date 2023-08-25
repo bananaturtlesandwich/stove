@@ -162,6 +162,13 @@ impl Stove {
             false,
         );
         ctx.memory_mut(|storage| {
+            if let Some(config) = config()
+                .map(|config| config.join("config.ron"))
+                .and_then(|path| std::fs::read_to_string(path).ok())
+                .and_then(|str| ron::from_str::<egui::util::IdTypeMap>(&str).ok())
+            {
+                storage.data = config
+            }
             let data = &mut storage.data;
             fn retrieve<T: egui::util::id_type_map::SerializableAny>(
                 val: &mut T,
@@ -271,7 +278,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate,
         };
-        stove.refresh(&device, format);
+        stove.refresh(device, format);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -344,7 +351,7 @@ impl Stove {
                                     if cache_path(&mesh).exists() ||
                                             // try to create cache if it doesn't exist
                                             (
-                                                std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
+                                                std::fs::create_dir_all(cache_path(path).parent().unwrap()).is_ok() &&
                                                 pak.read_to_file(&mesh, cache_path(&mesh)).is_ok() &&
                                                 // we don't care whether these are successful in case they don't exist
                                                 pak.read_to_file(&exp, cache_path(&exp)).map_or(true,|_| true) &&
@@ -607,10 +614,7 @@ impl Stove {
         self.get_avg_base(
             |actor, map| (actor.location(map), actor.scale(map)),
             |(accpos, accsca), (pos, sca)| ((accpos + pos), (accsca + sca)),
-            |(pos, sca), len| {
-                let len = len as f32;
-                (pos / len, sca / len)
-            },
+            |(pos, sca), len| (pos / len, sca / len),
         )
     }
 }
@@ -673,7 +677,7 @@ impl Stove {
         self.cubes.draw(pass);
         if self.grab != Grab::None {
             if let Some((loc, sca)) = self.avg_transform() {
-                let filter = self.filter.clone();
+                let filter = self.filter;
                 self.axes.copy(
                     &(vp * glam::Mat4::from_translation(loc) * glam::Mat4::from_scale(sca)),
                     queue,
@@ -1022,12 +1026,17 @@ impl Stove {
         storage.insert_persisted(Id::new("CACHE"), self.use_cache);
         storage.insert_persisted(Id::new("SCRIPT"), self.script.clone());
         storage.insert_persisted(Id::new("AUTOUPDATE"), self.autoupdate);
+        if let Some(config) = config() {
+            if let Ok(data) = ron::to_string(&storage) {
+                let _ = std::fs::write(config.join("config.ron"), data);
+            }
+        }
     }
 
     #[cfg(not(target_family = "wasm"))]
     pub fn close(&mut self) {
         if let Some(client) = &mut self.client {
-            client.close().unwrap()
+            let _ = client.close();
         }
     }
 }
@@ -1046,7 +1055,7 @@ impl Stove {
             path: Some(path), ..
         }) = input.raw.dropped_files.first()
         {
-            self.open(&path);
+            self.open(path);
             self.refresh(device, format)
         }
         self.camera.update_times(input.stable_dt);
@@ -1196,7 +1205,7 @@ impl Stove {
                         if ctx.is_pointer_over_area() {
                             return;
                         }
-                        let proj = self.view_projection(&size);
+                        let proj = self.view_projection(size);
                         // THE HACKIEST MOUSE PICKING EVER CONCEIVED
                         let pick = self
                             .map
