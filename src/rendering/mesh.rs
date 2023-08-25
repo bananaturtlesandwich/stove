@@ -1,6 +1,6 @@
-use egui_wgpu::wgpu::{self, util::DeviceExt, *};
+use egui_wgpu::wgpu::{util::DeviceExt, *};
 
-use super::{size_of, Vert};
+use super::size_of;
 
 pub struct Mesh {
     vertices: Buffer,
@@ -12,19 +12,6 @@ pub struct Mesh {
     uniform: Buffer,
     len: u32,
     num: u32,
-}
-
-#[repr(C)]
-#[derive(wrld::DescInstance, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
-struct Inst {
-    #[f32x4(1)]
-    instx: [f32; 4],
-    #[f32x4(2)]
-    insty: [f32; 4],
-    #[f32x4(3)]
-    instz: [f32; 4],
-    #[f32x4(4)]
-    instw: [f32; 4],
 }
 
 impl Mesh {
@@ -85,7 +72,14 @@ impl Mesh {
                 vertex: VertexState {
                     module: &shader,
                     entry_point: "vert",
-                    buffers: &[Vert::desc(), Inst::desc()],
+                    buffers: &[
+                        super::VERT,
+                        VertexBufferLayout {
+                            array_stride: size_of::<f32>() * 4 * 4,
+                            step_mode: VertexStepMode::Instance,
+                            attributes: &vertex_attr_array![1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4],
+                        },
+                    ],
                 },
                 primitive: PrimitiveState {
                     cull_mode: Some(Face::Back),
@@ -116,7 +110,14 @@ impl Mesh {
                 vertex: VertexState {
                     module: &shader,
                     entry_point: "vert",
-                    buffers: &[Vert::desc(), Inst::desc()],
+                    buffers: &[
+                        super::VERT,
+                        VertexBufferLayout {
+                            array_stride: size_of::<f32>() * 4 * 4,
+                            step_mode: VertexStepMode::Instance,
+                            attributes: &vertex_attr_array![1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4],
+                        },
+                    ],
                 },
                 primitive: PrimitiveState {
                     polygon_mode: PolygonMode::Line,
@@ -160,12 +161,7 @@ impl Mesh {
         queue.write_buffer(
             &self.inst,
             self.num as u64 * size_of::<glam::Mat4>(),
-            bytemuck::bytes_of(&Inst {
-                instx: mat.x_axis.to_array(),
-                insty: mat.y_axis.to_array(),
-                instz: mat.z_axis.to_array(),
-                instw: mat.w_axis.to_array(),
-            }),
+            bytemuck::bytes_of(&mat.to_cols_array_2d()),
         );
         self.num += 1;
     }

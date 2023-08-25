@@ -1,5 +1,5 @@
-use super::{size_of, Vert};
-use egui_wgpu::wgpu::{self, util::DeviceExt, *};
+use super::size_of;
+use egui_wgpu::wgpu::{util::DeviceExt, *};
 
 pub struct Cube {
     vertices: Buffer,
@@ -12,17 +12,9 @@ pub struct Cube {
 }
 
 #[repr(C)]
-#[derive(wrld::DescInstance, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
+#[derive(bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
 struct Inst {
-    #[f32x4(1)]
-    instx: [f32; 4],
-    #[f32x4(2)]
-    insty: [f32; 4],
-    #[f32x4(3)]
-    instz: [f32; 4],
-    #[f32x4(4)]
-    instw: [f32; 4],
-    #[f32(5)]
+    mat: [[f32; 4]; 4],
     selected: f32,
 }
 
@@ -51,20 +43,21 @@ impl Cube {
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+
         Self {
-            vertices: device.create_buffer_init(&util::BufferInitDescriptor {
+            vertices:  device.create_buffer_init(&util::BufferInitDescriptor {
                 label: None,
-                contents: bytemuck::cast_slice(&[
+                contents: bytemuck::cast_slice::<f32, u8>(&[
                     // front verts
-                    Vert::new(-0.5, -0.5, -0.5),
-                    Vert::new(-0.5, 0.5, -0.5),
-                    Vert::new(0.5, -0.5, -0.5),
-                    Vert::new(0.5, 0.5, -0.5),
+                    -0.5, -0.5, -0.5,
+                    -0.5, 0.5, -0.5,
+                    0.5, -0.5, -0.5,
+                    0.5, 0.5, -0.5,
                     // back verts
-                    Vert::new(-0.5, -0.5, 0.5),
-                    Vert::new(-0.5, 0.5, 0.5),
-                    Vert::new(0.5, -0.5, 0.5),
-                    Vert::new(0.5, 0.5, 0.5),
+                    -0.5, -0.5, 0.5,
+                    -0.5, 0.5, 0.5,
+                    0.5, -0.5, 0.5,
+                    0.5, 0.5, 0.5,
                 ]),
                 usage: BufferUsages::VERTEX,
             }),
@@ -91,7 +84,13 @@ impl Cube {
                 vertex: VertexState {
                     module: &shader,
                     entry_point: "vert",
-                    buffers: &[Vert::desc(), Inst::desc()],
+                    buffers: &[super::VERT,
+                        VertexBufferLayout {
+                            array_stride: size_of::<f32>() * 4 * 4 + size_of::<u32>(),
+                            step_mode: VertexStepMode::Instance,
+                            attributes: &vertex_attr_array![1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4, 5 => Float32],
+                        },
+                    ],
                 },
                 primitive: PrimitiveState {
                     topology: PrimitiveTopology::LineList,
@@ -130,10 +129,7 @@ impl Cube {
         let inst: Vec<_> = inst
             .iter()
             .map(|(mat, selected)| Inst {
-                instx: mat.x_axis.to_array(),
-                insty: mat.y_axis.to_array(),
-                instz: mat.z_axis.to_array(),
-                instw: mat.w_axis.to_array(),
+                mat: mat.to_cols_array_2d(),
                 selected: *selected,
             })
             .collect();

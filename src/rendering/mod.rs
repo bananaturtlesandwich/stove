@@ -2,23 +2,15 @@ mod axes;
 mod camera;
 mod cube;
 mod mesh;
+use egui_wgpu::wgpu::*;
 pub use {axes::*, camera::*, cube::*, mesh::*};
 
-use egui_wgpu::wgpu;
-
-fn size_of<T>() -> u64 {
+const fn size_of<T>() -> u64 {
     std::mem::size_of::<T>() as u64
 }
 
-#[repr(C)]
-#[derive(wrld::Desc, bytemuck::Pod, Clone, Copy, bytemuck::Zeroable)]
-struct Vert {
-    #[f32x3(0)]
-    pos: [f32; 3],
-}
-
-impl Vert {
-    const fn new(x: f32, y: f32, z: f32) -> Self {
-        Self { pos: [x, y, z] }
-    }
-}
+const VERT: VertexBufferLayout = VertexBufferLayout {
+    array_stride: size_of::<f32>() * 3,
+    step_mode: VertexStepMode::Vertex,
+    attributes: &vertex_attr_array![0 => Float32x3],
+};
