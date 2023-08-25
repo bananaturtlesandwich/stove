@@ -1086,7 +1086,7 @@ impl Stove {
             self.refresh(device, format, samples)
         }
         self.camera.update_times(input.stable_dt);
-        self.camera.move_cam(input);
+        self.camera.move_cam(input, ctx.wants_keyboard_input());
         for event in input.events.iter() {
             match event {
                 egui::Event::Key {
