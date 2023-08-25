@@ -19,7 +19,7 @@ struct Inst {
 }
 
 impl Cube {
-    pub fn new(device: &Device, format: TextureFormat) -> Self {
+    pub fn new(device: &Device, format: TextureFormat, samples: u32) -> Self {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
             source: ShaderSource::Wgsl(include_str!("cube.wgsl").into()),
@@ -104,7 +104,7 @@ impl Cube {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
-                multisample: MultisampleState::default(),
+                multisample: MultisampleState { count: samples, ..Default::default() },
                 fragment: Some(FragmentState {
                     module: &shader,
                     entry_point: "frag",

@@ -20,6 +20,7 @@ impl Mesh {
         indices: &[u32],
         device: &Device,
         format: TextureFormat,
+        samples: u32,
     ) -> Self {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
@@ -92,7 +93,7 @@ impl Mesh {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
-                multisample: MultisampleState::default(),
+                multisample: MultisampleState { count: samples, ..Default::default() },
                 fragment: Some(FragmentState {
                     module: &shader,
                     entry_point: "solid",
@@ -130,7 +131,7 @@ impl Mesh {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
-                multisample: MultisampleState::default(),
+                multisample: MultisampleState { count: samples, ..Default::default() },
                 fragment: Some(FragmentState {
                     module: &shader,
                     entry_point: "wire",
