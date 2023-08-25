@@ -26,7 +26,8 @@ async fn main() {
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
-                features: wgpu::Features::POLYGON_MODE_LINE,
+                features: wgpu::Features::POLYGON_MODE_LINE
+                    | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
                 limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
             },
@@ -35,7 +36,12 @@ async fn main() {
         .await
         .unwrap();
     let caps = surface.get_capabilities(&adapter);
-    let format = caps.formats[0];
+    let format = caps
+        .formats
+        .iter()
+        .copied()
+        .find(|f| !f.is_srgb())
+        .unwrap_or(caps.formats[0]);
     let mut size = window.inner_size();
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -47,16 +53,27 @@ async fn main() {
         view_formats: vec![],
     };
     surface.configure(&device, &config);
-    let mut depthview = make_depth(&device, &config);
+    let samples = match adapter.get_texture_format_features(format).flags {
+        flags if flags.contains(wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X16) => 16,
+        flags if flags.contains(wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X8) => 8,
+        flags if flags.contains(wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X4) => 4,
+        flags if flags.contains(wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X2) => 2,
+        _ => 1,
+    };
+    let (mut depth, mut tex) = make_tex(&device, &config, samples, format);
     let mut screen = egui_wgpu::renderer::ScreenDescriptor {
         size_in_pixels: [size.width, size.height],
         pixels_per_point: window.scale_factor() as f32,
     };
     let mut platform = egui_winit::State::new(&window);
     let mut ctx = egui::Context::default();
-    let mut ui =
-        egui_wgpu::Renderer::new(&device, format, Some(wgpu::TextureFormat::Depth32Float), 1);
-    let mut app = stove::Stove::new(&mut ctx, &device, format);
+    let mut ui = egui_wgpu::Renderer::new(
+        &device,
+        format,
+        Some(wgpu::TextureFormat::Depth32Float),
+        samples,
+    );
+    let mut app = stove::Stove::new(&mut ctx, &device, format, samples);
     events.run(move |event, _, flow| {
         use winit::{
             event::{Event, WindowEvent},
@@ -71,10 +88,9 @@ async fn main() {
                     return;
                 };
                 let mut encoder = device.create_command_encoder(&Default::default());
-                let view = frame.texture.create_view(&Default::default());
                 let jobs = app.show_ui().then(|| {
                     let output = ctx.run(platform.take_egui_input(&window), |ctx| {
-                        app.ui(ctx, &device, format, &size)
+                        app.ui(ctx, &device, format, samples, &size)
                     });
                     let jobs = ctx.tessellate(output.shapes);
                     platform.handle_platform_output(&window, &ctx, output.platform_output);
@@ -87,22 +103,23 @@ async fn main() {
                     ui.update_buffers(&device, &queue, &mut encoder, &jobs, &screen);
                     jobs
                 });
+                let resolve = frame.texture.create_view(&Default::default());
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
+                        view: &tex,
+                        resolve_target: Some(&resolve),
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.0,
-                                g: 0.0,
-                                b: 0.0,
+                                r: 0.15,
+                                g: 0.15,
+                                b: 0.15,
                                 a: 1.0,
                             }),
                             store: true,
                         },
                     })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &depthview,
+                        view: &depth,
                         depth_ops: Some(wgpu::Operations {
                             load: wgpu::LoadOp::Clear(1.0),
                             store: true,
@@ -132,7 +149,7 @@ async fn main() {
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
-                depthview = make_depth(&device, &config);
+                (depth, tex) = make_tex(&device, &config, samples, format);
                 screen = egui_wgpu::renderer::ScreenDescriptor {
                     size_in_pixels: [size.width, size.height],
                     pixels_per_point: window.scale_factor() as f32,
@@ -153,21 +170,42 @@ async fn main() {
     });
 }
 
-fn make_depth(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> wgpu::TextureView {
-    device
-        .create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        })
-        .create_view(&wgpu::TextureViewDescriptor::default())
+fn make_tex(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+    samples: u32,
+    format: wgpu::TextureFormat,
+) -> (wgpu::TextureView, wgpu::TextureView) {
+    let size = wgpu::Extent3d {
+        width: config.width,
+        height: config.height,
+        depth_or_array_layers: 1,
+    };
+    (
+        device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size,
+                mip_level_count: 1,
+                sample_count: samples,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth32Float,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+            .create_view(&Default::default()),
+        device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size,
+                mip_level_count: 1,
+                sample_count: samples,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            })
+            .create_view(&Default::default()),
+    )
 }

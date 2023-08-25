@@ -135,6 +135,7 @@ impl Stove {
         ctx: &mut egui::Context,
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
+        samples: u32,
     ) -> Self {
         let mut notifs = egui_notify::Toasts::new();
         #[cfg(not(target_family = "wasm"))]
@@ -229,9 +230,9 @@ impl Stove {
 
         let mut stove = Self {
             camera: rendering::Camera::default(),
-            cubes: rendering::Cube::new(device, format),
+            cubes: rendering::Cube::new(device, format, samples),
             meshes: hashbrown::HashMap::new(),
-            axes: rendering::Axes::new(device, format),
+            axes: rendering::Axes::new(device, format, samples),
             notifs,
             map,
             version,
@@ -278,7 +279,7 @@ impl Stove {
             #[cfg(not(target_family = "wasm"))]
             autoupdate,
         };
-        stove.refresh(device, format);
+        stove.refresh(device, format, samples);
         if stove.map.is_none() {
             stove.open_dialog.open()
         }
@@ -293,7 +294,7 @@ impl Stove {
         VERSIONS[self.version].0
     }
 
-    fn refresh(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
+    fn refresh(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, samples: u32) {
         let Some(map) = self.map.as_ref() else {return};
         self.actors.clear();
         self.selected.clear();
@@ -447,7 +448,9 @@ impl Stove {
                                     //     .collect();
                                     self.meshes.insert(
                                         path.to_string(),
-                                        rendering::Mesh::new(&positions, &indices, device, format),
+                                        rendering::Mesh::new(
+                                            &positions, &indices, device, format, samples,
+                                        ),
                                     );
                                     break;
                                 }
@@ -709,6 +712,7 @@ impl Stove {
         ctx: &egui::Context,
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
+        samples: u32,
         size: &winit::dpi::PhysicalSize<u32>,
     ) {
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
@@ -948,7 +952,7 @@ impl Stove {
                     ],
                 );
                 self.open(&path);
-                self.refresh(device, format);
+                self.refresh(device, format, samples);
             }
         }
         self.transplant_dialog.show(ctx);
@@ -1013,7 +1017,7 @@ impl Stove {
                 self.save()
             }
         }
-        ctx.input(|input| self.handle_input(input, ctx, device, format, size));
+        ctx.input(|input| self.handle_input(input, ctx, device, format, samples, size));
         ctx.request_repaint();
     }
 
@@ -1048,6 +1052,7 @@ impl Stove {
         ctx: &egui::Context,
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
+        samples: u32,
         size: &winit::dpi::PhysicalSize<u32>,
     ) {
         use egui::{Key, PointerButton};
@@ -1056,7 +1061,7 @@ impl Stove {
         }) = input.raw.dropped_files.first()
         {
             self.open(path);
-            self.refresh(device, format)
+            self.refresh(device, format, samples)
         }
         self.camera.update_times(input.stable_dt);
         self.camera.move_cam(input);
