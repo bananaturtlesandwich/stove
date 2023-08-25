@@ -15,6 +15,11 @@ fn vert(
 }
 
 @fragment
-fn frag() -> @location(0) vec4f {
+fn solid() -> @location(0) vec4f {
     return vec4(0.2, 0.5, 1.0, 1.0);
+}
+
+@fragment
+fn wire() -> @location(0) vec4f {
+    return vec4(0.0, 0.0, 0.0, 1.0);
 }
