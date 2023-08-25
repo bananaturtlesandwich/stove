@@ -155,7 +155,7 @@ impl Stove {
             mut use_cache,
             mut script,
             mut autoupdate,
-        ): (usize, Vec<String>, f32, String, bool, String, bool) = (
+        ) = (
             0,
             vec![],
             100000.0,
@@ -720,6 +720,7 @@ impl Stove {
         format: wgpu::TextureFormat,
         samples: u32,
         size: &winit::dpi::PhysicalSize<u32>,
+        window: &winit::window::Window,
     ) {
         egui::SidePanel::left("sidepanel").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -1039,7 +1040,7 @@ impl Stove {
                 self.save()
             }
         }
-        ctx.input(|input| self.handle_input(input, ctx, device, format, samples, size));
+        ctx.input(|input| self.handle_input(input, ctx, device, format, samples, size, window));
         ctx.request_repaint();
     }
 
@@ -1076,6 +1077,7 @@ impl Stove {
         format: wgpu::TextureFormat,
         samples: u32,
         size: &winit::dpi::PhysicalSize<u32>,
+        window: &winit::window::Window,
     ) {
         use egui::{Key, PointerButton};
         if let Some(egui::DroppedFile {
@@ -1152,7 +1154,10 @@ impl Stove {
                             },
                             Key::Enter if modifiers.alt => {
                                 self.fullscreen = !self.fullscreen;
-                                // frame.set_fullscreen(self.fullscreen);
+                                window.set_fullscreen(
+                                    self.fullscreen
+                                        .then_some(winit::window::Fullscreen::Borderless(None)),
+                                );
                             }
                             Key::C if modifiers.ctrl => {
                                 match self.avg_raw_loc() {

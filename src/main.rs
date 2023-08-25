@@ -90,7 +90,7 @@ async fn main() {
                 let mut encoder = device.create_command_encoder(&Default::default());
                 let jobs = app.show_ui().then(|| {
                     let output = ctx.run(platform.take_egui_input(&window), |ctx| {
-                        app.ui(ctx, &device, format, samples, &size)
+                        app.ui(ctx, &device, format, samples, &size, &window)
                     });
                     let jobs = ctx.tessellate(output.shapes);
                     platform.handle_platform_output(&window, &ctx, output.platform_output);
