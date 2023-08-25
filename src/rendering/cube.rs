@@ -128,7 +128,7 @@ impl Cube {
 
     pub fn copy(&mut self, inst: &[(glam::Mat4, f32)], vp: &glam::Mat4, queue: &Queue) {
         let inst: Vec<_> = inst
-            .into_iter()
+            .iter()
             .map(|(mat, selected)| Inst {
                 instx: mat.x_axis.to_array(),
                 insty: mat.y_axis.to_array(),
