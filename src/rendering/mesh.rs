@@ -6,7 +6,8 @@ pub struct Mesh {
     vertices: Buffer,
     indices: Buffer,
     inst: Buffer,
-    pipeline: RenderPipeline,
+    solid: RenderPipeline,
+    wire: RenderPipeline,
     bindings: BindGroup,
     uniform: Buffer,
     len: u32,
@@ -74,7 +75,7 @@ impl Mesh {
                 usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
-            pipeline: device.create_render_pipeline(&RenderPipelineDescriptor {
+            solid: device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: None,
                 layout: Some(&device.create_pipeline_layout(&PipelineLayoutDescriptor {
                     label: None,
@@ -87,7 +88,6 @@ impl Mesh {
                     buffers: &[Vert::desc(), Inst::desc()],
                 },
                 primitive: PrimitiveState {
-                    polygon_mode: PolygonMode::Line,
                     cull_mode: Some(Face::Back),
                     ..Default::default()
                 },
@@ -101,7 +101,38 @@ impl Mesh {
                 multisample: MultisampleState::default(),
                 fragment: Some(FragmentState {
                     module: &shader,
-                    entry_point: "frag",
+                    entry_point: "solid",
+                    targets: &[Some(format.into())],
+                }),
+                multiview: None,
+            }),
+            wire: device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                    label: None,
+                    bind_group_layouts: &[&bindings],
+                    push_constant_ranges: &[],
+                })),
+                vertex: VertexState {
+                    module: &shader,
+                    entry_point: "vert",
+                    buffers: &[Vert::desc(), Inst::desc()],
+                },
+                primitive: PrimitiveState {
+                    polygon_mode: PolygonMode::Line,
+                    ..Default::default()
+                },
+                depth_stencil: Some(DepthStencilState {
+                    format: TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: CompareFunction::Less,
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: MultisampleState::default(),
+                fragment: Some(FragmentState {
+                    module: &shader,
+                    entry_point: "wire",
                     targets: &[Some(format.into())],
                 }),
                 multiview: None,
@@ -140,12 +171,16 @@ impl Mesh {
     }
 
     pub fn draw<'a>(&'a self, pass: &mut RenderPass<'a>) {
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bindings, &[]);
-        pass.set_index_buffer(self.indices.slice(..), IndexFormat::Uint32);
-        pass.set_vertex_buffer(0, self.vertices.slice(..));
-        pass.set_vertex_buffer(1, self.inst.slice(..));
-        pass.draw_indexed(0..self.len, 0, 0..self.num);
+        let mut draw = |pipeline| {
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(0, &self.bindings, &[]);
+            pass.set_index_buffer(self.indices.slice(..), IndexFormat::Uint32);
+            pass.set_vertex_buffer(0, self.vertices.slice(..));
+            pass.set_vertex_buffer(1, self.inst.slice(..));
+            pass.draw_indexed(0..self.len, 0, 0..self.num);
+        };
+        draw(&self.solid);
+        draw(&self.wire);
     }
 }
 // pub struct Mesh {
