@@ -1,8 +1,8 @@
-# <img src="assets/pot.ico" width="50" /> `stove` - an editor for cooked unreal engine 4 maps
+# <img src="assets/pot.ico" width="50" /> `stove` - an editor for cooked unreal engine maps
 
 **<h1 align="center">[get the latest alpha build!](https://github.com/bananaturtlesandwich/stove/releases)</h1>**
 
-<h1 align="center"><img width=700 src=https://user-images.githubusercontent.com/71292624/217354220-8d21f016-7941-44e9-95c6-bce7de373147.png></h1>
+<h1 align="center"><img width=900 src=https://github.com/bananaturtlesandwich/stove/assets/71292624/3ee1db0f-7509-4ef8-9205-6c461d65e563></h1>
 
 # features
 - visualise maps as they would be in-game
@@ -26,7 +26,7 @@
 - [ ] undo and redo
 - [x] actor deletion
 - [x] move actors in the viewport
-- [ ] searching
+- [x] searching
 ### advanced functionality
 - [ ] insert default values (properties left as default are cut from the map)
 - [ ] delete excess exports left after actor removal
@@ -45,5 +45,4 @@
 
 - [atenfyr](https://github.com/atenfyr) for creating the extensive [UAssetAPI](https://github.com/atenfyr/UAssetAPI) which made this project possible ❤️
 - [localcc](https://github.com/localcc) for rewriting it as [unreal_asset](https://github.com/AstroTechies/unrealmodding/tree/main/unreal_asset), allowing me to program this in [rust <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Crab.png" width="20" />](https://www.rust-lang.org/)
-- [fedor](https://github.com/not-fl3) and [emilk](https://github.com/emilk) for their minimal yet easy-to-use [miniquad](https://crates.io/crates/miniquad) and [egui](https://crates.io/crates/egui) crates 📦
 - [LongerWarrior](https://github.com/LongerWarrior) for pointing out everything I was missing in the actor duplication code
