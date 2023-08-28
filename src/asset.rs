@@ -1,12 +1,14 @@
-use std::{fs::File, path::Path};
+use std::{fs::File, io::BufReader, path::Path};
 
 use unreal_asset::{engine_version::EngineVersion, error::Error, Asset};
 
 /// creates an asset from the specified path and version
-pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<Asset<File>, Error> {
+pub fn open(file: impl AsRef<Path>, version: EngineVersion) -> Result<super::Asset, Error> {
     Asset::new(
-        File::open(&file)?,
-        File::open(file.as_ref().with_extension("uexp")).ok(),
+        BufReader::new(File::open(&file)?),
+        File::open(file.as_ref().with_extension("uexp"))
+            .ok()
+            .map(BufReader::new),
         version,
         None,
     )

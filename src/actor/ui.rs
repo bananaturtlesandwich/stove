@@ -6,11 +6,10 @@ use unreal_asset::{
         PropertyDataTrait,
     },
     types::fname::{FName, ToSerializedName},
-    Asset,
 };
 
 impl super::Actor {
-    pub fn show(&self, asset: &mut Asset<std::fs::File>, ui: &mut egui::Ui) {
+    pub fn show(&self, asset: &mut crate::Asset, ui: &mut egui::Ui) {
         ui.heading(&self.name);
         fn export(ui: &mut egui::Ui, export: &mut Export) {
             if let Some(norm) = export.get_normal_export_mut() {

@@ -3,11 +3,11 @@ use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     reader::archive_trait::ArchiveTrait,
     types::PackageIndex,
-    Asset, Import,
+    Import,
 };
 
 impl super::Actor {
-    pub fn transplant(&self, recipient: &mut Asset<std::fs::File>, donor: &Asset<std::fs::File>) {
+    pub fn transplant(&self, recipient: &mut crate::Asset, donor: &crate::Asset) {
         let mut children = self.get_actor_exports(donor, recipient.asset_data.exports.len());
 
         // make sure the actor has a unique object name

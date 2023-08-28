@@ -7,7 +7,7 @@ use unreal_asset::{
 
 impl super::Actor {
     /// adds an actor to a map where the actor is already present
-    pub fn duplicate(&self, asset: &mut Asset<std::fs::File>) {
+    pub fn duplicate(&self, asset: &mut Asset<std::io::BufReader<std::fs::File>>) {
         let len = asset.asset_data.exports.len();
         let mut children = self.get_actor_exports(asset, len);
 

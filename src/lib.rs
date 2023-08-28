@@ -11,6 +11,8 @@ mod asset;
 mod extras;
 mod rendering;
 
+type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
+
 #[derive(PartialEq)]
 enum Grab {
     None,
@@ -27,7 +29,7 @@ pub struct Stove {
     meshes: hashbrown::HashMap<String, rendering::Mesh>,
     axes: rendering::Axes,
     notifs: egui_notify::Toasts,
-    map: Option<unreal_asset::Asset<std::fs::File>>,
+    map: Option<Asset>,
     version: usize,
     actors: Vec<actor::Actor>,
     selected: Vec<usize>,
@@ -35,7 +37,7 @@ pub struct Stove {
     matched: Vec<usize>,
     ui: bool,
     transplant: Option<(
-        unreal_asset::Asset<std::fs::File>,
+        unreal_asset::Asset<std::io::BufReader<std::fs::File>>,
         Vec<actor::Actor>,
         Vec<usize>,
     )>,
@@ -106,7 +108,7 @@ fn auto_update() {
 }
 
 enum Wrapper {
-    File(std::fs::File),
+    File(std::io::BufReader<std::fs::File>),
     Bytes(std::io::Cursor<Vec<u8>>),
 }
 
@@ -299,7 +301,7 @@ impl Stove {
     }
 
     fn refresh(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, samples: u32) {
-        let Some(map) = self.map.as_ref() else {return};
+        let Some(map) = self.map.as_ref() else { return };
         self.actors.clear();
         self.selected.clear();
         self.query.clear();
@@ -330,7 +332,7 @@ impl Stove {
                 Ok(mut actor) => {
                     let actor::DrawType::Mesh(path) = &actor.draw_type else {
                         self.actors.push(actor);
-                        continue
+                        continue;
                     };
                     if !self.meshes.contains_key(path) {
                         fn get<T>(
@@ -368,9 +370,12 @@ impl Stove {
                                 {
                                     func(
                                         unreal_asset::Asset::new(
-                                            Wrapper::File(std::fs::File::open(cache_path(&mesh))?),
+                                            Wrapper::File(std::io::BufReader::new(
+                                                std::fs::File::open(cache_path(&mesh))?,
+                                            )),
                                             std::fs::File::open(cache_path(&exp))
                                                 .ok()
+                                                .map(std::io::BufReader::new)
                                                 .map(Wrapper::File),
                                             version,
                                             None,
@@ -381,6 +386,7 @@ impl Stove {
                                                 || std::fs::File::open(cache_path(&uptnl)).ok(),
                                                 Some,
                                             )
+                                            .map(std::io::BufReader::new)
                                             .map(Wrapper::File),
                                     )
                                 }
@@ -566,7 +572,9 @@ impl Stove {
         if self.selected.is_empty() {
             self.notifs.error("nothing selected to focus on");
         }
-        let Some((pos, sca)) = self.avg_transform() else { return };
+        let Some((pos, sca)) = self.avg_transform() else {
+            return;
+        };
         self.camera.set_focus(pos, sca)
     }
 
@@ -591,7 +599,7 @@ impl Stove {
 
     fn get_avg_base<T>(
         &self,
-        get: impl Fn(&actor::Actor, &unreal_asset::Asset<std::fs::File>) -> T,
+        get: impl Fn(&actor::Actor, &Asset) -> T,
         add: impl Fn(T, T) -> T,
         div: impl Fn(T, f32) -> T,
     ) -> Option<T> {
@@ -606,7 +614,7 @@ impl Stove {
 
     fn get_avg<T: std::ops::Add<T, Output = T> + std::ops::Div<f32, Output = T>>(
         &self,
-        get: impl Fn(&actor::Actor, &unreal_asset::Asset<std::fs::File>) -> T,
+        get: impl Fn(&actor::Actor, &Asset) -> T,
     ) -> Option<T> {
         self.get_avg_base(get, |a, b| a + b, |a, b| a / b)
     }
@@ -669,7 +677,7 @@ impl Stove {
         pass: &mut wgpu::RenderPass<'a>,
         size: &winit::dpi::PhysicalSize<u32>,
     ) {
-        let Some(map) = self.map.as_ref() else {return};
+        let Some(map) = self.map.as_ref() else { return };
         let vp = self.view_projection(size);
         let inst: Vec<_> = self
             .actors

@@ -33,7 +33,7 @@ impl Actor {
         PackageIndex::new(self.export as i32 + 1)
     }
 
-    pub fn new(asset: &Asset<File>, package: PackageIndex) -> Result<Self, Error> {
+    pub fn new(asset: &crate::Asset, package: PackageIndex) -> Result<Self, Error> {
         if package.index == 0 {
             return Err(Error::invalid_package_index(
                 "actor was null reference".to_string(),
@@ -117,7 +117,11 @@ impl Actor {
     }
 
     /// gets all exports related to the given actor
-    fn get_actor_exports(&self, asset: &Asset<File>, offset: usize) -> Vec<Export> {
+    fn get_actor_exports(
+        &self,
+        asset: &Asset<std::io::BufReader<File>>,
+        offset: usize,
+    ) -> Vec<Export> {
         // get references to all the actor's children
         let mut child_indexes: Vec<PackageIndex> = asset.asset_data.exports[self.export]
             .get_base_export()
@@ -154,7 +158,7 @@ impl Actor {
 }
 
 /// gets all actor exports within a map (all exports direct children of PersistentLevel)
-pub fn get_actors(asset: &Asset<File>) -> Vec<PackageIndex> {
+pub fn get_actors(asset: &crate::Asset) -> Vec<PackageIndex> {
     match asset
         .asset_data
         .exports
@@ -172,7 +176,7 @@ pub fn get_actors(asset: &Asset<File>) -> Vec<PackageIndex> {
 }
 
 /// creates and assigns a unique name
-fn give_unique_name(orig: &mut FName, asset: &mut Asset<File>) {
+fn give_unique_name(orig: &mut FName, asset: &mut crate::Asset) {
     // for the cases where the number is unnecessary
     let mut name = orig.get_owned_content();
     if asset.search_name_reference(&name).is_none() {

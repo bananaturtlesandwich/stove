@@ -2,12 +2,11 @@ use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait},
     types::PackageIndex,
-    Asset,
 };
 
 impl super::Actor {
     /// delete an actor from a map
-    pub fn delete(&self, map: &mut Asset<std::fs::File>) {
+    pub fn delete(&self, map: &mut crate::Asset) {
         let val = PackageIndex::new(self.export as i32 + 1);
         if let Some(level) = map
             .asset_data
