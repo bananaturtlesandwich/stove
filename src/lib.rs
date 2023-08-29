@@ -314,14 +314,24 @@ impl Stove {
                 None
             }
         };
-        let paks: Vec<_> = self
+        let mut paks: Vec<_> = self
             .paks
             .iter()
             .filter_map(|dir| std::fs::read_dir(dir).ok())
             .flatten()
             .filter_map(Result::ok)
             .map(|dir| dir.path())
-            .filter_map(|path| unpak::Pak::new_any(path, key.as_deref()).ok())
+            .filter_map(|path| {
+                use aes::cipher::KeyInit;
+                let mut pak_file = std::io::BufReader::new(std::fs::File::open(path).ok()?);
+                let pak = repak::PakReader::new_any_with_optional_key(
+                    &mut pak_file,
+                    key.as_deref()
+                        .and_then(|bytes| aes::Aes256::new_from_slice(bytes).ok()),
+                )
+                .ok()?;
+                Some((pak_file, pak))
+            })
             .collect();
         let cache = config()
             .filter(|_| self.use_cache)
@@ -336,7 +346,8 @@ impl Stove {
                     };
                     if !self.meshes.contains_key(path) {
                         fn get<T>(
-                            pak: &unpak::Pak,
+                            pak: &repak::PakReader,
+                            pak_file: &mut std::io::BufReader<std::fs::File>,
                             cache: Option<&std::path::Path>,
                             path: &str,
                             version: EngineVersion,
@@ -346,6 +357,12 @@ impl Stove {
                             )
                                 -> Result<T, unreal_asset::error::Error>,
                         ) -> Result<T, unreal_asset::error::Error> {
+                            let path = path
+                                .replace(
+                                    "/Game",
+                                    &format!("{}/Content", pak.game_name().unwrap_or_default()),
+                                )
+                                .replace("/Engine", "Engine/Content");
                             let make = |ext: &str| path.to_string() + ext;
                             let (mesh, exp, bulk, uptnl) = (
                                 make(".uasset"),
@@ -360,13 +377,13 @@ impl Stove {
                                     if cache_path(&mesh).exists() ||
                                             // try to create cache if it doesn't exist
                                             (
-                                                std::fs::create_dir_all(cache_path(path).parent().unwrap()).is_ok() &&
-                                                pak.read_to_file(&mesh, cache_path(&mesh)).is_ok() &&
+                                                std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
+                                                pak.read_file(&mesh, pak_file, &mut std::fs::File::create(cache_path(&mesh))?).is_ok() &&
                                                 // we don't care whether these are successful in case they don't exist
-                                                pak.read_to_file(&exp, cache_path(&exp)).map_or(true,|_| true) &&
-                                                pak.read_to_file(&bulk, cache_path(&bulk)).map_or(true,|_| true) &&
-                                                pak.read_to_file(&uptnl, cache_path(&uptnl)).map_or(true,|_| true)
-                                            ) =>
+                                                pak.read_file(&exp, pak_file, &mut std::fs::File::create(cache_path(&exp))?).map_or(true,|_| true) &&
+                                                pak.read_file(&bulk, pak_file, &mut std::fs::File::create(cache_path(&bulk))?).map_or(true,|_| true) &&
+                                                pak.read_file(&uptnl, pak_file, &mut std::fs::File::create(cache_path(&uptnl))?).map_or(true,|_| true)
+                                             ) =>
                                 {
                                     func(
                                         unreal_asset::Asset::new(
@@ -394,34 +411,39 @@ impl Stove {
                                 _ => func(
                                     unreal_asset::Asset::new(
                                         Wrapper::Bytes(std::io::Cursor::new(
-                                            pak.get(&mesh).map_err(|e| {
+                                            pak.get(&mesh, pak_file).map_err(|e| {
                                                 unreal_asset::error::Error::no_data(match e {
-                                                    unpak::Error::Oodle => {
+                                                    repak::Error::Oodle => {
                                                         "oodle paks are unsupported atm".to_string()
                                                     }
                                                     e => format!("error reading pak: {e}"),
                                                 })
                                             })?,
                                         )),
-                                        pak.get(&exp)
+                                        pak.get(&exp, pak_file)
                                             .ok()
                                             .map(std::io::Cursor::new)
                                             .map(Wrapper::Bytes),
                                         version,
                                         None,
                                     )?,
-                                    pak.get(&bulk)
+                                    pak.get(&bulk, pak_file)
                                         .ok()
-                                        .map_or_else(|| pak.get(&uptnl).ok(), Some)
+                                        .map_or_else(|| pak.get(&uptnl, pak_file).ok(), Some)
                                         .map(std::io::Cursor::new)
                                         .map(Wrapper::Bytes),
                                 ),
                             }
                         }
-                        for pak in paks.iter() {
-                            match get(pak, cache.as_deref(), path, version, |asset, _| {
-                                Ok(extras::get_mesh_info(asset)?)
-                            }) {
+                        for (pak_file, pak) in paks.iter_mut() {
+                            match get(
+                                pak,
+                                pak_file,
+                                cache.as_deref(),
+                                path,
+                                version,
+                                |asset, _| Ok(extras::get_mesh_info(asset)?),
+                            ) {
                                 // just use old rendering for now
                                 Ok((positions, indices, ..)) => {
                                     // let mats: Vec<_> = mats
@@ -843,6 +865,15 @@ impl Stove {
                         ui.label("cache meshes:");
                         ui.add(egui::Checkbox::without_text(&mut self.use_cache));
                     });
+                    if ui.button("clear cache").clicked() {
+                        match config() {
+                            Some(cache) => match std::fs::remove_dir_all(cache.join("cache")) {
+                                Ok(()) => self.notifs.success("cleared cache"),
+                                Err(e) => self.notifs.error(e.to_string()),
+                            },
+                            None => self.notifs.error("cache does not exist"),
+                        };
+                    }
                     ui.horizontal(|ui| {
                         ui.label("render distance:");
                         ui.add(

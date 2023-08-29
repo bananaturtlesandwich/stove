@@ -8,8 +8,9 @@ version = "0.11.0"
 edition = "2021"
 
 [dependencies]
-unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", package = "unreal_asset", rev = "40bc421" }
-unpak = { version = "1.0", features = ["asset-paths"] }
+unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
+repak = { git = "https://github.com/bananaturtlesandwich/repak", branch = "more-api-stuff" }
+aes = "0.8"
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 winit = "0.28"
 egui = { version = "0.22", features = ["persistence", "serde"] }
@@ -37,6 +38,9 @@ autoupdater = "0.3"
 [dev-dependencies]
 png = "0.17"
 obj-exporter = "0.2"
+
+[profile.dev.package."*"]
+opt-level = 3
 
 [profile.release]
 strip = true
