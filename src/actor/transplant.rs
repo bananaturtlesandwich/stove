@@ -174,6 +174,10 @@ fn on_import_refs(export: &mut Export, func: &mut impl FnMut(&mut PackageIndex))
         .iter_mut()
         .for_each(&mut *func);
     export
+        .serialization_before_serialization_dependencies
+        .iter_mut()
+        .for_each(&mut *func);
+    export
         .create_before_serialization_dependencies
         .iter_mut()
         .for_each(func);

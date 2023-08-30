@@ -122,6 +122,12 @@ impl Actor {
         asset: &Asset<std::io::BufReader<File>>,
         offset: usize,
     ) -> Vec<Export> {
+        let level = asset
+            .asset_data
+            .exports
+            .iter()
+            .find_map(|ex| unreal_asset::cast!(Export, LevelExport, ex))
+            .unwrap();
         // get references to all the actor's children
         let mut child_indexes: Vec<PackageIndex> = asset.asset_data.exports[self.export]
             .get_base_export()
@@ -131,6 +137,15 @@ impl Actor {
             // dw PackageIndex is just a wrapper around i32 which is cloned by default anyway
             .cloned()
             .collect();
+        let actors: Vec<_> = child_indexes
+            .iter()
+            .enumerate()
+            .rev()
+            .filter_map(|(i, child)| level.actors.contains(&child).then_some(i))
+            .collect();
+        for i in actors {
+            child_indexes.remove(i);
+        }
         // add the top-level actor reference
         child_indexes.insert(0, self.index());
 
