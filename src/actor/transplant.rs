@@ -87,7 +87,10 @@ impl super::Actor {
             on_import_refs(child, &mut resolve)
         }
         if donor.get_engine_version() >= unreal_asset::engine_version::EngineVersion::VER_UE5_1 {
-            for child in &mut children[1..] {
+            for child in children[1..]
+                .iter_mut()
+                .filter(|child| child.get_base_export().object_name != "Model")
+            {
                 on_extra_import_refs(
                     donor.get_name_map(),
                     recipient.get_name_map(),
