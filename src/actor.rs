@@ -52,7 +52,15 @@ impl Actor {
                 package.index
             )));
         };
-        let name = norm.base_export.object_name.get_owned_content();
+        let name = match asset.get_engine_version()
+            >= unreal_asset::engine_version::EngineVersion::VER_UE5_1
+        {
+            true => {
+                let len = i32::from_le_bytes(norm.extras[8..12].try_into().unwrap()) as usize;
+                String::from_utf8(norm.extras[12..12 + len].to_vec()).unwrap()
+            }
+            false => norm.base_export.object_name.get_owned_content(),
+        };
         let class = asset
             .get_import(norm.base_export.class_index)
             .map(|import| import.object_name.get_owned_content())
