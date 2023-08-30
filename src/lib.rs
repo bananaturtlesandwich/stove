@@ -966,10 +966,11 @@ impl Stove {
                             for actor in selected.iter().map(|i| &actors[*i]) {
                                 let insert = map.asset_data.exports.len() as i32 + 1;
                                 actor.transplant(map, donor);
-                                self.actors.push(
-                                    actor::Actor::new(map, PackageIndex::new(insert)).unwrap(),
-                                );
                                 self.notifs.success(format!("transplanted {}", actor.name));
+                                let mut actor =
+                                    actor::Actor::new(map, PackageIndex::new(insert)).unwrap();
+                                actor.draw_type = actor::DrawType::Cube;
+                                self.actors.push(actor);
                             }
                         }
                     });
