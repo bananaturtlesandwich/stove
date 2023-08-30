@@ -2,7 +2,7 @@ use unreal_asset::{
     cast,
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     reader::archive_trait::ArchiveTrait,
-    types::PackageIndex,
+    types::{fname::ToSerializedName, PackageIndex},
     Import,
 };
 
@@ -85,6 +85,15 @@ impl super::Actor {
                 }
             })
         }
+        for prop in children
+            .iter_mut()
+            .filter_map(ExportNormalTrait::get_normal_export_mut)
+            .flat_map(|norm| &mut norm.properties)
+        {
+            super::on_props(prop, &mut |prop| {
+                recipient.add_name_reference(prop.to_serialized_name(), false);
+            })
+        }
         // finally add the exports
         recipient.asset_data.exports.append(&mut children);
 
@@ -141,7 +150,7 @@ impl super::Actor {
 fn on_import_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
-            super::on_props(prop, &mut func);
+            super::on_prop_refs(prop, &mut func);
         }
     }
     let export = export.get_base_export_mut();

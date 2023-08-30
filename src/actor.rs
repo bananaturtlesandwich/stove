@@ -202,7 +202,7 @@ fn give_unique_name(orig: &mut FName, asset: &mut crate::Asset) {
 fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
-            on_props(prop, &mut func);
+            on_prop_refs(prop, &mut func);
         }
     }
     let export = export.get_base_export_mut();
@@ -221,12 +221,8 @@ fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) 
     func(&mut export.outer_index);
 }
 
-/// on any possible references stashed away in properties
-fn on_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
+fn on_props(prop: &mut Property, func: &mut impl FnMut(&mut Property)) {
     match prop {
-        Property::ObjectProperty(obj) => {
-            func(&mut obj.value);
-        }
         Property::ArrayProperty(arr) => {
             for entry in arr.value.iter_mut() {
                 on_props(entry, func);
@@ -245,6 +241,21 @@ fn on_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
                 on_props(entry, func);
             }
         }
+        Property::StructProperty(struc) => {
+            for entry in struc.value.iter_mut() {
+                on_props(entry, func);
+            }
+        }
+        prop => func(prop),
+    }
+}
+
+/// on any possible references stashed away in properties
+fn on_prop_refs(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
+    on_props(prop, &mut |prop| match prop {
+        Property::ObjectProperty(obj) => {
+            func(&mut obj.value);
+        }
         Property::DelegateProperty(del) => func(&mut del.value.object),
         Property::MulticastDelegateProperty(del) => {
             for delegate in del.value.iter_mut() {
@@ -261,11 +272,6 @@ fn on_props(prop: &mut Property, func: &mut impl FnMut(&mut PackageIndex)) {
                 func(&mut delegate.object)
             }
         }
-        Property::StructProperty(struc) => {
-            for entry in struc.value.iter_mut() {
-                on_props(entry, func);
-            }
-        }
         _ => (),
-    }
+    })
 }
