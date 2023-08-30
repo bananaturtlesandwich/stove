@@ -16,18 +16,18 @@ use unreal_asset::{
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
     use obj_exporter::*;
     let (verts, indices, ..) = get_mesh_info(unreal_asset::Asset::new(
-        io::Cursor::new(include_bytes!("A02_Outside_Castle.uasset").as_slice()),
+        io::Cursor::new(include_bytes!("AirKickPreRoom.uasset").as_slice()),
         Some(io::Cursor::new(
-            include_bytes!("A02_Outside_Castle.uexp").as_slice(),
+            include_bytes!("AirKickPreRoom.uexp").as_slice(),
         )),
-        EngineVersion::VER_UE4_25,
+        EngineVersion::VER_UE5_1,
         None,
     )?)?;
     export_to_file(
         &ObjSet {
             material_library: None,
             objects: vec![Object {
-                name: "A02_Outside_Castle".to_string(),
+                name: "AirKickPreRoom".to_string(),
                 vertices: verts
                     .into_iter()
                     .map(|glam::Vec3 { x, y, z }| Vertex {
@@ -55,7 +55,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
                 }],
             }],
         },
-        "A02_Outside_Castle.obj",
+        "AirKickPreRoom.obj",
     )?;
     Ok(())
 }
@@ -179,8 +179,12 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         if engine >= EngineVersion::VER_UE4_25 {
             data.read_u32::<LE>()?;
         }
-        //visible in ray tracing
+        // visible in ray tracing
         if engine >= EngineVersion::VER_UE4_26 {
+            data.read_u32::<LE>()?;
+        }
+        // affect distance field lighting
+        if engine >= EngineVersion::VER_UE5_1 {
             data.read_u32::<LE>()?;
         }
     }
@@ -188,10 +192,14 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
     data.read_f32::<LE>()?;
     match engine >= EngineVersion::VER_UE4_23 {
         // lod isn't cooked out
-        true if data.read_u32::<LE>()? == 0
-        // data is inlined
-        && data.read_u32::<LE>()? == 1 =>
-        {
+        true if data.read_u32::<LE>()? == 0 => {
+            // data is not inlined
+            if data.read_u32::<LE>()? == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "mesh uses bulk data",
+                ));
+            }
             StripDataFlags::read(&mut data)?;
         }
         false if !flags.class_data_stripped(2) => (),
