@@ -9,14 +9,14 @@ edition = "2021"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
-repak = { git = "https://github.com/bananaturtlesandwich/repak", rev = "87f8190", features = ["oodle"] }
+repak = { git = "https://github.com/bananaturtlesandwich/repak", rev = "87f8190" }
 aes = "0.8"
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 winit = "0.28"
 egui = { version = "0.22", features = ["persistence", "serde"] }
 egui-winit = "0.22"
 egui-wgpu = "0.22"
-pollster = { version = "0.3", features = ["macro"]}
+pollster = { version = "0.3", features = ["macro"] }
 egui-notify = "0.7"
 egui_file = "0.10"
 bytemuck = "1.13"

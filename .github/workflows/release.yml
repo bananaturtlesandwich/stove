@@ -21,23 +21,23 @@ jobs:
           draft: true
           prerelease: true
           body: "# Changes"
-  windows:
-    needs: draft
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v1
-      - name: build
-        run: cargo build -r
-      - name: upload
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.draft.outputs.upload }}
-          asset_path: target/release/stove.exe
-          asset_name: stove.exe
-          asset_content_type: application/x-msdownload
+  # windows:
+  #   needs: draft
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: Swatinem/rust-cache@v1
+  #     - name: build
+  #       run: cargo build -r
+  #     - name: upload
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.draft.outputs.upload }}
+  #         asset_path: target/release/stove.exe
+  #         asset_name: stove.exe
+  #         asset_content_type: application/x-msdownload
         
   macos:
     needs: draft

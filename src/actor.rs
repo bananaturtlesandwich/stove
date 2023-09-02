@@ -55,10 +55,15 @@ impl Actor {
         let name = match asset.get_engine_version()
             >= unreal_asset::engine_version::EngineVersion::VER_UE5_1
         {
-            true => {
-                let len = i32::from_le_bytes(norm.extras[8..12].try_into().unwrap()) as usize;
-                String::from_utf8(norm.extras[12..12 + len].to_vec()).unwrap()
-            }
+            true => match norm.extras[8..12]
+                .try_into()
+                .ok()
+                .map(|i| i32::from_le_bytes(i) as usize)
+                .and_then(|len| String::from_utf8(norm.extras[12..12 + len].to_vec()).ok())
+            {
+                Some(name) => name,
+                None => norm.base_export.object_name.get_owned_content(),
+            },
             false => norm.base_export.object_name.get_owned_content(),
         };
         let class = asset
