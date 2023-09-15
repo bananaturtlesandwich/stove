@@ -3,6 +3,7 @@ name = "stove"
 authors = ["spuds"]
 repository = "https://github.com/bananaturtlesandwich/stove"
 description = "an editor for cooked unreal engine map files"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 version = "0.12.0"
 edition = "2021"
