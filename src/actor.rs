@@ -79,8 +79,7 @@ impl Actor {
             .find(|i| {
                 asset
                     .get_import(i.get_base_export().class_index)
-                    .filter(|import| import.object_name == "StaticMeshComponent")
-                    .is_some()
+                    .is_some_and(|import| import.object_name == "StaticMeshComponent")
             })
             .and_then(|norm| {
                 norm.properties.iter().find_map(|prop| {

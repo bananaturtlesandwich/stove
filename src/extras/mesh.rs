@@ -14,50 +14,68 @@ use unreal_asset::{
 // currently doesn't read bulk data but we'll get there
 #[test]
 fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
-    use obj_exporter::*;
-    let (verts, indices, ..) = get_mesh_info(unreal_asset::Asset::new(
-        io::Cursor::new(include_bytes!("AirKickPreRoom.uasset").as_slice()),
-        Some(io::Cursor::new(
-            include_bytes!("AirKickPreRoom.uexp").as_slice(),
-        )),
-        EngineVersion::VER_UE5_1,
-        None,
-    )?)?;
-    export_to_file(
-        &ObjSet {
-            material_library: None,
-            objects: vec![Object {
-                name: "AirKickPreRoom".to_string(),
-                vertices: verts
-                    .into_iter()
-                    .map(|glam::Vec3 { x, y, z }| Vertex {
-                        x: x as f64,
-                        y: y as f64,
-                        z: z as f64,
-                    })
-                    .collect(),
-                tex_vertices: vec![],
-                normals: vec![],
-                geometry: vec![Geometry {
-                    material_name: None,
-                    shapes: indices
-                        .chunks(3)
-                        .map(|face| Shape {
-                            primitive: Primitive::Triangle(
-                                (face[0] as usize, None, None),
-                                (face[1] as usize, None, None),
-                                (face[2] as usize, None, None),
-                            ),
-                            groups: vec![],
-                            smoothing_groups: vec![],
+    let parse = |asset, bulk, name: &str, version| {
+        use obj_exporter::*;
+        let (verts, indices, ..) = get_mesh_info(unreal_asset::Asset::new(
+            io::Cursor::new(asset),
+            Some(io::Cursor::new(bulk)),
+            version,
+            None,
+        )?)?;
+        export_to_file(
+            &ObjSet {
+                material_library: None,
+                objects: vec![Object {
+                    name: name.to_string(),
+                    vertices: verts
+                        .into_iter()
+                        .map(|glam::Vec3 { x, y, z }| Vertex {
+                            x: x as f64,
+                            y: y as f64,
+                            z: z as f64,
                         })
                         .collect(),
+                    tex_vertices: vec![],
+                    normals: vec![],
+                    geometry: vec![Geometry {
+                        material_name: None,
+                        shapes: indices
+                            .chunks(3)
+                            .map(|face| Shape {
+                                primitive: Primitive::Triangle(
+                                    (face[0] as usize, None, None),
+                                    (face[1] as usize, None, None),
+                                    (face[2] as usize, None, None),
+                                ),
+                                groups: vec![],
+                                smoothing_groups: vec![],
+                            })
+                            .collect(),
+                    }],
                 }],
-            }],
-        },
-        "AirKickPreRoom.obj",
+            },
+            format!("{name}.obj"),
+        )?;
+        Ok(())
+    };
+    parse(
+        include_bytes!("A02_Outside_Castle.uasset").as_slice(),
+        include_bytes!("A02_Outside_Castle.uexp").as_slice(),
+        "A02_Outside_Castle",
+        EngineVersion::VER_UE4_25,
     )?;
-    Ok(())
+    parse(
+        include_bytes!("AirKickPreRoom.uasset").as_slice(),
+        include_bytes!("AirKickPreRoom.uexp").as_slice(),
+        "AirKickPreRoom",
+        EngineVersion::VER_UE5_1,
+    )?;
+    parse(
+        include_bytes!("SM_Cybercity_Hook_End.uasset").as_slice(),
+        include_bytes!("SM_Cybercity_Hook_End.uexp").as_slice(),
+        "SM_Cybercity_Hook_End",
+        EngineVersion::VER_UE4_27,
+    )
 }
 
 // reference implementations:
