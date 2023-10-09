@@ -314,6 +314,25 @@ impl Stove {
                 None
             }
         };
+        #[link(name = "oo2core_win64", kind = "static")]
+        extern "C" {
+            fn OodleLZ_Decompress(
+                compBuf: *mut u8,
+                compBufSize: usize,
+                rawBuf: *mut u8,
+                rawLen: usize,
+                fuzzSafe: u32,
+                checkCRC: u32,
+                verbosity: u32,
+                decBufBase: u64,
+                decBufSize: usize,
+                fpCallback: u64,
+                callbackUserData: u64,
+                decoderMemory: *mut u8,
+                decoderMemorySize: usize,
+                threadPhase: u32,
+            ) -> i32;
+        }
         let mut paks: Vec<_> = self
             .paks
             .iter()
@@ -324,12 +343,18 @@ impl Stove {
             .filter_map(|path| {
                 use aes::cipher::KeyInit;
                 let mut pak_file = std::io::BufReader::new(std::fs::File::open(path).ok()?);
-                let pak = repak::PakReader::new_any_with_optional_key(
-                    &mut pak_file,
-                    key.as_deref()
-                        .and_then(|bytes| aes::Aes256::new_from_slice(bytes).ok()),
-                )
-                .ok()?;
+                let mut pak = repak::PakBuilder::new();
+                if let Some(key) = key
+                    .as_deref()
+                    .and_then(|bytes| aes::Aes256::new_from_slice(bytes).ok())
+                {
+                    pak = pak.key(key);
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    pak = pak.oodle(|| OodleLZ_Decompress);
+                }
+                let pak = pak.reader(&mut pak_file).ok()?;
                 Some((pak_file, pak))
             })
             .collect();
@@ -357,10 +382,27 @@ impl Stove {
                             )
                                 -> Result<T, unreal_asset::error::Error>,
                         ) -> Result<T, unreal_asset::error::Error> {
+                            fn game_name(pak: &repak::PakReader) -> Option<String> {
+                                let mut split = pak.mount_point().split('/').peekable();
+                                while let Some((game, content)) = split.next().zip(split.peek()) {
+                                    if game != "Engine" && content == &"Content" {
+                                        return Some(game.to_string());
+                                    }
+                                }
+                                for entry in pak.files() {
+                                    let mut split = entry.split('/').take(2);
+                                    if let Some((game, content)) = split.next().zip(split.next()) {
+                                        if game != "Engine" && content == "Content" {
+                                            return Some(game.to_string());
+                                        }
+                                    }
+                                }
+                                None
+                            }
                             let path = path
                                 .replace(
                                     "/Game",
-                                    &format!("{}/Content", pak.game_name().unwrap_or_default()),
+                                    &format!("{}/Content", game_name(pak).unwrap_or_default()),
                                 )
                                 .replace("/Engine", "Engine/Content");
                             let make = |ext: &str| path.to_string() + ext;

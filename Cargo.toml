@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
-repak = { git = "https://github.com/bananaturtlesandwich/repak", rev = "87f8190" }
+repak = { git = "https://github.com/bananaturtlesandwich/repak", rev = "9716e37", features = ["oodle"] }
 aes = "0.8"
 glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
 winit = "0.28"
