@@ -5,46 +5,36 @@ repository = "https://github.com/bananaturtlesandwich/stove"
 description = "an editor for cooked unreal engine map files"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 
 [dependencies]
-unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
-repak = { git = "https://github.com/bananaturtlesandwich/repak", rev = "9716e37", features = ["oodle"] }
-aes = "0.8"
-glam = { version = "0.23", features = ["fast-math", "bytemuck"] }
+bevy = { version = "0.12", default-features = false, features = [
+    "x11",
+    "wayland",
+    # "bevy_asset",
+    # "bevy_gilrs",
+    "bevy_scene",
+    "bevy_winit",
+    "bevy_core_pipeline",
+    # "bevy_pbr",
+    "bevy_render",
+    # "bevy_sprite",
+    # "bevy_text",
+    # "bevy_ui",
+    # "bevy_gltf",
+    # "animation",
+    # "png",
+] }
+# seldom_fn_plugin = "0.5"
 winit = "0.28"
-egui = { version = "0.22", features = ["persistence", "serde"] }
-egui-winit = "0.22"
-egui-wgpu = "0.22"
-pollster = { version = "0.3", features = ["macro"] }
-egui-notify = "0.7"
-egui_file = "0.10"
-bytemuck = "1.13"
-byteorder = "1.4"
-bitflags = "2.3"
-texture2ddecoder = "0.0"
-hashbrown = "0.13"
-dirs = "5.0"
-ron = "0.8"
-hex = "0.4"
+# bevy_mod_picking = "0.17"
+# smooth-bevy-cameras = "0.10"
+# bevy_egui = "0.24"
+# bevy-discord-presence = "0.4"
 
 [build-dependencies]
 winres = "0.1"
 
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-discord-rich-presence = "0.2"
-autoupdater = "0.3"
-
-[dev-dependencies]
-png = "0.17"
-obj-exporter = "0.2"
-
 [profile.dev.package."*"]
 opt-level = 3
-
-[profile.release]
-strip = true
-lto = true
-codegen-units = 1
-panic = "abort"

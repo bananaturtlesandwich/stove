@@ -1,3 +1,4 @@
+/*
 #[cfg(not(target_family = "wasm"))]
 use discord_rich_presence::{activity::*, DiscordIpc};
 use egui_wgpu::wgpu;
@@ -1452,3 +1453,4 @@ const VERSIONS: [(EngineVersion, &str); 33] = [
     (VER_UE5_1, "5.1"),
     (VER_UE5_2, "5.2"),
 ];
+*/
