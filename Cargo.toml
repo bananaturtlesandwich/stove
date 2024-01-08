@@ -26,14 +26,20 @@ bevy = { version = "0.12", default-features = false, features = [
     # "bevy_gltf",
     # "animation",
     # "png",
-    "multi-threaded"
+    "multi-threaded",
+    "dynamic_linking"
 ] }
 winit = "0.28"
 # bevy_mod_picking = "0.17"
 # smooth-bevy-cameras = "0.10"
 bevy_egui = "0.24"
-egui-notify = "0.11.0"
+egui-notify = "0.11"
 # bevy-discord-presence = "0.4"
+update-informer = { version = "1.1", default-features = false, features = [
+    "github",
+    "rustls-tls",
+    "ureq"
+] }
 
 [build-dependencies]
 winres = "0.1"
