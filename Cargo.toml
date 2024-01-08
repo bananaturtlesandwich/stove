@@ -28,11 +28,11 @@ bevy = { version = "0.12", default-features = false, features = [
     # "png",
     "multi-threaded"
 ] }
-# seldom_fn_plugin = "0.5"
 winit = "0.28"
 # bevy_mod_picking = "0.17"
 # smooth-bevy-cameras = "0.10"
-# bevy_egui = "0.24"
+bevy_egui = "0.24"
+egui-notify = "0.11.0"
 # bevy-discord-presence = "0.4"
 
 [build-dependencies]
