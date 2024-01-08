@@ -37,12 +37,8 @@ pub fn load(mut commands: Commands, mut ctx: bevy_egui::EguiContexts) {
     commands.insert_resource(appdata);
 }
 
-pub fn write(
-    mut ctx: bevy_egui::EguiContexts,
-    appdata: Res<AppData>,
-    exit: EventReader<bevy::app::AppExit>,
-) {
-    if exit.is_empty() {
+pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>) {
+    if !appdata.is_changed() {
         return;
     }
     use egui::Id;
