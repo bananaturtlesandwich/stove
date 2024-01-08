@@ -9,9 +9,9 @@ type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
 struct Map(Option<Asset>);
 
 #[derive(Event)]
-enum Notif {
-    Static(&'static str),
-    Dynamic(String),
+struct Notif {
+    message: String,
+    kind: egui_notify::ToastLevel,
 }
 
 #[derive(Default, Resource)]
@@ -21,7 +21,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "stove".to_string(),
+                title: "stove".into(),
                 ..default()
             }),
             ..default()
@@ -42,6 +42,28 @@ fn main() {
                 window.set_window_icon(Some(icon.clone()))
             }
         })
+        // check for updates
+        .add_systems(Startup, |mut notifs: EventWriter<Notif>| {
+            use update_informer::Check;
+            if let Ok(Some(new)) = update_informer::new(
+                update_informer::registry::GitHub,
+                "bananaturtlesandwich/stove",
+                env!("CARGO_PKG_VERSION"),
+            )
+            .check_version()
+            {
+                notifs.send(Notif {
+                    // yes i'm petty and hate the v prefix
+                    message: format!(
+                        "{}.{}.{} now available!",
+                        new.semver().major,
+                        new.semver().minor,
+                        new.semver().patch
+                    ),
+                    kind: egui_notify::ToastLevel::Info,
+                })
+            }
+        })
         // allow open with...
         .add_systems(
             Startup,
@@ -51,7 +73,10 @@ fn main() {
                 };
                 let path = std::path::PathBuf::from(path);
                 if !path.exists() {
-                    notifs.send(Notif::Static("the given path does not exist"));
+                    notifs.send(Notif {
+                        message: "the given path does not exist".into(),
+                        kind: egui_notify::ToastLevel::Error,
+                    });
                     return;
                 }
                 match asset::open(
@@ -59,7 +84,10 @@ fn main() {
                     unreal_asset::engine_version::EngineVersion::VER_UE5_1,
                 ) {
                     Ok(asset) => map.0 = Some(asset),
-                    Err(e) => notifs.send(Notif::Dynamic(e.to_string())),
+                    Err(e) => notifs.send(Notif {
+                        message: e.to_string(),
+                        kind: egui_notify::ToastLevel::Error,
+                    }),
                 }
             },
         )
@@ -70,10 +98,10 @@ fn main() {
              mut queue: EventReader<Notif>,
              mut notifs: ResMut<Notifs>| {
                 for notif in queue.read() {
-                    match notif {
-                        Notif::Static(message) => notifs.0.info(message.to_string()),
-                        Notif::Dynamic(err) => notifs.0.error(err),
-                    };
+                    notifs.0.add(egui_notify::Toast::custom(
+                        notif.message.clone(),
+                        notif.kind.clone(),
+                    ));
                 }
                 notifs.0.show(ctx.ctx_mut());
             },
