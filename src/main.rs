@@ -17,6 +17,20 @@ struct Notif {
 #[derive(Default, Resource)]
 struct Notifs(egui_notify::Toasts);
 
+#[derive(Resource)]
+struct AppData {
+    version: usize,
+    paks: Vec<std::path::PathBuf>,
+    distance: f32,
+    aes: String,
+    cache: bool,
+    script: String,
+}
+
+fn config() -> Option<std::path::PathBuf> {
+    dirs::config_dir().map(|path| path.join("stove"))
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -64,6 +78,73 @@ fn main() {
                 })
             }
         })
+        // get app data
+        .add_systems(
+            Startup,
+            |mut commands: Commands, mut ctx: bevy_egui::EguiContexts| {
+                let mut appdata = AppData {
+                    version: 0,
+                    paks: vec![],
+                    distance: 100000.0,
+                    aes: String::new(),
+                    cache: true,
+                    script: String::new(),
+                };
+                ctx.ctx_mut().memory_mut(|storage| {
+                    if let Some(config) = config()
+                        .map(|config| config.join("config.ron"))
+                        .and_then(|path| std::fs::read_to_string(path).ok())
+                        .and_then(|str| ron::from_str::<egui::util::IdTypeMap>(&str).ok())
+                    {
+                        storage.data = config
+                    }
+                    let data = &mut storage.data;
+                    fn retrieve<T: egui::util::id_type_map::SerializableAny>(
+                        val: &mut T,
+                        key: &str,
+                        data: &mut egui::util::IdTypeMap,
+                    ) {
+                        if let Some(inner) = data.get_persisted(egui::Id::new(key)) {
+                            *val = inner
+                        }
+                    }
+                    retrieve(&mut appdata.version, "VERSION", data);
+                    retrieve(&mut appdata.paks, "PAKS", data);
+                    retrieve(&mut appdata.distance, "DIST", data);
+                    retrieve(&mut appdata.aes, "AES", data);
+                    retrieve(&mut appdata.cache, "CACHE", data);
+                    retrieve(&mut appdata.script, "SCRIPT", data);
+                });
+                commands.insert_resource(appdata);
+            },
+        )
+        // save app data
+        .add_systems(
+            PostUpdate,
+            |mut ctx: bevy_egui::EguiContexts,
+             appdata: Res<AppData>,
+             exit: EventReader<bevy::app::AppExit>| {
+                if exit.is_empty() {
+                    return;
+                }
+                use egui::Id;
+                ctx.ctx_mut().memory_mut(|storage| {
+                    let storage = &mut storage.data;
+                    storage.insert_persisted(Id::new("VERSION"), appdata.version);
+                    storage.insert_persisted(Id::new("PAKS"), appdata.paks.clone());
+                    storage.insert_persisted(Id::new("DIST"), appdata.distance);
+                    storage.insert_persisted(Id::new("AES"), appdata.aes.clone());
+                    storage.insert_persisted(Id::new("CACHE"), appdata.cache);
+                    storage.insert_persisted(Id::new("SCRIPT"), appdata.script.clone());
+                    if let Some(config) = config() {
+                        let _ = std::fs::create_dir_all(&config);
+                        if let Ok(data) = ron::to_string(&storage) {
+                            let _ = std::fs::write(config.join("config.ron"), data);
+                        }
+                    }
+                })
+            },
+        )
         // allow open with...
         .add_systems(
             Startup,
