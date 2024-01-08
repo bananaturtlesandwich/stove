@@ -2,12 +2,8 @@ use super::*;
 
 pub fn load(mut commands: Commands, mut ctx: bevy_egui::EguiContexts) {
     let mut appdata = AppData {
-        version: 0,
-        paks: vec![],
         distance: 100000.0,
-        aes: String::new(),
-        cache: true,
-        script: String::new(),
+        ..default()
     };
     ctx.ctx_mut().memory_mut(|storage| {
         if let Some(config) = config()

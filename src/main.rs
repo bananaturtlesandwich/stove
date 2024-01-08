@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::type_complexity)]
 use bevy::prelude::*;
-use egui_notify::ToastLevel::{Error, Info, Success, Warning};
+use egui_notify::ToastLevel::{Error, Info, Success};
 
+mod actor;
 mod asset;
 mod persistence;
 mod startup;
@@ -13,7 +14,7 @@ type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
 struct Map(Option<(Asset, std::path::PathBuf)>);
 
 #[derive(Event)]
-enum Command {
+enum Events {
     Notif {
         message: String,
         kind: egui_notify::ToastLevel,
@@ -26,7 +27,7 @@ enum Command {
 #[derive(Default, Resource)]
 struct Notifs(egui_notify::Toasts);
 
-#[derive(Resource)]
+#[derive(Default, Resource)]
 struct AppData {
     version: usize,
     paks: Vec<String>,
@@ -34,6 +35,7 @@ struct AppData {
     aes: String,
     cache: bool,
     script: String,
+    query: String,
 }
 
 fn config() -> Option<std::path::PathBuf> {
@@ -52,7 +54,7 @@ fn main() {
         .add_plugins(bevy_egui::EguiPlugin)
         .insert_non_send_resource(Map(None))
         .init_resource::<Notifs>()
-        .add_event::<Command>()
+        .add_event::<Events>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
@@ -61,7 +63,18 @@ fn main() {
         .add_systems(Startup, startup::check_updates)
         .add_systems(
             Update,
-            |mut events: EventReader<Command>,
+            |mut drops: EventReader<bevy::window::FileDragAndDrop>,
+             mut events: EventWriter<Events>| {
+                for drop in drops.read() {
+                    if let bevy::window::FileDragAndDrop::DroppedFile { path_buf, .. } = drop {
+                        events.send(Events::Open(path_buf.clone()))
+                    }
+                }
+            },
+        )
+        .add_systems(
+            Update,
+            |mut events: EventReader<Events>,
              mut notifs: ResMut<Notifs>,
              mut appdata: ResMut<AppData>,
              mut map: NonSendMut<Map>| {
@@ -70,14 +83,17 @@ fn main() {
                 };
                 for event in events.read() {
                     match event {
-                        Command::Notif { message, kind } => queue(message.clone(), kind.clone()),
-                        Command::Open(path) => {
-                            match asset::open(&path, VERSIONS[appdata.version].0) {
-                                Ok(asset) => map.0 = Some((asset, path.clone())),
+                        Events::Notif { message, kind } => queue(message.clone(), kind.clone()),
+                        Events::Open(path) => {
+                            match asset::open(path, VERSIONS[appdata.version].0) {
+                                Ok(asset) => {
+                                    map.0 = Some((asset, path.clone()));
+                                    queue("map opened".into(), Success)
+                                }
                                 Err(e) => queue(e.to_string(), Error),
                             }
                         }
-                        Command::SaveAs(ask) => {
+                        Events::SaveAs(ask) => {
                             let Some((map, path)) = &mut map.0 else {
                                 queue("no map to save".into(), Error);
                                 continue;
@@ -96,7 +112,7 @@ fn main() {
                                 Err(e) => queue(e.to_string(), Error),
                             }
                         }
-                        Command::AddPak => {
+                        Events::AddPak => {
                             if let Some(path) = rfd::FileDialog::new()
                                 .set_title("add pak folder")
                                 .pick_folder()

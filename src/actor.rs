@@ -9,17 +9,24 @@ use unreal_asset::{
     Asset,
 };
 
-mod delete;
-mod duplicate;
-mod transform;
-mod transplant;
-mod ui;
+// mod delete;
+// mod duplicate;
+// mod transform;
+// mod transplant;
+// mod ui;
 
 pub enum DrawType {
     Mesh(String),
     Cube,
 }
 
+#[derive(bevy::prelude::Component)]
+pub struct Selected;
+
+#[derive(bevy::prelude::Component)]
+pub struct Matched;
+
+#[derive(bevy::prelude::Component)]
 pub struct Actor {
     export: usize,
     transform: usize,
@@ -172,7 +179,7 @@ impl Actor {
             .iter()
             .enumerate()
             .rev()
-            .filter_map(|(i, child)| level.actors.contains(&child).then_some(i))
+            .filter_map(|(i, child)| level.actors.contains(child).then_some(i))
             .collect();
         for i in actors {
             child_indexes.remove(i);
