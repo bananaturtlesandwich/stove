@@ -10,22 +10,19 @@ edition = "2021"
 
 [dependencies]
 unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
+byteorder = "1.5"
+bitflags = "2.4"
+texture2ddecoder = "0.0"
+repak = { git = "https://github.com/bananaturtlesandwich/repak", rev = "9716e37", features = ["oodle"] }
+aes = "0.8"
+hex = "0.4"
 bevy = { version = "0.12", default-features = false, features = [
     "x11",
     "wayland",
-    # "bevy_asset",
-    # "bevy_gilrs",
-    # "bevy_scene",
     "bevy_winit",
     "bevy_core_pipeline",
     "bevy_pbr",
     "bevy_render",
-    # "bevy_sprite",
-    # "bevy_text",
-    # "bevy_ui",
-    # "bevy_gltf",
-    # "animation",
-    # "png",
     "multi-threaded",
     "dynamic_linking"
 ] }
@@ -44,6 +41,10 @@ update-informer = { version = "1.1", default-features = false, features = [
     "rustls-tls",
     "ureq"
 ] }
+
+[dev-dependencies]
+png = "0.17"
+obj-exporter = "0.2"
 
 [build-dependencies]
 winres = "0.1"

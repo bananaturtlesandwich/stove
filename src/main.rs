@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
 use bevy::prelude::*;
-use egui_notify::ToastLevel::{Error, Info, Success};
+use egui_notify::ToastLevel::{Error, Info, Success, Warning};
 
 mod actor;
 mod asset;
+mod extras;
 mod persistence;
 mod startup;
 mod ui;
@@ -28,6 +29,9 @@ enum Events {
 struct Notifs(egui_notify::Toasts);
 
 #[derive(Default, Resource)]
+struct Registry(std::collections::BTreeMap<String, bevy::asset::AssetId<Mesh>>);
+
+#[derive(Default, Resource)]
 struct AppData {
     version: usize,
     paks: Vec<String>,
@@ -36,6 +40,29 @@ struct AppData {
     cache: bool,
     script: String,
     query: String,
+}
+
+enum Wrapper {
+    File(std::io::BufReader<std::fs::File>),
+    Bytes(std::io::Cursor<Vec<u8>>),
+}
+
+impl std::io::Read for Wrapper {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Wrapper::File(file) => file.read(buf),
+            Wrapper::Bytes(bytes) => bytes.read(buf),
+        }
+    }
+}
+
+impl std::io::Seek for Wrapper {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        match self {
+            Wrapper::File(file) => file.seek(pos),
+            Wrapper::Bytes(bytes) => bytes.seek(pos),
+        }
+    }
 }
 
 fn config() -> Option<std::path::PathBuf> {
@@ -54,6 +81,7 @@ fn main() {
         .add_plugins(bevy_egui::EguiPlugin)
         .insert_non_send_resource(Map(None))
         .init_resource::<Notifs>()
+        .init_resource::<Registry>()
         .add_event::<Events>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
@@ -74,10 +102,14 @@ fn main() {
         )
         .add_systems(
             Update,
-            |mut events: EventReader<Events>,
+            |mut commands: Commands,
+             actors: Query<Entity, With<actor::Actor>>,
+             mut events: EventReader<Events>,
              mut notifs: ResMut<Notifs>,
              mut appdata: ResMut<AppData>,
-             mut map: NonSendMut<Map>| {
+             mut map: NonSendMut<Map>,
+             mut registry: ResMut<Registry>,
+             mut meshes: ResMut<Assets<Mesh>>| {
                 let mut queue = |message, kind| {
                     notifs.0.add(egui_notify::Toast::custom(message, kind));
                 };
@@ -87,8 +119,236 @@ fn main() {
                         Events::Open(path) => {
                             match asset::open(path, VERSIONS[appdata.version].0) {
                                 Ok(asset) => {
+                                    for actor in actors.iter() {
+                                        commands.entity(actor).despawn_recursive();
+                                    }
+                                    let key =
+                                        match hex::decode(appdata.aes.trim_start_matches("0x"))
+                                        {
+                                            Ok(key) if !appdata.aes.is_empty() => Some(key),
+                                            Ok(_) => None,
+                                            Err(_) => {
+                                                queue("aes key is invalid hex".into(), Warning);
+                                                None
+                                            }
+                                        };
+                                    #[link(name = "oo2core_win64", kind = "static")]
+                                    extern "C" {
+                                        fn OodleLZ_Decompress(
+                                            compBuf: *mut u8,
+                                            compBufSize: usize,
+                                            rawBuf: *mut u8,
+                                            rawLen: usize,
+                                            fuzzSafe: u32,
+                                            checkCRC: u32,
+                                            verbosity: u32,
+                                            decBufBase: u64,
+                                            decBufSize: usize,
+                                            fpCallback: u64,
+                                            callbackUserData: u64,
+                                            decoderMemory: *mut u8,
+                                            decoderMemorySize: usize,
+                                            threadPhase: u32,
+                                        ) -> i32;
+                                    }
+                                    let mut paks: Vec<_> = appdata
+                                        .paks
+                                        .iter()
+                                        .filter_map(|dir| std::fs::read_dir(dir).ok())
+                                        .flatten()
+                                        .filter_map(Result::ok)
+                                        .map(|dir| dir.path())
+                                        .filter_map(|path| {
+                                            use aes::cipher::KeyInit;
+                                            let mut pak_file = std::io::BufReader::new(
+                                                std::fs::File::open(path).ok()?,
+                                            );
+                                            let mut pak = repak::PakBuilder::new();
+                                            if let Some(key) =
+                                                key.as_deref().and_then(|bytes| {
+                                                    aes::Aes256::new_from_slice(bytes).ok()
+                                                })
+                                            {
+                                                pak = pak.key(key);
+                                            }
+                                            #[cfg(target_os = "windows")]
+                                            {
+                                                pak = pak.oodle(|| OodleLZ_Decompress);
+                                            }
+                                            let pak = pak.reader(&mut pak_file).ok()?;
+                                            Some((pak_file, pak))
+                                        })
+                                        .collect();
+                                    let cache = config()
+                                        .filter(|_| appdata.cache)
+                                        .map(|path| path.join("cache"));
+                                    let version = VERSIONS[appdata.version].0;
+                                    for i in actor::get_actors(&asset) {
+                                        match actor::Actor::new(&asset, i) {
+                                            Ok(actor) => {
+                                                let actor::DrawType::Mesh(path) =
+                                                    &actor.draw_type
+                                                else {
+                                                    commands.spawn((PbrBundle {
+                                                        mesh: meshes.add(Mesh::new(bevy::render::render_resource::PrimitiveTopology::LineList).with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![
+                                                            // front verts
+                                                            bevy::math::vec3(-0.5, -0.5, -0.5),
+                                                            bevy::math::vec3(-0.5, 0.5, -0.5),
+                                                            bevy::math::vec3(0.5, -0.5, -0.5),
+                                                            bevy::math::vec3(0.5, 0.5, -0.5),
+                                                            // back verts
+                                                            bevy::math::vec3(-0.5, -0.5, 0.5),
+                                                            bevy::math::vec3(-0.5, 0.5, 0.5),
+                                                            bevy::math::vec3(0.5, -0.5, 0.5),
+                                                            bevy::math::vec3(0.5, 0.5, 0.5),
+                                                        ]).with_indices(Some(bevy::render::mesh::Indices::U16(vec![
+                                                            0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
+                                                        ])))),
+                                                        transform: actor.transform(&asset),
+                                                        ..default()
+                                                    }, actor));
+                                                    continue;
+                                                };
+                                                if !registry.0.contains_key(path) {
+                                                    fn get<T>(
+                                                        pak: &repak::PakReader,
+                                                        pak_file: &mut std::io::BufReader<std::fs::File>,
+                                                        cache: Option<&std::path::Path>,
+                                                        path: &str,
+                                                        version: unreal_asset::engine_version::EngineVersion,
+                                                        func: impl Fn(
+                                                            unreal_asset::Asset<Wrapper>,
+                                                            Option<Wrapper>,
+                                                        )
+                                                            -> Result<T, unreal_asset::error::Error>,
+                                                    ) -> Result<T, unreal_asset::error::Error> {
+                                                        fn game_name(pak: &repak::PakReader) -> Option<String> {
+                                                            let mut split = pak.mount_point().split('/').peekable();
+                                                            while let Some((game, content)) = split.next().zip(split.peek()) {
+                                                                if game != "Engine" && content == &"Content" {
+                                                                    return Some(game.to_string());
+                                                                }
+                                                            }
+                                                            for entry in pak.files() {
+                                                                let mut split = entry.split('/').take(2);
+                                                                if let Some((game, content)) = split.next().zip(split.next()) {
+                                                                    if game != "Engine" && content == "Content" {
+                                                                        return Some(game.to_string());
+                                                                    }
+                                                                }
+                                                            }
+                                                            None
+                                                        }
+                                                        let path = path
+                                                            .replace(
+                                                                "/Game",
+                                                                &format!("{}/Content", game_name(pak).unwrap_or_default()),
+                                                            )
+                                                            .replace("/Engine", "Engine/Content");
+                                                        let make = |ext: &str| path.to_string() + ext;
+                                                        let (mesh, exp, bulk, uptnl) = (
+                                                            make(".uasset"),
+                                                            make(".uexp"),
+                                                            make(".ubulk"),
+                                                            make(".uptnl"),
+                                                        );
+                                                        let cache_path =
+                                                            |path: &str| cache.unwrap().join(path.trim_start_matches('/'));
+                                                        match cache {
+                                                            Some(_)
+                                                                if cache_path(&mesh).exists() ||
+                                                                        // try to create cache if it doesn't exist
+                                                                        (
+                                                                            std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
+                                                                            pak.read_file(&mesh, pak_file, &mut std::fs::File::create(cache_path(&mesh))?).is_ok() &&
+                                                                            // we don't care whether these are successful in case they don't exist
+                                                                            pak.read_file(&exp, pak_file, &mut std::fs::File::create(cache_path(&exp))?).map_or(true,|_| true) &&
+                                                                            pak.read_file(&bulk, pak_file, &mut std::fs::File::create(cache_path(&bulk))?).map_or(true,|_| true) &&
+                                                                            pak.read_file(&uptnl, pak_file, &mut std::fs::File::create(cache_path(&uptnl))?).map_or(true,|_| true)
+                                                                         ) =>
+                                                            {
+                                                                func(
+                                                                    unreal_asset::Asset::new(
+                                                                        Wrapper::File(std::io::BufReader::new(
+                                                                            std::fs::File::open(cache_path(&mesh))?,
+                                                                        )),
+                                                                        std::fs::File::open(cache_path(&exp))
+                                                                            .ok()
+                                                                            .map(std::io::BufReader::new)
+                                                                            .map(Wrapper::File),
+                                                                        version,
+                                                                        None,
+                                                                    )?,
+                                                                    std::fs::File::open(cache_path(&bulk))
+                                                                        .ok()
+                                                                        .map_or_else(
+                                                                            || std::fs::File::open(cache_path(&uptnl)).ok(),
+                                                                            Some,
+                                                                        )
+                                                                        .map(std::io::BufReader::new)
+                                                                        .map(Wrapper::File),
+                                                                )
+                                                            }
+                                                            // if the cache cannot be created fall back to storing in memory
+                                                            _ => func(
+                                                                unreal_asset::Asset::new(
+                                                                    Wrapper::Bytes(std::io::Cursor::new(
+                                                                        pak.get(&mesh, pak_file).map_err(|e| {
+                                                                            unreal_asset::error::Error::no_data(match e {
+                                                                                repak::Error::Oodle => {
+                                                                                    "oodle paks are unsupported atm".to_string()
+                                                                                }
+                                                                                e => format!("error reading pak: {e}"),
+                                                                            })
+                                                                        })?,
+                                                                    )),
+                                                                    pak.get(&exp, pak_file)
+                                                                        .ok()
+                                                                        .map(std::io::Cursor::new)
+                                                                        .map(Wrapper::Bytes),
+                                                                    version,
+                                                                    None,
+                                                                )?,
+                                                                pak.get(&bulk, pak_file)
+                                                                    .ok()
+                                                                    .map_or_else(|| pak.get(&uptnl, pak_file).ok(), Some)
+                                                                    .map(std::io::Cursor::new)
+                                                                    .map(Wrapper::Bytes),
+                                                            ),
+                                                        }
+                                                    }
+                                                    for (pak_file, pak) in paks.iter_mut() {
+                                                        match get(
+                                                            pak,
+                                                            pak_file,
+                                                            cache.as_deref(),
+                                                            path,
+                                                            version,
+                                                            |asset, _| Ok(extras::get_mesh_info(asset)?),
+                                                        ) {
+                                                            // just use old rendering for now
+                                                            Ok((positions, indices, ..)) => {
+                                                                let handle = meshes.add(Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList)
+                                                                    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+                                                                    .with_indices(Some(bevy::render::mesh::Indices::U32(indices))));
+                                                                registry.0.insert(path.clone(),handle.id());
+                                                                commands.spawn((PbrBundle {
+                                                                    mesh: handle,
+                                                                    transform: actor.transform(&asset),
+                                                                    ..default()
+                                                                }, actor));
+                                                                break;
+                                                            }
+                                                            Err(e) => queue(e.to_string(), Error),
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => queue(e.to_string(), Warning),
+                                        }
+                                    }
                                     map.0 = Some((asset, path.clone()));
-                                    queue("map opened".into(), Success)
+                                    queue("map opened".into(), Success);
                                 }
                                 Err(e) => queue(e.to_string(), Error),
                             }

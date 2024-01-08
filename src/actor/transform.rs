@@ -14,7 +14,7 @@ pub const ROTATION: &str = "RelativeRotation";
 pub const SCALE: &str = "RelativeScale3D";
 
 impl super::Actor {
-    pub fn location(&self, map: &crate::Asset) -> glam::Vec3 {
+    pub fn location(&self, map: &crate::Asset) -> bevy::math::Vec3 {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .and_then(|norm| {
@@ -27,17 +27,19 @@ impl super::Actor {
                     None
                 })
             })
-            .map(|pos| glam::dvec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0).as_vec3() * 0.01)
+            .map(|pos| {
+                bevy::math::dvec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0).as_vec3() * 0.01
+            })
             .unwrap_or_default()
     }
 
-    pub fn coords(&self, map: &crate::Asset, proj: glam::Mat4) -> glam::Vec2 {
-        use glam::Vec4Swizzles;
+    pub fn coords(&self, map: &crate::Asset, proj: bevy::math::Mat4) -> bevy::math::Vec2 {
+        use bevy::math::Vec4Swizzles;
         let coords = proj * self.location(map).extend(1.0);
         coords.xy() / coords.w.abs()
     }
 
-    pub fn add_location(&self, map: &mut crate::Asset, offset: glam::Vec3) {
+    pub fn add_location(&self, map: &mut crate::Asset, offset: bevy::math::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -88,7 +90,7 @@ impl super::Actor {
         }
     }
 
-    pub fn get_raw_location(&self, map: &crate::Asset) -> glam::DVec3 {
+    pub fn get_raw_location(&self, map: &crate::Asset) -> bevy::math::DVec3 {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .and_then(|norm| {
@@ -101,11 +103,11 @@ impl super::Actor {
                     None
                 })
             })
-            .map(|pos| glam::dvec3(pos.value.x.0, pos.value.y.0, pos.value.z.0))
+            .map(|pos| bevy::math::dvec3(pos.value.x.0, pos.value.y.0, pos.value.z.0))
             .unwrap_or_default()
     }
 
-    pub fn add_raw_location(&self, map: &mut crate::Asset, offset: glam::DVec3) {
+    pub fn add_raw_location(&self, map: &mut crate::Asset, offset: bevy::math::DVec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -149,7 +151,7 @@ impl super::Actor {
         }
     }
 
-    pub fn rotation(&self, map: &crate::Asset) -> glam::Quat {
+    pub fn rotation(&self, map: &crate::Asset) -> bevy::math::Quat {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -165,8 +167,8 @@ impl super::Actor {
                         None
                     })
                     .map(|rot| {
-                        glam::DQuat::from_euler(
-                            glam::EulerRot::XYZ,
+                        bevy::math::DQuat::from_euler(
+                            bevy::math::EulerRot::XYZ,
                             rot.value.x.0.to_radians(),
                             rot.value.y.0.to_radians(),
                             rot.value.z.0.to_radians(),
@@ -178,7 +180,7 @@ impl super::Actor {
             .unwrap_or_default()
     }
 
-    pub fn combine_rotation(&self, map: &mut crate::Asset, offset: glam::Quat) {
+    pub fn combine_rotation(&self, map: &mut crate::Asset, offset: bevy::math::Quat) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -192,13 +194,13 @@ impl super::Actor {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::RotatorProperty(vec) = &mut struc.value[0] {
                         (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (offset.as_f64()
-                            * glam::DQuat::from_euler(
-                                glam::EulerRot::XYZ,
+                            * bevy::math::DQuat::from_euler(
+                                bevy::math::EulerRot::XYZ,
                                 vec.value.x.0.to_radians(),
                                 vec.value.y.0.to_radians(),
                                 vec.value.z.0.to_radians(),
                             ))
-                        .to_euler(glam::EulerRot::XYZ);
+                        .to_euler(bevy::math::EulerRot::XYZ);
                         (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (
                             vec.value.x.0.to_degrees(),
                             vec.value.y.0.to_degrees(),
@@ -239,7 +241,7 @@ impl super::Actor {
         }
     }
 
-    pub fn scale(&self, map: &crate::Asset) -> glam::Vec3 {
+    pub fn scale(&self, map: &crate::Asset) -> bevy::math::Vec3 {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .and_then(|norm| {
@@ -252,11 +254,11 @@ impl super::Actor {
                     None
                 })
             })
-            .map(|rot| glam::dvec3(rot.value.x.0, rot.value.z.0, rot.value.y.0).as_vec3())
-            .unwrap_or(glam::Vec3::ONE)
+            .map(|rot| bevy::math::dvec3(rot.value.x.0, rot.value.z.0, rot.value.y.0).as_vec3())
+            .unwrap_or(bevy::math::Vec3::ONE)
     }
 
-    pub fn mul_scale(&self, map: &mut crate::Asset, offset: glam::Vec3) {
+    pub fn mul_scale(&self, map: &mut crate::Asset, offset: bevy::math::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -307,11 +309,11 @@ impl super::Actor {
         }
     }
 
-    pub fn model_matrix(&self, map: &crate::Asset) -> glam::Mat4 {
-        glam::Mat4::from_scale_rotation_translation(
-            self.scale(map),
-            self.rotation(map),
-            self.location(map),
-        )
+    pub fn transform(&self, map: &crate::Asset) -> bevy::prelude::Transform {
+        bevy::prelude::Transform {
+            translation: self.location(map),
+            rotation: self.rotation(map),
+            scale: self.scale(map),
+        }
     }
 }

@@ -192,7 +192,7 @@ pub fn ui(
                     false => matched.iter().count(),
                 },
                 |ui, range| ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
-                    let label =|(entity, actor): (Entity, &actor::Actor)|{
+                    let label = |(entity, actor): (Entity, &actor::Actor)|{
                         let highlighted = selected.contains(entity);
                         if ui.selectable_label(
                             highlighted,

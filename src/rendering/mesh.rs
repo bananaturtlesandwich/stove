@@ -16,7 +16,7 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(
-        vertices: &[glam::Vec3],
+        vertices: &[bevy::math::Vec3],
         indices: &[u32],
         device: &Device,
         format: TextureFormat,
@@ -34,14 +34,14 @@ impl Mesh {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: BufferSize::new(size_of::<glam::Mat4>()),
+                    min_binding_size: BufferSize::new(size_of::<bevy::math::Mat4>()),
                 },
                 count: None,
             }],
         });
         let uniform = device.create_buffer(&BufferDescriptor {
             label: None,
-            size: size_of::<glam::Mat4>(),
+            size: size_of::<bevy::math::Mat4>(),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -59,7 +59,7 @@ impl Mesh {
             }),
             inst: device.create_buffer(&BufferDescriptor {
                 label: None,
-                size: 512 * 1024 * size_of::<glam::Mat4>(),
+                size: 512 * 1024 * size_of::<bevy::math::Mat4>(),
                 usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
@@ -157,11 +157,11 @@ impl Mesh {
         self.num = 0
     }
 
-    pub fn copy(&mut self, mat: glam::Mat4, vp: &glam::Mat4, queue: &Queue) {
+    pub fn copy(&mut self, mat: bevy::math::Mat4, vp: &bevy::math::Mat4, queue: &Queue) {
         queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(vp));
         queue.write_buffer(
             &self.inst,
-            self.num as u64 * size_of::<glam::Mat4>(),
+            self.num as u64 * size_of::<bevy::math::Mat4>(),
             bytemuck::bytes_of(&mat.to_cols_array_2d()),
         );
         self.num += 1;
@@ -188,7 +188,7 @@ impl Mesh {
 // impl Mesh {
 //     pub fn new(
 //         ctx: &mut Context,
-//         vertices: Vec<glam::Vec3>,
+//         vertices: Vec<bevy::math::Vec3>,
 //         indices: Vec<u32>,
 //         uvs: Vec<Vec<(f32, f32)>>,
 //         mats: Vec<(u32, u32, Vec<u8>)>,
@@ -262,7 +262,7 @@ impl Mesh {
 //         }
 //     }
 
-//     pub fn draw(&self, ctx: &mut Context, vp: glam::Mat4) {
+//     pub fn draw(&self, ctx: &mut Context, vp: bevy::math::Mat4) {
 //         for binding in self.bindings.iter() {
 //             ctx.apply_pipeline(&self.pipeline);
 //             ctx.apply_bindings(binding);
