@@ -3,8 +3,13 @@ use super::*;
 pub fn ui(
     mut ctx: bevy_egui::EguiContexts,
     mut appdata: ResMut<AppData>,
-    mut command: EventWriter<Command>,
+    mut commands: Commands,
+    mut events: EventWriter<Events>,
     mut notifs: ResMut<Notifs>,
+    // map: NonSendMut<Map>,
+    actors: Query<(Entity, &actor::Actor)>,
+    selected: Query<(Entity, &actor::Actor), With<actor::Selected>>,
+    matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
 ) {
     notifs.0.show(ctx.ctx_mut());
     egui::SidePanel::left("sidepanel").show(ctx.ctx_mut(), |ui| {
@@ -19,20 +24,20 @@ pub fn ui(
                         .add_filter("maps", &["umap"])
                         .pick_file()
                     {
-                        command.send(Command::Open(path))
+                        events.send(Events::Open(path))
                     }
                 }
                 if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
                     .clicked()
                 {
-                    command.send(Command::SaveAs(false))
+                    events.send(Events::SaveAs(false))
                 }
                 if ui
                     .add(egui::Button::new("save as").shortcut_text("ctrl + shift + s"))
                     .clicked()
                 {
-                    command.send(Command::SaveAs(true))
+                    events.send(Events::SaveAs(true))
                 }
             });
             egui::ComboBox::from_id_source("version")
@@ -65,7 +70,7 @@ pub fn ui(
                     .add(egui::Button::new("add pak folder").shortcut_text("alt + o"))
                     .clicked()
                 {
-                    command.send(Command::AddPak)
+                    events.send(Events::AddPak)
                 }
             });
             ui.menu_button("options", |ui| {
@@ -139,16 +144,16 @@ pub fn ui(
                 if ui.button("clear cache").clicked() {
                     match config() {
                         Some(cache) => match std::fs::remove_dir_all(cache.join("cache")) {
-                            Ok(()) => command.send(Command::Notif {
+                            Ok(()) => events.send(Events::Notif {
                                 message: "cleared cache".into(),
                                 kind: egui_notify::ToastLevel::Info
                             }),
-                            Err(e) => command.send(Command::Notif {
+                            Err(e) => events.send(Events::Notif {
                                 message: e.to_string(),
                                 kind: egui_notify::ToastLevel::Error
                             }),
                         },
-                        None => command.send(Command::Notif {
+                        None => events.send(Events::Notif {
                             message: "cache does not exist".into(),
                             kind: egui_notify::ToastLevel::Warning
                         }),
@@ -165,5 +170,54 @@ pub fn ui(
                 ui.text_edit_multiline(&mut appdata.script);
             });
         });
+        // let Some((map, _)) = &mut map.0 else { return };
+        if ui.add(egui::TextEdit::singleline(&mut appdata.query).hint_text("🔎 search actors")).changed() {
+            for (entity, _) in matched.iter() {
+                commands.entity(entity).remove::<actor::Matched>();
+            }
+            for (entity, actor) in actors.iter() {
+                if actor.name.to_ascii_lowercase().contains(&appdata.query.to_ascii_lowercase()) {
+                    commands.entity(entity).insert(actor::Matched);
+                }
+            }
+        }
+        ui.push_id("actors", |ui| egui::ScrollArea::both()
+            .auto_shrink([false, true])
+            .max_height(ui.available_height() * 0.5)
+            .show_rows(
+                ui,
+                ui.text_style_height(&egui::TextStyle::Body),
+                match appdata.query.is_empty() {
+                    true => actors.iter().count(),
+                    false => matched.iter().count(),
+                },
+                |ui, range| ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                    let label =|(entity, actor): (Entity, &actor::Actor)|{
+                        let highlighted = selected.contains(entity);
+                        if ui.selectable_label(
+                            highlighted,
+                            &actor.name
+                        )
+                        .on_hover_text(&actor.class)
+                        .clicked() {
+                            ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
+                                for (entity, _) in selected.iter() {
+                                    commands.entity(entity).remove::<actor::Selected>();
+                                }
+                            });
+                            match highlighted {
+                                true => commands.entity(entity).remove::<actor::Selected>(),
+                                // false if ui.input(|input| input.modifiers.shift) => todo!(),
+                                false => commands.entity(entity).insert(actor::Selected),
+                            };
+                        }
+                    };
+                    match appdata.query.is_empty() {
+                        true => actors.iter().skip(range.start).take(range.end).for_each(label),
+                        false => matched.iter().skip(range.start).take(range.end).for_each(label),
+                    }
+                })
+            )
+        );
     });
 }
