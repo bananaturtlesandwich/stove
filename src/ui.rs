@@ -181,6 +181,7 @@ pub fn ui(
                 }
             }
         }
+        ui.add_space(10.0);
         ui.push_id("actors", |ui| egui::ScrollArea::both()
             .auto_shrink([false, true])
             .max_height(ui.available_height() * 0.5)
@@ -216,6 +217,7 @@ pub fn ui(
                         true => actors.iter().skip(range.start).take(range.end).for_each(label),
                         false => matched.iter().skip(range.start).take(range.end).for_each(label),
                     }
+                    ui.add_space(10.0);
                 })
             )
         );

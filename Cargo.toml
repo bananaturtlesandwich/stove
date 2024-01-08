@@ -28,7 +28,7 @@ bevy = { version = "0.12", default-features = false, features = [
 ] }
 winit = "0.28"
 # bevy_mod_picking = "0.17"
-# smooth-bevy-cameras = "0.10"
+smooth-bevy-cameras = "0.10"
 bevy_egui = "0.24"
 egui = { version = "0.24", features = ["persistence", "serde"] }
 egui-notify = "0.11"

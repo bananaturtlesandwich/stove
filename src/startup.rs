@@ -45,3 +45,19 @@ pub fn check_args(mut events: EventWriter<Events>) {
     }
     events.send(Events::Open(path))
 }
+
+pub fn setup_camera(mut commands: Commands) {
+    use smooth_bevy_cameras::controllers::unreal::*;
+    commands
+        .spawn(Camera3dBundle {
+            tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
+            ..Default::default()
+        })
+        .insert(UnrealCameraBundle::new(
+            UnrealCameraController::default(),
+            // for some reason it doesn't work at the origin
+            Vec3::new(0.0, 0.0, 5.0),
+            Vec3::ZERO,
+            Vec3::Y,
+        ));
+}

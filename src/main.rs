@@ -79,6 +79,8 @@ fn main() {
             ..default()
         }))
         .add_plugins(bevy_egui::EguiPlugin)
+        .add_plugins(smooth_bevy_cameras::LookTransformPlugin)
+        .add_plugins(smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default())
         .insert_non_send_resource(Map(None))
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
@@ -89,6 +91,7 @@ fn main() {
         .add_systems(Update, persistence::write)
         .add_systems(Startup, startup::check_args.after(persistence::load))
         .add_systems(Startup, startup::check_updates)
+        .add_systems(Startup, startup::setup_camera)
         .add_systems(
             Update,
             |mut drops: EventReader<bevy::window::FileDragAndDrop>,
@@ -100,6 +103,7 @@ fn main() {
                 }
             },
         )
+        .add_systems(Update, ui::ui)
         .add_systems(
             Update,
             |mut commands: Commands,
@@ -385,7 +389,6 @@ fn main() {
                 }
             },
         )
-        .add_systems(Update, ui::ui)
         .run();
 }
 
