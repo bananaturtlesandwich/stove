@@ -29,7 +29,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
                     name: name.to_string(),
                     vertices: verts
                         .into_iter()
-                        .map(|glam::Vec3 { x, y, z }| Vertex {
+                        .map(|bevy::math::Vec3 { x, y, z }| Vertex {
                             x: x as f64,
                             y: y as f64,
                             z: z as f64,
@@ -86,7 +86,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
 pub fn get_mesh_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
 ) -> io::Result<(
-    Vec<glam::Vec3>,
+    Vec<bevy::math::Vec3>,
     Vec<u32>,
     Vec<Vec<(f32, f32)>>,
     Vec<String>,
@@ -243,7 +243,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
         );
-        positions.push(glam::vec3(-x, z, y) * 0.01);
+        positions.push(bevy::math::vec3(-x, z, y) * 0.01);
     }
 
     // vertex buffer
