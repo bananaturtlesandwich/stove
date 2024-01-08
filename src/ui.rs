@@ -2,29 +2,41 @@ use super::*;
 
 pub fn ui(
     mut ctx: bevy_egui::EguiContexts,
-    appdata: ResMut<AppData>,
-    notif: EventWriter<Notif>,
-    map: NonSendMut<Map>,
+    mut appdata: ResMut<AppData>,
+    mut command: EventWriter<Command>,
+    mut notifs: ResMut<Notifs>,
 ) {
+    notifs.0.show(ctx.ctx_mut());
     egui::SidePanel::left("sidepanel").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
-            let mut appdata = appdata;let mut notif = notif;let mut map = map;
             ui.menu_button("file", |ui| {
                 if ui
                     .add(egui::Button::new("open").shortcut_text("ctrl + o"))
                     .clicked()
-                {}
+                {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .set_title("open map")
+                        .add_filter("maps", &["umap"])
+                        .pick_file()
+                    {
+                        command.send(Command::Open(path))
+                    }
+                }
                 if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
                     .clicked()
-                {}
+                {
+                    command.send(Command::SaveAs(false))
+                }
                 if ui
                     .add(egui::Button::new("save as").shortcut_text("ctrl + shift + s"))
                     .clicked()
-                {}
+                {
+                    command.send(Command::SaveAs(true))
+                }
             });
             egui::ComboBox::from_id_source("version")
-                .show_index(ui, &mut appdata.version, 33, |i| VERSIONS[i].1.to_string());
+                .show_index(ui, &mut appdata.version, VERSIONS.len(), |i| VERSIONS[i].1.to_string());
             ui.menu_button("paks", |ui| {
                 egui::TextEdit::singleline(&mut appdata.aes)
                     .clip_text(false)
@@ -52,7 +64,9 @@ pub fn ui(
                 if ui
                     .add(egui::Button::new("add pak folder").shortcut_text("alt + o"))
                     .clicked()
-                {}
+                {
+                    command.send(Command::AddPak)
+                }
             });
             ui.menu_button("options", |ui| {
                 ui.menu_button("about",|ui|{
@@ -125,16 +139,16 @@ pub fn ui(
                 if ui.button("clear cache").clicked() {
                     match config() {
                         Some(cache) => match std::fs::remove_dir_all(cache.join("cache")) {
-                            Ok(()) => notif.send(Notif {
+                            Ok(()) => command.send(Command::Notif {
                                 message: "cleared cache".into(),
                                 kind: egui_notify::ToastLevel::Info
                             }),
-                            Err(e) => notif.send(Notif {
+                            Err(e) => command.send(Command::Notif {
                                 message: e.to_string(),
                                 kind: egui_notify::ToastLevel::Error
                             }),
                         },
-                        None => notif.send(Notif {
+                        None => command.send(Command::Notif {
                             message: "cache does not exist".into(),
                             kind: egui_notify::ToastLevel::Warning
                         }),

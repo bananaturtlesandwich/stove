@@ -10,12 +10,17 @@ mod ui;
 
 type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
 
-struct Map(Option<Asset>);
+struct Map(Option<(Asset, std::path::PathBuf)>);
 
 #[derive(Event)]
-struct Notif {
-    message: String,
-    kind: egui_notify::ToastLevel,
+enum Command {
+    Notif {
+        message: String,
+        kind: egui_notify::ToastLevel,
+    },
+    Open(std::path::PathBuf),
+    SaveAs(bool),
+    AddPak,
 }
 
 #[derive(Default, Resource)]
@@ -47,32 +52,61 @@ fn main() {
         .add_plugins(bevy_egui::EguiPlugin)
         .insert_non_send_resource(Map(None))
         .init_resource::<Notifs>()
-        .add_event::<Notif>()
-        // set window icon
+        .add_event::<Command>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
-        .add_systems(
-            PostUpdate,
-            persistence::write.after(bevy_egui::EguiSet::InitContexts),
-        )
-        // allow open with...
+        .add_systems(Update, persistence::write)
         .add_systems(Startup, startup::check_args.after(persistence::load))
-        // check for updates
         .add_systems(Startup, startup::check_updates)
-        // show notifications
         .add_systems(
             Update,
-            |mut ctx: bevy_egui::EguiContexts,
-             mut queue: EventReader<Notif>,
-             mut notifs: ResMut<Notifs>| {
-                for notif in queue.read() {
-                    notifs.0.add(egui_notify::Toast::custom(
-                        notif.message.clone(),
-                        notif.kind.clone(),
-                    ));
+            |mut events: EventReader<Command>,
+             mut notifs: ResMut<Notifs>,
+             mut appdata: ResMut<AppData>,
+             mut map: NonSendMut<Map>| {
+                let mut queue = |message, kind| {
+                    notifs.0.add(egui_notify::Toast::custom(message, kind));
+                };
+                for event in events.read() {
+                    match event {
+                        Command::Notif { message, kind } => queue(message.clone(), kind.clone()),
+                        Command::Open(path) => {
+                            match asset::open(&path, VERSIONS[appdata.version].0) {
+                                Ok(asset) => map.0 = Some((asset, path.clone())),
+                                Err(e) => queue(e.to_string(), Error),
+                            }
+                        }
+                        Command::SaveAs(ask) => {
+                            let Some((map, path)) = &mut map.0 else {
+                                queue("no map to save".into(), Error);
+                                continue;
+                            };
+                            if *ask {
+                                if let Some(new) = rfd::FileDialog::new()
+                                    .set_title("save map as")
+                                    .add_filter("maps", &["umap"])
+                                    .save_file()
+                                {
+                                    *path = new;
+                                }
+                            }
+                            match asset::save(map, path) {
+                                Ok(_) => queue("map saved".into(), Success),
+                                Err(e) => queue(e.to_string(), Error),
+                            }
+                        }
+                        Command::AddPak => {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .set_title("add pak folder")
+                                .pick_folder()
+                                .and_then(|path| path.to_str().map(str::to_string))
+                            {
+                                appdata.paks.push(path)
+                            }
+                        }
+                    }
                 }
-                notifs.0.show(ctx.ctx_mut());
             },
         )
         .add_systems(Update, ui::ui)
