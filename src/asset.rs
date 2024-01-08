@@ -22,6 +22,11 @@ pub fn save<C: std::io::Read + std::io::Seek>(
     asset.rebuild_name_map();
     asset.write_data(
         &mut File::create(&path)?,
-        Some(&mut File::create(path.as_ref().with_extension("uexp"))?),
+        asset
+            .asset_data
+            .use_event_driven_loader
+            .then(|| File::create(path.as_ref().with_extension("uexp")))
+            .transpose()?
+            .as_mut(),
     )
 }

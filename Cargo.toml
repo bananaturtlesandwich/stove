@@ -9,15 +9,16 @@ version = "0.13.0"
 edition = "2021"
 
 [dependencies]
+unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
 bevy = { version = "0.12", default-features = false, features = [
     "x11",
     "wayland",
     # "bevy_asset",
     # "bevy_gilrs",
-    "bevy_scene",
+    # "bevy_scene",
     "bevy_winit",
     "bevy_core_pipeline",
-    # "bevy_pbr",
+    "bevy_pbr",
     "bevy_render",
     # "bevy_sprite",
     # "bevy_text",
@@ -25,6 +26,7 @@ bevy = { version = "0.12", default-features = false, features = [
     # "bevy_gltf",
     # "animation",
     # "png",
+    "multi-threaded"
 ] }
 # seldom_fn_plugin = "0.5"
 winit = "0.28"
