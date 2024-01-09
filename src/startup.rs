@@ -46,7 +46,11 @@ pub fn check_args(mut events: EventWriter<Events>) {
     events.send(Events::Open(path))
 }
 
-pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+pub fn initialise(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<bevy::pbr::wireframe::WireframeMaterial>>,
+) {
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn(Camera3dBundle {
@@ -60,7 +64,7 @@ pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             Vec3::ZERO,
             Vec3::Y,
         ));
-    commands.insert_resource(Cube(
+    commands.insert_resource(Constants(
         meshes.add(
             Mesh::new(bevy::render::render_resource::PrimitiveTopology::LineList)
                 .with_inserted_attribute(
@@ -82,5 +86,6 @@ pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
                     0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
                 ]))),
         ),
+        materials.add(bevy::pbr::wireframe::WireframeMaterial { color: Color::CYAN }),
     ))
 }
