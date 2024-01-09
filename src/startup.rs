@@ -49,14 +49,18 @@ pub fn check_args(mut events: EventWriter<Events>) {
 pub fn initialise(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<bevy::pbr::wireframe::WireframeMaterial>>,
+    mut wireframes: ResMut<Assets<bevy::pbr::wireframe::WireframeMaterial>>,
 ) {
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
-        .spawn(Camera3dBundle {
-            tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
-            ..Default::default()
-        })
+        .spawn((
+            Camera3dBundle {
+                tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
+                ..Default::default()
+            },
+            bevy_mod_raycast::deferred::RaycastSource::<()>::new_cursor()
+                .with_visibility(bevy_mod_raycast::immediate::RaycastVisibility::Ignore),
+        ))
         .insert(UnrealCameraBundle::new(
             UnrealCameraController::default(),
             // for some reason it doesn't work at the origin
@@ -64,8 +68,8 @@ pub fn initialise(
             Vec3::ZERO,
             Vec3::Y,
         ));
-    commands.insert_resource(Constants(
-        meshes.add(
+    commands.insert_resource(Constants {
+        cube: meshes.add(
             Mesh::new(bevy::render::render_resource::PrimitiveTopology::LineList)
                 .with_inserted_attribute(
                     Mesh::ATTRIBUTE_POSITION,
@@ -86,6 +90,7 @@ pub fn initialise(
                     0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
                 ]))),
         ),
-        materials.add(bevy::pbr::wireframe::WireframeMaterial { color: Color::CYAN }),
-    ))
+        bounds: meshes.add(shape::Box::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5)).into()),
+        wireframe: wireframes.add(bevy::pbr::wireframe::WireframeMaterial { color: Color::CYAN }),
+    })
 }

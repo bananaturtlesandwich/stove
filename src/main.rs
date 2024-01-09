@@ -43,10 +43,11 @@ struct AppData {
 }
 
 #[derive(Resource)]
-struct Constants(
-    Handle<Mesh>,
-    Handle<bevy::pbr::wireframe::WireframeMaterial>,
-);
+struct Constants {
+    cube: Handle<Mesh>,
+    bounds: Handle<Mesh>,
+    wireframe: Handle<bevy::pbr::wireframe::WireframeMaterial>,
+}
 
 enum Wrapper {
     File(std::io::BufReader<std::fs::File>),
@@ -77,17 +78,20 @@ fn config() -> Option<std::path::PathBuf> {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "stove".into(),
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "stove".into(),
+                    ..default()
+                }),
                 ..default()
             }),
-            ..default()
-        }))
-        .add_plugins(bevy::pbr::wireframe::WireframePlugin)
-        .add_plugins(bevy_egui::EguiPlugin)
-        .add_plugins(smooth_bevy_cameras::LookTransformPlugin)
-        .add_plugins(smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default())
+            bevy::pbr::wireframe::WireframePlugin,
+            bevy_egui::EguiPlugin,
+            smooth_bevy_cameras::LookTransformPlugin,
+            smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default(),
+            bevy_mod_raycast::deferred::DeferredRaycastingPlugin::<()>::default(),
+        ))
         .insert_non_send_resource(Map(None))
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
@@ -111,6 +115,24 @@ fn main() {
             },
         )
         .add_systems(Update, ui::ui)
+        .add_systems(
+            Update,
+            |mut commands: Commands,
+             mouse: Res<Input<MouseButton>>,
+             keys: Res<Input<KeyCode>>,
+             camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
+             selected: Query<Entity, With<actor::Selected>>| {
+            if mouse.just_released(MouseButton::Left) {
+                if !keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight, KeyCode::ControlLeft, KeyCode::ControlRight]) {
+                    for entity in selected.iter() {
+                        commands.entity(entity).remove::<actor::Selected>();
+                    }
+                }
+                if let Some((entity, _)) = camera.single().get_nearest_intersection() {
+                    commands.entity(entity).insert(actor::Selected);
+                }
+            }
+        })
         .add_systems(
             Update,
             |mut commands: Commands,
@@ -220,15 +242,41 @@ fn main() {
                                                         }
                                                     }
                                                 }
-                                                commands.spawn((MaterialMeshBundle {
-                                                    mesh: match &actor.draw_type{
-                                                        actor::DrawType::Mesh(path) => registry.0[path].clone_weak(),
-                                                        actor::DrawType::Cube => consts.0.clone_weak(),
+                                                match &actor.draw_type {
+                                                    actor::DrawType::Mesh(path) => {
+                                                        commands.spawn((
+                                                            MaterialMeshBundle {
+                                                                mesh: registry.0[path].clone_weak(),
+                                                                material: consts.wireframe.clone_weak(),
+                                                                transform: actor.transform(&asset),
+                                                                ..default()
+                                                            },
+                                                            bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                                                            actor
+                                                        ));
                                                     },
-                                                    material: consts.1.clone_weak(),
-                                                    transform: actor.transform(&asset),
-                                                    ..default()
-                                                }, actor));
+                                                    actor::DrawType::Cube => {
+                                                        commands.spawn((
+                                                            PbrBundle {
+                                                                mesh: consts.bounds.clone_weak(),
+                                                                transform: actor.transform(&asset),
+                                                                visibility: Visibility::Hidden,
+                                                                ..default()
+                                                            },
+                                                            bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                                                            actor
+                                                        // child because it's LineList which picking can't do
+                                                        )).with_children(|parent| {
+                                                            parent.spawn(
+                                                                PbrBundle {
+                                                                    mesh: consts.cube.clone_weak(),
+                                                                    visibility: Visibility::Visible,
+                                                                    ..default()
+                                                                },
+                                                            );
+                                                        });
+                                                    },
+                                                }
                                             }
                                             Err(e) => queue(e.to_string(), Warning),
                                         }
