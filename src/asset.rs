@@ -30,3 +30,104 @@ pub fn save<C: std::io::Read + std::io::Seek>(
             .as_mut(),
     )
 }
+
+pub fn get<T>(
+    pak: &repak::PakReader,
+    pak_file: &mut std::io::BufReader<std::fs::File>,
+    cache: Option<&std::path::Path>,
+    path: &str,
+    version: unreal_asset::engine_version::EngineVersion,
+    func: impl Fn(
+        unreal_asset::Asset<super::Wrapper>,
+        Option<super::Wrapper>,
+    ) -> Result<T, unreal_asset::error::Error>,
+) -> Result<T, unreal_asset::error::Error> {
+    fn game_name(pak: &repak::PakReader) -> Option<String> {
+        let mut split = pak.mount_point().split('/').peekable();
+        while let Some((game, content)) = split.next().zip(split.peek()) {
+            if game != "Engine" && content == &"Content" {
+                return Some(game.to_string());
+            }
+        }
+        for entry in pak.files() {
+            let mut split = entry.split('/').take(2);
+            if let Some((game, content)) = split.next().zip(split.next()) {
+                if game != "Engine" && content == "Content" {
+                    return Some(game.to_string());
+                }
+            }
+        }
+        None
+    }
+    let path = path
+        .replace(
+            "/Game",
+            &format!("{}/Content", game_name(pak).unwrap_or_default()),
+        )
+        .replace("/Engine", "Engine/Content");
+    let make = |ext: &str| path.to_string() + ext;
+    let (mesh, exp, bulk, uptnl) = (
+        make(".uasset"),
+        make(".uexp"),
+        make(".ubulk"),
+        make(".uptnl"),
+    );
+    let cache_path = |path: &str| cache.unwrap().join(path.trim_start_matches('/'));
+    match cache {
+        Some(_)
+            if cache_path(&mesh).exists() ||
+            // try to create cache if it doesn't exist
+            (
+                std::fs::create_dir_all(cache_path(&path).parent().unwrap()).is_ok() &&
+                pak.read_file(&mesh, pak_file, &mut std::fs::File::create(cache_path(&mesh))?).is_ok() &&
+                // we don't care whether these are successful in case they don't exist
+                pak.read_file(&exp, pak_file, &mut std::fs::File::create(cache_path(&exp))?).map_or(true,|_| true) &&
+                pak.read_file(&bulk, pak_file, &mut std::fs::File::create(cache_path(&bulk))?).map_or(true,|_| true) &&
+                pak.read_file(&uptnl, pak_file, &mut std::fs::File::create(cache_path(&uptnl))?).map_or(true,|_| true)
+             ) =>
+        {
+            func(
+                unreal_asset::Asset::new(
+                    super::Wrapper::File(std::io::BufReader::new(std::fs::File::open(
+                        cache_path(&mesh),
+                    )?)),
+                    std::fs::File::open(cache_path(&exp))
+                        .ok()
+                        .map(std::io::BufReader::new)
+                        .map(super::Wrapper::File),
+                    version,
+                    None,
+                )?,
+                std::fs::File::open(cache_path(&bulk))
+                    .ok()
+                    .map_or_else(|| std::fs::File::open(cache_path(&uptnl)).ok(), Some)
+                    .map(std::io::BufReader::new)
+                    .map(super::Wrapper::File),
+            )
+        }
+        // if the cache cannot be created fall back to storing in memory
+        _ => func(
+            unreal_asset::Asset::new(
+                super::Wrapper::Bytes(std::io::Cursor::new(pak.get(&mesh, pak_file).map_err(
+                    |e| {
+                        unreal_asset::error::Error::no_data(match e {
+                            repak::Error::Oodle => "oodle paks are unsupported atm".to_string(),
+                            e => format!("error reading pak: {e}"),
+                        })
+                    },
+                )?)),
+                pak.get(&exp, pak_file)
+                    .ok()
+                    .map(std::io::Cursor::new)
+                    .map(super::Wrapper::Bytes),
+                version,
+                None,
+            )?,
+            pak.get(&bulk, pak_file)
+                .ok()
+                .map_or_else(|| pak.get(&uptnl, pak_file).ok(), Some)
+                .map(std::io::Cursor::new)
+                .map(super::Wrapper::Bytes),
+        ),
+    }
+}
