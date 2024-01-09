@@ -68,8 +68,8 @@ impl Actor {
                 .map(|i| i32::from_le_bytes(i) as usize)
                 .and_then(|len| String::from_utf8(norm.extras[12..12 + len].to_vec()).ok())
             {
-                Some(name) => name,
-                None => norm.base_export.object_name.get_owned_content(),
+                Some(name) if !name.chars().all(char::is_whitespace) => name,
+                _ => norm.base_export.object_name.get_owned_content(),
             },
             false => norm.base_export.object_name.get_owned_content(),
         };
