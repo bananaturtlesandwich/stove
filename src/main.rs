@@ -43,7 +43,10 @@ struct AppData {
 }
 
 #[derive(Resource)]
-struct Cube(Handle<Mesh>);
+struct Constants(
+    Handle<Mesh>,
+    Handle<bevy::pbr::wireframe::WireframeMaterial>,
+);
 
 enum Wrapper {
     File(std::io::BufReader<std::fs::File>),
@@ -81,6 +84,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(bevy::pbr::wireframe::WireframePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
         .add_plugins(smooth_bevy_cameras::LookTransformPlugin)
         .add_plugins(smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default())
@@ -116,7 +120,7 @@ fn main() {
              mut appdata: ResMut<AppData>,
              mut map: NonSendMut<Map>,
              mut registry: ResMut<Registry>,
-             mut meshes: ResMut<Assets<Mesh>>, cube: Res<Cube>| {
+             mut meshes: ResMut<Assets<Mesh>>, consts: Res<Constants>| {
                 let mut queue = |message, kind| {
                     notifs.0.add(egui_notify::Toast::custom(message, kind));
                 };
@@ -216,11 +220,12 @@ fn main() {
                                                         }
                                                     }
                                                 }
-                                                commands.spawn((PbrBundle {
+                                                commands.spawn((MaterialMeshBundle {
                                                     mesh: match &actor.draw_type{
                                                         actor::DrawType::Mesh(path) => registry.0[path].clone_weak(),
-                                                        actor::DrawType::Cube => cube.0.clone_weak(),
+                                                        actor::DrawType::Cube => consts.0.clone_weak(),
                                                     },
+                                                    material: consts.1.clone_weak(),
                                                     transform: actor.transform(&asset),
                                                     ..default()
                                                 }, actor));
