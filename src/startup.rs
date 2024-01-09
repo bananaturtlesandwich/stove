@@ -46,7 +46,7 @@ pub fn check_args(mut events: EventWriter<Events>) {
     events.send(Events::Open(path))
 }
 
-pub fn setup_camera(mut commands: Commands) {
+pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn(Camera3dBundle {
@@ -60,4 +60,27 @@ pub fn setup_camera(mut commands: Commands) {
             Vec3::ZERO,
             Vec3::Y,
         ));
+    commands.insert_resource(Cube(
+        meshes.add(
+            Mesh::new(bevy::render::render_resource::PrimitiveTopology::LineList)
+                .with_inserted_attribute(
+                    Mesh::ATTRIBUTE_POSITION,
+                    vec![
+                        // front verts
+                        bevy::math::vec3(-0.5, -0.5, -0.5),
+                        bevy::math::vec3(-0.5, 0.5, -0.5),
+                        bevy::math::vec3(0.5, -0.5, -0.5),
+                        bevy::math::vec3(0.5, 0.5, -0.5),
+                        // back verts
+                        bevy::math::vec3(-0.5, -0.5, 0.5),
+                        bevy::math::vec3(-0.5, 0.5, 0.5),
+                        bevy::math::vec3(0.5, -0.5, 0.5),
+                        bevy::math::vec3(0.5, 0.5, 0.5),
+                    ],
+                )
+                .with_indices(Some(bevy::render::mesh::Indices::U16(vec![
+                    0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
+                ]))),
+        ),
+    ))
 }
