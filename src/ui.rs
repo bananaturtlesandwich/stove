@@ -19,25 +19,22 @@ pub fn ui(
                     .add(egui::Button::new("open").shortcut_text("ctrl + o"))
                     .clicked()
                 {
-                    if let Some(path) = rfd::FileDialog::new()
-                        .set_title("open map")
-                        .add_filter("maps", &["umap"])
-                        .pick_file()
-                    {
-                        events.send(Events::Open(path))
-                    }
+                    events.send(Events::Open(None));
+                    ui.close_menu();
                 }
                 if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
                     .clicked()
                 {
-                    events.send(Events::SaveAs(false))
+                    events.send(Events::SaveAs(false));
+                    ui.close_menu();
                 }
                 if ui
                     .add(egui::Button::new("save as").shortcut_text("ctrl + shift + s"))
                     .clicked()
                 {
-                    events.send(Events::SaveAs(true))
+                    events.send(Events::SaveAs(true));
+                    ui.close_menu();
                 }
             });
             egui::ComboBox::from_id_source("version")
