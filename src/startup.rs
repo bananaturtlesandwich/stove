@@ -43,7 +43,7 @@ pub fn check_args(mut events: EventWriter<Events>) {
         });
         return;
     }
-    events.send(Events::Open(path))
+    events.send(Events::Open(Some(path)))
 }
 
 pub fn initialise(

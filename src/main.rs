@@ -6,6 +6,7 @@ use egui_notify::ToastLevel::{Error, Info, Success, Warning};
 mod actor;
 mod asset;
 mod extras;
+mod input;
 mod persistence;
 mod startup;
 mod ui;
@@ -20,7 +21,7 @@ enum Events {
         message: String,
         kind: egui_notify::ToastLevel,
     },
-    Open(std::path::PathBuf),
+    Open(Option<std::path::PathBuf>),
     SaveAs(bool),
     AddPak,
 }
@@ -89,7 +90,7 @@ fn main() {
             bevy::pbr::wireframe::WireframePlugin,
             bevy_egui::EguiPlugin,
             smooth_bevy_cameras::LookTransformPlugin,
-            smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default(),
+            smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin { override_input_system: true },
             bevy_mod_raycast::deferred::DeferredRaycastingPlugin::<()>::default(),
         ))
         .insert_non_send_resource(Map(None))
@@ -109,30 +110,16 @@ fn main() {
              mut events: EventWriter<Events>| {
                 for drop in drops.read() {
                     if let bevy::window::FileDragAndDrop::DroppedFile { path_buf, .. } = drop {
-                        events.send(Events::Open(path_buf.clone()))
+                        events.send(Events::Open(Some(path_buf.clone())))
                     }
                 }
             },
         )
         .add_systems(Update, ui::ui)
-        .add_systems(
-            Update,
-            |mut commands: Commands,
-             mouse: Res<Input<MouseButton>>,
-             keys: Res<Input<KeyCode>>,
-             camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
-             selected: Query<Entity, With<actor::Selected>>| {
-            if mouse.just_released(MouseButton::Left) {
-                if !keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight, KeyCode::ControlLeft, KeyCode::ControlRight]) {
-                    for entity in selected.iter() {
-                        commands.entity(entity).remove::<actor::Selected>();
-                    }
-                }
-                if let Some((entity, _)) = camera.single().get_nearest_intersection() {
-                    commands.entity(entity).insert(actor::Selected);
-                }
-            }
-        })
+        .add_systems(Update, input::shortcuts)
+        // post update because egui isn't built until update
+        .add_systems(PostUpdate, input::pick)
+        .add_systems(PostUpdate, input::camera)
         .add_systems(
             Update,
             |mut commands: Commands,
@@ -150,7 +137,11 @@ fn main() {
                     match event {
                         Events::Notif { message, kind } => queue(message.clone(), kind.clone()),
                         Events::Open(path) => {
-                            match asset::open(path, VERSIONS[appdata.version].0) {
+                            let Some(path) = path.clone().or_else(|| rfd::FileDialog::new()
+                                .set_title("open map")
+                                .add_filter("maps", &["umap"])
+                                .pick_file()) else { continue };
+                            match asset::open(&path, VERSIONS[appdata.version].0) {
                                 Ok(asset) => {
                                     for actor in actors.iter() {
                                         commands.entity(actor).despawn_recursive();
