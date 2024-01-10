@@ -46,11 +46,7 @@ pub fn check_args(mut events: EventWriter<Events>) {
     events.send(Events::Open(Some(path)))
 }
 
-pub fn initialise(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut wireframes: ResMut<Assets<bevy::pbr::wireframe::WireframeMaterial>>,
-) {
+pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn((
@@ -91,6 +87,5 @@ pub fn initialise(
                 ]))),
         ),
         bounds: meshes.add(shape::Box::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5)).into()),
-        wireframe: wireframes.add(bevy::pbr::wireframe::WireframeMaterial { color: Color::CYAN }),
     })
 }

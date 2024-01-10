@@ -30,7 +30,7 @@ enum Events {
 struct Notifs(egui_notify::Toasts);
 
 #[derive(Default, Resource)]
-struct Registry(std::collections::BTreeMap<String, Handle<Mesh>>);
+struct Registry(std::collections::BTreeMap<String, (Handle<Mesh>, Vec<Handle<StandardMaterial>>)>);
 
 #[derive(Default, Resource)]
 struct AppData {
@@ -47,7 +47,6 @@ struct AppData {
 struct Constants {
     cube: Handle<Mesh>,
     bounds: Handle<Mesh>,
-    wireframe: Handle<bevy::pbr::wireframe::WireframeMaterial>,
 }
 
 enum Wrapper {
@@ -87,7 +86,6 @@ fn main() {
                 }),
                 ..default()
             }),
-            bevy::pbr::wireframe::WireframePlugin,
             bevy_egui::EguiPlugin,
             smooth_bevy_cameras::LookTransformPlugin,
             smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin { override_input_system: true },
@@ -129,7 +127,10 @@ fn main() {
              mut appdata: ResMut<AppData>,
              mut map: NonSendMut<Map>,
              mut registry: ResMut<Registry>,
-             mut meshes: ResMut<Assets<Mesh>>, consts: Res<Constants>| {
+             mut meshes: ResMut<Assets<Mesh>>,
+             mut materials: ResMut<Assets<StandardMaterial>>,
+             mut images: ResMut<Assets<Image>>,
+             consts: Res<Constants>| {
                 let mut queue = |message, kind| {
                     notifs.0.add(egui_notify::Toast::custom(message, kind));
                 };
@@ -219,13 +220,80 @@ fn main() {
                                                                 path,
                                                                 version,
                                                                 |asset, _| Ok(extras::get_mesh_info(asset)?),
-                                                            ).ok()
+                                                            ).ok().map(|mesh| (mesh, pak_file, pak))
                                                         ) {
-                                                            Some((positions, indices, uvs, ..)) => {
-                                                                registry.0.insert(path.clone(), meshes.add(Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList)
-                                                                    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+                                                            Some(((positions, indices, uvs, mats, _mat_data), pak_file, pak)) => {
+                                                                let mats: Vec<_> = mats
+                                                                    .into_iter()
+                                                                    .map(|path| {
+                                                                        match asset::get(
+                                                                            pak,
+                                                                            pak_file,
+                                                                            cache.as_deref(),
+                                                                            &path,
+                                                                            version,
+                                                                            |mat, _| Ok(extras::get_tex_path(mat)),
+                                                                        ) {
+                                                                            Ok(Some(path)) => match asset::get(
+                                                                                pak,
+                                                                                pak_file,
+                                                                                cache.as_deref(),
+                                                                                &path,
+                                                                                version,
+                                                                                |tex, bulk| {
+                                                                                    Ok(extras::get_tex_info(tex, bulk)?)
+                                                                                },
+                                                                            ) {
+                                                                                Ok(o) => o,
+                                                                                Err(e) => {
+                                                                                    queue(
+                                                                                        format!(
+                                                                                            "{}: {e}",
+                                                                                            path.split('/')
+                                                                                                .last()
+                                                                                                .unwrap_or_default()
+                                                                                        ),
+                                                                                        Warning
+                                                                                    );
+                                                                                    // vec is rgba
+                                                                                    (1, 1, vec![255, 50, 125, 255])
+                                                                                }
+                                                                            },
+                                                                            _ => (1, 1, vec![125, 50, 255, 255]),
+                                                                        }
+                                                                    })
+                                                                    .collect();
+                                                                registry.0.insert(path.clone(), (
+                                                                    meshes.add(
+                                                                        Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList)
+                                                                            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
                                                                     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>())
-                                                                    .with_indices(Some(bevy::render::mesh::Indices::U32(indices)))));
+                                                                            .with_indices(Some(bevy::render::mesh::Indices::U32(indices)))
+                                                                    ),
+                                                                    mats.into_iter().map(|(width, height, data)| {
+                                                                        materials.add(StandardMaterial{
+                                                                            base_color_texture: Some(images.add(Image {
+                                                                                data,
+                                                                                texture_descriptor: bevy::render::render_resource::TextureDescriptor {
+                                                                                    label: None,
+                                                                                    size: bevy::render::render_resource::Extent3d {
+                                                                                        width: width.min(16384),
+                                                                                        height: height.min(16384),
+                                                                                        depth_or_array_layers: 1,
+                                                                                    },
+                                                                                    mip_level_count: 1,
+                                                                                    sample_count: 1,
+                                                                                    dimension: bevy::render::render_resource::TextureDimension::D2,
+                                                                                    format: bevy::render::render_resource::TextureFormat::Rgba8Unorm,
+                                                                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
+                                                                                    view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8Unorm],
+                                                                                },
+                                                                                ..default()
+                                                                            })),
+                                                                            ..default()
+                                                                        })
+                                                                    }).collect()
+                                                                ));
                                                             }
                                                             None => {
                                                                 queue(format!("mesh not found for {}", actor.name), Warning);
@@ -236,10 +304,11 @@ fn main() {
                                                 }
                                                 match &actor.draw_type {
                                                     actor::DrawType::Mesh(path) => {
+                                                        let (mesh, material) = &registry.0[path];
                                                         commands.spawn((
                                                             MaterialMeshBundle {
-                                                                mesh: registry.0[path].clone_weak(),
-                                                                material: consts.wireframe.clone_weak(),
+                                                                mesh: mesh.clone_weak(),
+                                                                material: material.get(0).map(Handle::clone_weak).unwrap_or_default(),
                                                                 transform: actor.transform(&asset),
                                                                 ..default()
                                                             },
