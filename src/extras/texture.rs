@@ -30,13 +30,13 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
             .unwrap();
         Ok::<_, unreal_asset::error::Error>(())
     };
-    // parse(
-    //     include_bytes!("tests/Basic_SplitRGB.uasset").as_slice(),
-    //     include_bytes!("tests/Basic_SplitRGB.uexp").as_slice(),
-    //     Some(include_bytes!("tests/Basic_SplitRGB.ubulk").as_slice()),
-    //     "Basic_SplitRGB",
-    //     EngineVersion::VER_UE4_25,
-    // )?;
+    parse(
+        include_bytes!("tests/Basic_SplitRGB.uasset").as_slice(),
+        include_bytes!("tests/Basic_SplitRGB.uexp").as_slice(),
+        Some(include_bytes!("tests/Basic_SplitRGB.ubulk").as_slice()),
+        "Basic_SplitRGB",
+        EngineVersion::VER_UE4_25,
+    )?;
     parse(
         include_bytes!("tests/moon0023.uasset").as_slice(),
         include_bytes!("tests/moon0023.uexp").as_slice(),
@@ -105,15 +105,20 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
 
     // skip offset
     match engine >= EngineVersion::VER_UE4_20 {
-        true => data.read_i64::<LE>()?,
-        false => data.read_i32::<LE>()? as i64,
+        // if >= UE5_0 then this is relative to position before reading
+        true => data.read_u64::<LE>()?,
+        false => data.read_u32::<LE>()? as u64,
     };
+
+    if engine >= EngineVersion::VER_UE5_0 {
+        data.set_position(data.position() + 16);
+    }
 
     // x
     data.read_i32::<LE>()?;
     // y
     data.read_i32::<LE>()?;
-    let packed = data.read_i32::<LE>()?;
+    let packed = data.read_u32::<LE>()?;
     let mut pixel_format = match data.read_i32::<LE>()? {
         len if len.is_negative() => {
             let mut buf = Vec::with_capacity(-len as usize);
@@ -141,7 +146,7 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     // ignore len since we're just reading the first mip
     data.read_i32::<LE>()?;
     // data isn't cooked
-    if data.read_i32::<LE>()? == 0 {
+    if engine < EngineVersion::VER_UE5_0 && data.read_i32::<LE>()? == 0 {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "mip is raw"));
     }
     let bulk = BulkData::new(&mut data, bulk, asset.bulk_data_start_offset)?;
@@ -170,7 +175,12 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
         "PF_ETC1" => run!(decode_etc1),
         "PF_ETC2_RGB" => run!(decode_etc2_rgb),
         "PF_ETC2_RGBA" => run!(decode_etc2_rgba1),
-        "PF_B8G8R8A8" => Ok(()),
+        "PF_B8G8R8A8" => Ok(bgra = bulk
+            .data
+            .chunks(4)
+            // would prefer array_chunks but that's a nightly feature
+            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+            .collect()),
         "PF_G8" => Ok(bgra = bulk
             .data
             .into_iter()
@@ -186,4 +196,4 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     Ok((x as u32, y as u32, rgba))
 }
 
-const HAS_OPT_DATA: i32 = 1 << 30;
+const HAS_OPT_DATA: u32 = 1 << 30;
