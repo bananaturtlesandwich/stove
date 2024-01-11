@@ -28,7 +28,7 @@ pub struct Matched;
 
 #[derive(bevy::prelude::Component)]
 pub struct Actor {
-    export: usize,
+    pub export: usize,
     transform: usize,
     pub name: String,
     pub class: String,

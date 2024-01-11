@@ -190,7 +190,12 @@ pub fn ui(
                     false => matched.iter().count(),
                 },
                 |ui, range| ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
-                    let label = |(entity, actor): (Entity, &actor::Actor)|{
+                    let mut displayed: Vec<_> = match appdata.query.is_empty() {
+                        true => actors.iter().collect(),
+                        false => matched.iter().collect(),
+                    };
+                    displayed.sort_by_key(|(_, actor)| actor.export);
+                    for (entity, actor) in displayed.into_iter().skip(range.start).take(range.end) {
                         let highlighted = selected.contains(entity);
                         if ui.selectable_label(
                             highlighted,
@@ -209,10 +214,6 @@ pub fn ui(
                                 false => commands.entity(entity).insert(actor::Selected),
                             };
                         }
-                    };
-                    match appdata.query.is_empty() {
-                        true => actors.iter().skip(range.start).take(range.end).for_each(label),
-                        false => matched.iter().skip(range.start).take(range.end).for_each(label),
                     }
                     ui.add_space(10.0);
                 })
