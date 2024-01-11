@@ -221,9 +221,10 @@ fn main() {
                                                                 |asset, _| Ok(extras::get_mesh_info(asset)?),
                                                             ).ok()
                                                         ) {
-                                                            Some((positions, indices, ..)) => {
+                                                            Some((positions, indices, uvs, ..)) => {
                                                                 registry.0.insert(path.clone(), meshes.add(Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList)
                                                                     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+                                                                    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>())
                                                                     .with_indices(Some(bevy::render::mesh::Indices::U32(indices)))));
                                                             }
                                                             None => {

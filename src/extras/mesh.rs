@@ -56,7 +56,7 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
             },
             format!("{name}.obj"),
         )?;
-        Ok(())
+        Ok::<_, unreal_asset::error::Error>(())
     };
     parse(
         include_bytes!("tests/A02_Outside_Castle.uasset").as_slice(),
@@ -75,7 +75,8 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
         include_bytes!("tests/SM_Cybercity_Hook_End.uexp").as_slice(),
         "SM_Cybercity_Hook_End",
         EngineVersion::VER_UE4_27,
-    )
+    )?;
+    Ok(())
 }
 
 // reference implementations:
@@ -88,7 +89,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
 ) -> io::Result<(
     Vec<bevy::math::Vec3>,
     Vec<u32>,
-    Vec<Vec<(f32, f32)>>,
+    Vec<Vec<bevy::math::Vec2>>,
     Vec<String>,
     Vec<(u32, u32)>,
 )> {
@@ -309,16 +310,19 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
         data: &mut io::Cursor<&[u8]>,
         num_tex_coords: u32,
         precise_uvs: bool,
-    ) -> Result<Vec<(f32, f32)>, io::Error> {
+    ) -> Result<Vec<bevy::math::Vec2>, io::Error> {
         let mut uvs = Vec::with_capacity(num_tex_coords as usize);
         for _ in 0..num_tex_coords {
-            uvs.push(match precise_uvs {
-                true => (data.read_f32::<LE>()?, data.read_f32::<LE>()?),
-                false => (
-                    half_to_single(data.read_u16::<LE>()?),
-                    half_to_single(data.read_u16::<LE>()?),
-                ),
-            })
+            uvs.push(
+                match precise_uvs {
+                    true => (data.read_f32::<LE>()?, data.read_f32::<LE>()?),
+                    false => (
+                        half_to_single(data.read_u16::<LE>()?),
+                        half_to_single(data.read_u16::<LE>()?),
+                    ),
+                }
+                .into(),
+            )
         }
         Ok(uvs)
     }
@@ -402,7 +406,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             }
         }
         false => {
-            //size
+            // size
             data.read_u32::<LE>()?;
             let mut indices = Vec::with_capacity(data.read_u32::<LE>()? as usize);
             for _ in 0..indices.capacity() {
