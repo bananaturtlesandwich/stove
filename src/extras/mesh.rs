@@ -59,20 +59,20 @@ fn parse_mesh() -> Result<(), unreal_asset::error::Error> {
         Ok(())
     };
     parse(
-        include_bytes!("A02_Outside_Castle.uasset").as_slice(),
-        include_bytes!("A02_Outside_Castle.uexp").as_slice(),
+        include_bytes!("tests/A02_Outside_Castle.uasset").as_slice(),
+        include_bytes!("tests/A02_Outside_Castle.uexp").as_slice(),
         "A02_Outside_Castle",
         EngineVersion::VER_UE4_25,
     )?;
     parse(
-        include_bytes!("AirKickPreRoom.uasset").as_slice(),
-        include_bytes!("AirKickPreRoom.uexp").as_slice(),
+        include_bytes!("tests/AirKickPreRoom.uasset").as_slice(),
+        include_bytes!("tests/AirKickPreRoom.uexp").as_slice(),
         "AirKickPreRoom",
         EngineVersion::VER_UE5_1,
     )?;
     parse(
-        include_bytes!("SM_Cybercity_Hook_End.uasset").as_slice(),
-        include_bytes!("SM_Cybercity_Hook_End.uexp").as_slice(),
+        include_bytes!("tests/SM_Cybercity_Hook_End.uasset").as_slice(),
+        include_bytes!("tests/SM_Cybercity_Hook_End.uexp").as_slice(),
         "SM_Cybercity_Hook_End",
         EngineVersion::VER_UE4_27,
     )
