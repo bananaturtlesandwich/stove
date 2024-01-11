@@ -10,27 +10,40 @@ use unreal_asset::{
 
 #[test]
 fn parse_tex() -> Result<(), unreal_asset::error::Error> {
-    let (x, y, rgba) = get_tex_info(
-        unreal_asset::Asset::new(
-            io::Cursor::new(include_bytes!("Basic_SplitRGB.uasset").as_slice()),
-            Some(io::Cursor::new(
-                include_bytes!("Basic_SplitRGB.uexp").as_slice(),
-            )),
-            EngineVersion::VER_UE4_25,
-            None,
-        )?,
-        Some(io::Cursor::new(
-            include_bytes!("Basic_SplitRGB.ubulk").as_slice(),
-        )),
+    let parse = |asset, exp, bulk: Option<_>, name, version| {
+        let (x, y, rgba) = get_tex_info(
+            unreal_asset::Asset::new(
+                io::Cursor::new(asset),
+                Some(io::Cursor::new(exp)),
+                version,
+                None,
+            )?,
+            bulk.map(io::Cursor::new),
+        )?;
+        let mut image = png::Encoder::new(std::fs::File::create(format!("{name}.png"))?, x, y);
+        image.set_color(png::ColorType::Rgba);
+        image.set_depth(png::BitDepth::Eight);
+        image
+            .write_header()
+            .unwrap()
+            .write_image_data(&rgba)
+            .unwrap();
+        Ok::<_, unreal_asset::error::Error>(())
+    };
+    // parse(
+    //     include_bytes!("tests/Basic_SplitRGB.uasset").as_slice(),
+    //     include_bytes!("tests/Basic_SplitRGB.uexp").as_slice(),
+    //     Some(include_bytes!("tests/Basic_SplitRGB.ubulk").as_slice()),
+    //     "Basic_SplitRGB",
+    //     EngineVersion::VER_UE4_25,
+    // )?;
+    parse(
+        include_bytes!("tests/moon0023.uasset").as_slice(),
+        include_bytes!("tests/moon0023.uexp").as_slice(),
+        None,
+        "moon",
+        EngineVersion::VER_UE5_1,
     )?;
-    let mut image = png::Encoder::new(std::fs::File::create("Basic_SplitRGB.png")?, x, y);
-    image.set_color(png::ColorType::Rgba);
-    image.set_depth(png::BitDepth::Eight);
-    image
-        .write_header()
-        .unwrap()
-        .write_image_data(&rgba)
-        .unwrap();
     Ok(())
 }
 

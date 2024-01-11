@@ -64,7 +64,7 @@ pub fn get<T>(
             "/Game",
             &format!("{}/Content", game_name(pak).unwrap_or_default()),
         )
-        .replace("/Engine", "Engine/Content");
+        .replace("/Engine/", "Engine/Content/");
     let make = |ext: &str| path.to_string() + ext;
     let (mesh, exp, bulk, uptnl) = (
         make(".uasset"),
