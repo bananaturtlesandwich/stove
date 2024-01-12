@@ -5,13 +5,12 @@ pub fn ui(
     mut appdata: ResMut<AppData>,
     mut commands: Commands,
     mut events: EventWriter<Events>,
-    mut notifs: ResMut<Notifs>,
+    mut notif: EventWriter<Notif>,
     // map: NonSendMut<Map>,
     actors: Query<(Entity, &actor::Actor)>,
     selected: Query<(Entity, &actor::Actor), With<actor::Selected>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
 ) {
-    notifs.0.show(ctx.ctx_mut());
     egui::SidePanel::left("sidepanel").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             ui.menu_button("file", |ui| {
@@ -141,16 +140,16 @@ pub fn ui(
                 if ui.button("clear cache").clicked() {
                     match config() {
                         Some(cache) => match std::fs::remove_dir_all(cache.join("cache")) {
-                            Ok(()) => events.send(Events::Notif {
+                            Ok(()) => notif.send(Notif {
                                 message: "cleared cache".into(),
                                 kind: egui_notify::ToastLevel::Info
                             }),
-                            Err(e) => events.send(Events::Notif {
+                            Err(e) => notif.send(Notif {
                                 message: e.to_string(),
                                 kind: egui_notify::ToastLevel::Error
                             }),
                         },
-                        None => events.send(Events::Notif {
+                        None => notif.send(Notif {
                             message: "cache does not exist".into(),
                             kind: egui_notify::ToastLevel::Warning
                         }),

@@ -16,11 +16,13 @@ type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
 struct Map(Option<(Asset, std::path::PathBuf)>);
 
 #[derive(Event)]
+struct Notif {
+    message: String,
+    kind: egui_notify::ToastLevel,
+}
+
+#[derive(Event)]
 enum Events {
-    Notif {
-        message: String,
-        kind: egui_notify::ToastLevel,
-    },
     Open(Option<std::path::PathBuf>),
     SaveAs(bool),
     AddPak,
@@ -92,9 +94,11 @@ fn main() {
             bevy_mod_raycast::deferred::DeferredRaycastingPlugin::<()>::default(),
         ))
         .insert_non_send_resource(Map(None))
+        .insert_resource(AmbientLight { color: Color::ANTIQUE_WHITE, brightness: 0.3 })
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
         .add_event::<Events>()
+        .add_event::<Notif>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
@@ -118,12 +122,18 @@ fn main() {
         // post update because egui isn't built until update
         .add_systems(PostUpdate, input::pick)
         .add_systems(PostUpdate, input::camera)
+        .add_systems(Update, |mut notif: EventReader<Notif>, mut notifs: ResMut<Notifs>, mut ctx: bevy_egui::EguiContexts| {
+            for Notif { message, kind } in notif.read() {
+                notifs.0.add(egui_notify::Toast::custom(message, kind.clone()));                
+            }
+            notifs.0.show(ctx.ctx_mut());
+        })
         .add_systems(
             Update,
             |mut commands: Commands,
              actors: Query<Entity, With<actor::Actor>>,
              mut events: EventReader<Events>,
-             mut notifs: ResMut<Notifs>,
+             mut notif: EventWriter<Notif>,
              mut appdata: ResMut<AppData>,
              mut map: NonSendMut<Map>,
              mut registry: ResMut<Registry>,
@@ -131,12 +141,8 @@ fn main() {
              mut materials: ResMut<Assets<StandardMaterial>>,
              mut images: ResMut<Assets<Image>>,
              consts: Res<Constants>| {
-                let mut queue = |message, kind| {
-                    notifs.0.add(egui_notify::Toast::custom(message, kind));
-                };
                 for event in events.read() {
                     match event {
-                        Events::Notif { message, kind } => queue(message.clone(), kind.clone()),
                         Events::Open(path) => {
                             let Some(path) = path.clone().or_else(|| rfd::FileDialog::new()
                                 .set_title("open map")
@@ -153,7 +159,12 @@ fn main() {
                                             Ok(key) if !appdata.aes.is_empty() => Some(key),
                                             Ok(_) => None,
                                             Err(_) => {
-                                                queue("aes key is invalid hex".into(), Warning);
+                                                notif.send(
+                                                    Notif {
+                                                        message: "aes key is invalid hex".into(),
+                                                        kind: Warning
+                                                    }
+                                                );
                                                 None
                                             }
                                         };
@@ -246,14 +257,16 @@ fn main() {
                                                                             ) {
                                                                                 Ok(o) => o,
                                                                                 Err(e) => {
-                                                                                    queue(
-                                                                                        format!(
-                                                                                            "{}: {e}",
-                                                                                            path.split('/')
-                                                                                                .last()
-                                                                                                .unwrap_or_default()
-                                                                                        ),
-                                                                                        Warning
+                                                                                    notif.send(
+                                                                                        Notif {
+                                                                                            message: format!(
+                                                                                                "{}: {e}",
+                                                                                                path.split('/')
+                                                                                                    .last()
+                                                                                                    .unwrap_or_default()
+                                                                                            ),
+                                                                                            kind: Warning
+                                                                                        }
                                                                                     );
                                                                                     // vec is rgba
                                                                                     (1, 1, vec![255, 50, 125, 255])
@@ -296,7 +309,11 @@ fn main() {
                                                                 ));
                                                             }
                                                             None => {
-                                                                queue(format!("mesh not found for {}", actor.name), Warning);
+                                                                notif.send(
+                                                                    Notif {
+                                                                        message: format!("mesh not found for {}", actor.name),
+                                                                        kind: Warning
+                                                                });
                                                                 actor.draw_type = actor::DrawType::Cube;
                                                             },
                                                         }
@@ -339,18 +356,38 @@ fn main() {
                                                     },
                                                 }
                                             }
-                                            Err(e) => queue(e.to_string(), Warning),
+                                            Err(e) => notif.send(
+                                                Notif {
+                                                    message: e.to_string(),
+                                                    kind: Warning
+                                                }
+                                            ),
                                         }
                                     }
                                     map.0 = Some((asset, path.clone()));
-                                    queue("map opened".into(), Success);
+                                    notif.send(
+                                    Notif {
+                                        message: "map opened".into(),
+                                        kind: Success
+                                    }
+                                );
                                 }
-                                Err(e) => queue(e.to_string(), Error),
+                                Err(e) => notif.send(
+                                    Notif {
+                                        message: e.to_string(),
+                                        kind: Error
+                                    }
+                                ),
                             }
                         }
                         Events::SaveAs(ask) => {
                             let Some((map, path)) = &mut map.0 else {
-                                queue("no map to save".into(), Error);
+                                notif.send(
+                                    Notif {
+                                        message: "no map to save".into(),
+                                        kind: Error
+                                    }
+                                );
                                 continue;
                             };
                             if *ask {
@@ -363,8 +400,18 @@ fn main() {
                                 }
                             }
                             match asset::save(map, path) {
-                                Ok(_) => queue("map saved".into(), Success),
-                                Err(e) => queue(e.to_string(), Error),
+                                Ok(_) => notif.send(
+                                    Notif {
+                                        message: "map saved".into(),
+                                        kind: Success
+                                    }
+                                ),
+                                Err(e) => notif.send(
+                                    Notif {
+                                        message: e.to_string(),
+                                        kind: Error
+                                    }
+                                )
                             }
                         }
                         Events::AddPak => {

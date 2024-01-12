@@ -9,7 +9,7 @@ pub fn set_icon(windows: NonSend<bevy::winit::WinitWindows>) {
     }
 }
 
-pub fn check_updates(mut events: EventWriter<Events>) {
+pub fn check_updates(mut notif: EventWriter<Notif>) {
     use update_informer::Check;
     if let Ok(Some(new)) = update_informer::new(
         update_informer::registry::GitHub,
@@ -18,7 +18,7 @@ pub fn check_updates(mut events: EventWriter<Events>) {
     )
     .check_version()
     {
-        events.send(Events::Notif {
+        notif.send(Notif {
             // yes i'm petty and hate the v prefix
             message: format!(
                 "{}.{}.{} now available!",
@@ -31,13 +31,13 @@ pub fn check_updates(mut events: EventWriter<Events>) {
     }
 }
 
-pub fn check_args(mut events: EventWriter<Events>) {
+pub fn check_args(mut notif: EventWriter<Notif>, mut events: EventWriter<Events>) {
     let Some(path) = std::env::args().nth(1) else {
         return;
     };
     let path = std::path::PathBuf::from(path);
     if !path.exists() {
-        events.send(Events::Notif {
+        notif.send(Notif {
             message: "the given path does not exist".into(),
             kind: Error,
         });
