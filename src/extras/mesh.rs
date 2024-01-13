@@ -244,7 +244,7 @@ pub fn get_mesh_info<C: io::Read + io::Seek>(
             data.read_f32::<LE>()?,
             data.read_f32::<LE>()?,
         );
-        positions.push(bevy::math::vec3(-x, z, y) * 0.01);
+        positions.push(bevy::math::vec3(x, z, y) * 0.01);
     }
 
     // vertex buffer
