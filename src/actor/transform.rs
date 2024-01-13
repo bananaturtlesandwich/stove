@@ -28,7 +28,7 @@ impl super::Actor {
                 })
             })
             .map(|pos| {
-                bevy::math::dvec3(-pos.value.x.0, pos.value.z.0, pos.value.y.0).as_vec3() * 0.01
+                bevy::math::dvec3(pos.value.x.0, pos.value.z.0, pos.value.y.0).as_vec3() * 0.01
             })
             .unwrap_or_default()
     }
@@ -52,7 +52,7 @@ impl super::Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 -= offset.x as f64;
+                        vec.value.x.0 += offset.x as f64;
                         vec.value.y.0 += offset.z as f64;
                         vec.value.z.0 += offset.y as f64;
                     }
