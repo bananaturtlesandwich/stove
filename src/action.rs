@@ -20,7 +20,7 @@ pub fn follow(
                     })
                 }
                 for (entity, actor) in selected.iter() {
-                    commands.entity(entity).remove::<actor::Selected>();
+                    commands.entity(entity).remove::<actor::SelectedBundle>();
                     let insert = unreal_asset::types::PackageIndex::new(
                         map.asset_data.exports.len() as i32 + 1,
                     );
@@ -34,7 +34,7 @@ pub fn follow(
                         actor::DrawType::Mesh(path) => {
                             let (mesh, material) = &registry.0[path];
                             commands.spawn((
-                                actor::Selected,
+                                actor::SelectedBundle::default(),
                                 MaterialMeshBundle {
                                     mesh: mesh.clone_weak(),
                                     material: material
@@ -51,7 +51,7 @@ pub fn follow(
                         actor::DrawType::Cube => {
                             commands
                                 .spawn((
-                                    actor::Selected,
+                                    actor::SelectedBundle::default(),
                                     PbrBundle {
                                         mesh: consts.bounds.clone_weak(),
                                         transform: actor.transform(map),

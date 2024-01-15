@@ -20,6 +20,28 @@ pub enum DrawType {
     Cube,
 }
 
+#[derive(bevy::prelude::Bundle)]
+pub struct SelectedBundle {
+    selected: Selected,
+    outline: bevy_mod_outline::OutlineBundle,
+}
+
+impl Default for SelectedBundle {
+    fn default() -> Self {
+        Self {
+            selected: Selected,
+            outline: bevy_mod_outline::OutlineBundle {
+                outline: bevy_mod_outline::OutlineVolume {
+                    visible: true,
+                    colour: bevy::prelude::Color::rgb(1.0, 1.0, 0.5),
+                    width: 15.0,
+                },
+                ..Default::default()
+            },
+        }
+    }
+}
+
 #[derive(bevy::prelude::Component)]
 pub struct Selected;
 

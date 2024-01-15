@@ -113,6 +113,8 @@ fn main() {
                 override_input_system: true,
             },
             bevy_mod_raycast::deferred::DeferredRaycastingPlugin::<()>::default(),
+            bevy_mod_outline::OutlinePlugin,
+            bevy_mod_outline::AutoGenerateOutlineNormalsPlugin,
         ))
         .init_non_send_resource::<Map>()
         .init_non_send_resource::<Transplant>()
