@@ -15,7 +15,11 @@ mod ui;
 
 type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
 
+#[derive(Default)]
 struct Map(Option<(Asset, std::path::PathBuf)>);
+
+#[derive(Default)]
+struct Transplant(Option<(Asset, Vec<actor::Actor>, Vec<usize>)>);
 
 #[derive(Event)]
 struct Notif {
@@ -27,7 +31,6 @@ struct Notif {
 enum Action {
     Duplicate,
     Delete,
-    Transplant,
 }
 
 #[derive(Event)]
@@ -35,6 +38,7 @@ enum Dialog {
     Open(Option<std::path::PathBuf>),
     SaveAs(bool),
     AddPak,
+    Transplant,
 }
 
 #[derive(Default, Resource)]
@@ -52,6 +56,12 @@ struct AppData {
     cache: bool,
     script: String,
     query: String,
+}
+
+impl AppData {
+    fn version(&self) -> unreal_asset::engine_version::EngineVersion {
+        VERSIONS[self.version].0
+    }
 }
 
 #[derive(Resource)]
@@ -104,7 +114,8 @@ fn main() {
             },
             bevy_mod_raycast::deferred::DeferredRaycastingPlugin::<()>::default(),
         ))
-        .insert_non_send_resource(Map(None))
+        .init_non_send_resource::<Map>()
+        .init_non_send_resource::<Transplant>()
         .insert_resource(AmbientLight {
             color: Color::ANTIQUE_WHITE,
             brightness: 0.3,

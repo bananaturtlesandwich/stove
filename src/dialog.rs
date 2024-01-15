@@ -7,6 +7,7 @@ pub fn respond(
     mut notif: EventWriter<Notif>,
     mut appdata: ResMut<AppData>,
     mut map: NonSendMut<Map>,
+    mut transplant: NonSendMut<Transplant>,
     mut registry: ResMut<Registry>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -24,7 +25,7 @@ pub fn respond(
                 }) else {
                     continue;
                 };
-                match asset::open(&path, VERSIONS[appdata.version].0) {
+                match asset::open(&path, appdata.version()) {
                     Ok(asset) => {
                         for actor in actors.iter() {
                             commands.entity(actor).despawn_recursive();
@@ -88,7 +89,7 @@ pub fn respond(
                         let cache = config()
                             .filter(|_| appdata.cache)
                             .map(|path| path.join("cache"));
-                        let version = VERSIONS[appdata.version].0;
+                        let version = appdata.version();
                         for i in actor::get_actors(&asset) {
                             match actor::Actor::new(&asset, i) {
                                 Ok(mut actor) => {
@@ -288,6 +289,30 @@ pub fn respond(
                     .and_then(|path| path.to_str().map(str::to_string))
                 {
                     appdata.paks.push(path)
+                }
+            }
+            Dialog::Transplant => {
+                let Some(path) = rfd::FileDialog::new()
+                    .set_title("open map")
+                    .add_filter("maps", &["umap"])
+                    .pick_file()
+                else {
+                    continue;
+                };
+                match asset::open(path, appdata.version()) {
+                    Ok(donor) => {
+                        // no need for verbose warnings here
+                        let actors: Vec<_> = actor::get_actors(&donor)
+                            .into_iter()
+                            .filter_map(|index| actor::Actor::new(&donor, index).ok())
+                            .collect();
+                        let selected = Vec::with_capacity(actors.len());
+                        transplant.0 = Some((donor, actors, selected));
+                    }
+                    Err(e) => notif.send(Notif {
+                        message: e.to_string(),
+                        kind: Error,
+                    }),
                 }
             }
         }
