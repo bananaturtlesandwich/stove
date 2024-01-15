@@ -17,6 +17,9 @@ pub fn shortcuts(
     if keys.just_released(KeyCode::Delete) {
         action.send(Action::Delete)
     }
+    if keys.just_released(KeyCode::T) && ctrl {
+        dialog.send(Dialog::Transplant)
+    }
 }
 
 pub fn pick(

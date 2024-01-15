@@ -7,6 +7,8 @@ pub fn ui(
     mut dialog: EventWriter<Dialog>,
     mut notif: EventWriter<Notif>,
     mut map: NonSendMut<Map>,
+    mut transplant: NonSendMut<Transplant>,
+    consts: Res<Constants>,
     actors: Query<(Entity, &actor::Actor)>,
     selected: Query<(Entity, &actor::Actor), With<actor::Selected>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
@@ -132,8 +134,8 @@ pub fn ui(
                 ui,
                 ui.text_style_height(&egui::TextStyle::Body),
                 match appdata.query.is_empty() {
-                    true => actors.iter().count(),
-                    false => matched.iter().count(),
+                    true => actors.iter().len(),
+                    false => matched.iter().len(),
                 },
                 |ui, range| ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
                     let mut displayed: Vec<_> = match appdata.query.is_empty() {
@@ -141,7 +143,7 @@ pub fn ui(
                         false => matched.iter().collect(),
                     };
                     displayed.sort_by_key(|(_, actor)| actor.export);
-                    for (entity, actor) in displayed.into_iter().skip(range.start).take(range.end) {
+                    for (entity, actor) in displayed.into_iter().skip(range.start).take(range.end - range.start) {
                         let highlighted = selected.contains(entity);
                         if ui.selectable_label(
                             highlighted,
@@ -176,6 +178,100 @@ pub fn ui(
                 });
         }
     });
+    let mut open = true;
+    let mut transplanted = None;
+    if let (Some((donor, others, selected)), Some((map, _))) = (&mut transplant.0, &mut map.0) {
+        egui::Window::new("transplant actor")
+            .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
+            .resizable(false)
+            .collapsible(false)
+            .open(&mut open)
+            .show(ctx.ctx_mut(), |ui| {
+                // putting the button below breaks the scroll area somehow
+                ui.add_enabled_ui(!selected.is_empty(), |ui| {
+                    if ui
+                        .vertical_centered_justified(|ui| ui.button("transplant selected"))
+                        .inner
+                        .clicked()
+                    {
+                        let len = actors.iter().len();
+                        transplanted = Some(len..len + selected.len());
+                        for actor in selected.iter().map(|i| &others[*i]) {
+                            let insert = unreal_asset::types::PackageIndex::new(
+                                map.asset_data.exports.len() as i32 + 1,
+                            );
+                            actor.transplant(map, donor);
+                            notif.send(Notif {
+                                message: format!("transplanted {}", actor.name),
+                                kind: Success,
+                            });
+                            let mut actor = actor::Actor::new(map, insert).unwrap();
+                            actor.draw_type = actor::DrawType::Cube;
+                            commands
+                                .spawn((
+                                    actor::Selected,
+                                    PbrBundle {
+                                        mesh: consts.bounds.clone_weak(),
+                                        transform: actor.transform(map),
+                                        visibility: Visibility::Hidden,
+                                        ..default()
+                                    },
+                                    bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                                    actor, // child because it's LineList which picking can't do
+                                ))
+                                .with_children(|parent| {
+                                    parent.spawn(PbrBundle {
+                                        mesh: consts.cube.clone_weak(),
+                                        visibility: Visibility::Visible,
+                                        ..default()
+                                    });
+                                });
+                        }
+                    }
+                });
+                egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
+                    ui,
+                    ui.text_style_height(&egui::TextStyle::Body),
+                    actors.iter().len(),
+                    |ui, range| {
+                        ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                            for (i, actor) in range.clone().zip(others[range].iter()) {
+                                if ui
+                                    .selectable_label(selected.contains(&i), &actor.name)
+                                    .on_hover_text(&actor.class)
+                                    .clicked()
+                                {
+                                    ui.input(|input| {
+                                        match selected.iter().position(|entry| entry == &i) {
+                                            Some(i) => {
+                                                selected.remove(i);
+                                            }
+                                            None if input.modifiers.shift
+                                                && selected
+                                                    .last()
+                                                    .is_some_and(|last| last != &i) =>
+                                            {
+                                                let last_selected = *selected.last().unwrap();
+                                                for i in match i < last_selected {
+                                                    true => i..last_selected,
+                                                    false => last_selected + 1..i + 1,
+                                                } {
+                                                    selected.push(i)
+                                                }
+                                            }
+                                            _ => selected.push(i),
+                                        }
+                                    })
+                                }
+                            }
+                        })
+                    },
+                );
+            });
+        if transplanted.is_some() || !open {
+            transplant.0 = None
+        }
+    }
 }
 
 fn shortcuts(ui: &mut egui::Ui) {

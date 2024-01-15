@@ -12,7 +12,7 @@ use unreal_asset::{
 mod delete;
 mod duplicate;
 mod transform;
-// mod transplant;
+mod transplant;
 mod ui;
 
 pub enum DrawType {

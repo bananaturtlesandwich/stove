@@ -25,7 +25,7 @@ pub fn follow(
                         map.asset_data.exports.len() as i32 + 1,
                     );
                     actor.duplicate(map);
-                    let new = actor::Actor::new(&map, insert).unwrap();
+                    let new = actor::Actor::new(map, insert).unwrap();
                     notif.send(Notif {
                         message: format!("{} duplicated", actor.name),
                         kind: Warning,
@@ -41,7 +41,7 @@ pub fn follow(
                                         .first()
                                         .map(Handle::clone_weak)
                                         .unwrap_or_default(),
-                                    transform: actor.transform(&map),
+                                    transform: actor.transform(map),
                                     ..default()
                                 },
                                 bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
@@ -54,7 +54,7 @@ pub fn follow(
                                     actor::Selected,
                                     PbrBundle {
                                         mesh: consts.bounds.clone_weak(),
-                                        transform: actor.transform(&map),
+                                        transform: actor.transform(map),
                                         visibility: Visibility::Hidden,
                                         ..default()
                                     },
@@ -88,7 +88,6 @@ pub fn follow(
                     commands.entity(entity).despawn_recursive()
                 }
             }
-            Action::Transplant => todo!(),
         }
     }
 }
