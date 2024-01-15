@@ -43,11 +43,13 @@ pub fn pick(
             KeyCode::ControlRight,
         ]) {
             for entity in selected.iter() {
-                commands.entity(entity).remove::<actor::Selected>();
+                commands.entity(entity).remove::<actor::SelectedBundle>();
             }
         }
         if let Some((entity, _)) = camera.single().get_nearest_intersection() {
-            commands.entity(entity).insert(actor::Selected);
+            commands
+                .entity(entity)
+                .insert(actor::SelectedBundle::default());
             if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
                 action.send(Action::Duplicate)
             }

@@ -153,13 +153,13 @@ pub fn ui(
                         .clicked() {
                             ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
                                 for (entity, _) in selected.iter() {
-                                    commands.entity(entity).remove::<actor::Selected>();
+                                    commands.entity(entity).remove::<actor::SelectedBundle>();
                                 }
                             });
                             match highlighted {
-                                true => commands.entity(entity).remove::<actor::Selected>(),
+                                true => commands.entity(entity).remove::<actor::SelectedBundle>(),
                                 // false if ui.input(|input| input.modifiers.shift) => todo!(),
-                                false => commands.entity(entity).insert(actor::Selected),
+                                false => commands.entity(entity).insert(actor::SelectedBundle::default()),
                             };
                         }
                     }
