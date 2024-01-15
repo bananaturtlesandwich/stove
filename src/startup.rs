@@ -46,7 +46,12 @@ pub fn check_args(mut notif: EventWriter<Notif>, mut dialog: EventWriter<Dialog>
     dialog.send(Dialog::Open(Some(path)))
 }
 
-pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+pub fn initialise(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+) {
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn((
@@ -87,5 +92,34 @@ pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
                 ]))),
         ),
         bounds: meshes.add(shape::Box::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5)).into()),
+        grid: materials.add(StandardMaterial {
+            base_color_texture: Some(images.add(Image {
+                data: include_bytes!("../assets/DefaultWhiteGrid.rgba").into(),
+                texture_descriptor: bevy::render::render_resource::TextureDescriptor {
+                    label: None,
+                    size: bevy::render::render_resource::Extent3d {
+                        width: 128,
+                        height: 128,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: bevy::render::render_resource::TextureDimension::D2,
+                    format: bevy::render::render_resource::TextureFormat::Rgba8Unorm,
+                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8Unorm],
+                },
+                sampler: bevy::render::texture::ImageSampler::Descriptor(
+                    bevy::render::texture::ImageSamplerDescriptor {
+                        address_mode_u: bevy::render::texture::ImageAddressMode::Repeat,
+                        address_mode_v: bevy::render::texture::ImageAddressMode::Repeat,
+                        address_mode_w: bevy::render::texture::ImageAddressMode::Repeat,
+                        ..default()
+                    },
+                ),
+                ..default()
+            })),
+            ..default()
+        }),
     })
 }
