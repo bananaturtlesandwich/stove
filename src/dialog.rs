@@ -3,7 +3,7 @@ use super::*;
 pub fn respond(
     mut commands: Commands,
     actors: Query<Entity, With<actor::Actor>>,
-    mut dialog: EventReader<Dialog>,
+    mut dialogs: EventReader<Dialog>,
     mut notif: EventWriter<Notif>,
     mut appdata: ResMut<AppData>,
     mut map: NonSendMut<Map>,
@@ -13,7 +13,7 @@ pub fn respond(
     mut images: ResMut<Assets<Image>>,
     consts: Res<Constants>,
 ) {
-    for event in dialog.read() {
+    for event in dialogs.read() {
         match event {
             Dialog::Open(path) => {
                 let Some(path) = path.clone().or_else(|| {
@@ -204,7 +204,7 @@ pub fn respond(
                                             commands.spawn((
                                                 MaterialMeshBundle {
                                                     mesh: mesh.clone_weak(),
-                                                    material: material.get(0).map(Handle::clone_weak).unwrap_or_default(),
+                                                    material: material.first().map(Handle::clone_weak).unwrap_or_default(),
                                                     transform: actor.transform(&asset),
                                                     ..default()
                                                 },

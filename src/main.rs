@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(clippy::type_complexity, clippy::too_many_arguments)]
+#![allow(clippy::type_complexity, clippy::too_many_arguments, clippy::unit_arg)]
 use bevy::prelude::*;
 use egui_notify::ToastLevel::{Error, Info, Success, Warning};
 
+mod action;
 mod actor;
 mod asset;
 mod dialog;
@@ -20,6 +21,13 @@ struct Map(Option<(Asset, std::path::PathBuf)>);
 struct Notif {
     message: String,
     kind: egui_notify::ToastLevel,
+}
+
+#[derive(Event)]
+enum Action {
+    Duplicate,
+    Delete,
+    Transplant,
 }
 
 #[derive(Event)]
@@ -103,8 +111,9 @@ fn main() {
         })
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
-        .add_event::<Dialog>()
         .add_event::<Notif>()
+        .add_event::<Action>()
+        .add_event::<Dialog>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
@@ -142,6 +151,7 @@ fn main() {
             },
         )
         .add_systems(Update, dialog::respond)
+        .add_systems(Update, action::follow)
         .run();
 }
 

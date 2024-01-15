@@ -9,7 +9,7 @@ use unreal_asset::{
     Asset,
 };
 
-// mod delete;
+mod delete;
 // mod duplicate;
 mod transform;
 // mod transplant;
