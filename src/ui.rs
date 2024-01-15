@@ -4,9 +4,9 @@ pub fn ui(
     mut ctx: bevy_egui::EguiContexts,
     mut appdata: ResMut<AppData>,
     mut commands: Commands,
-    mut events: EventWriter<Events>,
+    mut dialog: EventWriter<Dialog>,
     mut notif: EventWriter<Notif>,
-    // map: NonSendMut<Map>,
+    mut map: NonSendMut<Map>,
     actors: Query<(Entity, &actor::Actor)>,
     selected: Query<(Entity, &actor::Actor), With<actor::Selected>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
@@ -18,21 +18,21 @@ pub fn ui(
                     .add(egui::Button::new("open").shortcut_text("ctrl + o"))
                     .clicked()
                 {
-                    events.send(Events::Open(None));
+                    dialog.send(Dialog::Open(None));
                     ui.close_menu();
                 }
                 if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
                     .clicked()
                 {
-                    events.send(Events::SaveAs(false));
+                    dialog.send(Dialog::SaveAs(false));
                     ui.close_menu();
                 }
                 if ui
                     .add(egui::Button::new("save as").shortcut_text("ctrl + shift + s"))
                     .clicked()
                 {
-                    events.send(Events::SaveAs(true));
+                    dialog.send(Dialog::SaveAs(true));
                     ui.close_menu();
                 }
             });
@@ -66,7 +66,7 @@ pub fn ui(
                     .add(egui::Button::new("add pak folder").shortcut_text("alt + o"))
                     .clicked()
                 {
-                    events.send(Events::AddPak)
+                    dialog.send(Dialog::AddPak)
                 }
             });
             ui.menu_button("options", |ui| {
@@ -79,60 +79,7 @@ pub fn ui(
                         ui.label(egui::special_emojis::GITHUB.to_string());
                     });
                 });
-                ui.menu_button("shortcuts", |ui|{
-                    let mut section = |heading: &str, bindings: &[(&str,&str)]| {
-                        ui.menu_button(heading, |ui| {
-                            egui::Grid::new(heading).striped(true).show(ui, |ui| {
-                                for (action, binding) in bindings {
-                                    ui.label(*action);
-                                    ui.label(*binding);
-                                    ui.end_row();
-                                }
-                            })
-                        })
-                    };
-                    section(
-                        "file",
-                        &[
-                            ("open","ctrl + o"),
-                            ("save", "ctrl + s"),
-                            ("save as","ctrl + shift + s"),
-                            ("add pak folder", "alt + o")
-                        ]
-                    );
-                    section(
-                        "camera",
-                        &[
-                            ("move","w + a + s + d"),
-                            ("rotate", "right-drag"),
-                            ("change speed", "scroll"),
-                        ]
-                    );
-                    section(
-                        "viewport",
-                        &[
-                            ("toggle fullscreen", "alt + enter"),
-                            ("hide ui", "h"),
-                            ("select", "left-click"),
-                            ("transplant", "ctrl + t")
-                        ]
-                    );
-                    section(
-                        "actor",
-                        &[
-                            ("focus", "f"),
-                            ("move", "left-drag"),
-                            ("rotate", "right-drag"),
-                            ("scale", "middle-drag"),
-                            ("copy location", "ctrl + c"),
-                            ("paste location", "ctrl + v"),
-                            ("duplicate", "alt + left-drag"),
-                            ("delete", "delete"),
-                            ("lock x / y / z axis", "x / y / z"),
-                            ("lock x / y / z plane", "shift + x / y / z"),
-                        ]
-                    )
-                });
+                ui.menu_button("shortcuts", shortcuts);
                 ui.horizontal(|ui|{
                     ui.label("cache meshes:");
                     ui.add(egui::Checkbox::without_text(&mut appdata.cache));
@@ -166,7 +113,6 @@ pub fn ui(
                 ui.text_edit_multiline(&mut appdata.script);
             });
         });
-        // let Some((map, _)) = &mut map.0 else { return };
         if ui.add(egui::TextEdit::singleline(&mut appdata.query).hint_text("🔎 search actors")).changed() {
             for (entity, _) in matched.iter() {
                 commands.entity(entity).remove::<actor::Matched>();
@@ -178,7 +124,8 @@ pub fn ui(
             }
         }
         ui.add_space(10.0);
-        ui.push_id("actors", |ui| egui::ScrollArea::both()
+        egui::ScrollArea::both()
+            .id_source("actors")
             .auto_shrink([false, true])
             .max_height(ui.available_height() * 0.5)
             .show_rows(
@@ -214,9 +161,74 @@ pub fn ui(
                             };
                         }
                     }
+                    // otherwise the scroll area bugs out at the bottom
                     ui.add_space(10.0);
                 })
-            )
-        );
+            );
+        if let (Ok((_, actor)), Some((map, _))) = (selected.get_single(), &mut map.0) {
+            egui::ScrollArea::both()
+                .id_source("properties")
+                .auto_shrink([false; 2])
+                .show(ui, |ui| {
+                    actor.show(map, ui);
+                    // otherwise the scroll area bugs out at the bottom
+                    ui.add_space(10.0);
+                });
+        }
     });
+}
+
+fn shortcuts(ui: &mut egui::Ui) {
+    let mut section = |heading: &str, bindings: &[(&str, &str)]| {
+        ui.menu_button(heading, |ui| {
+            egui::Grid::new(heading).striped(true).show(ui, |ui| {
+                for (action, binding) in bindings {
+                    ui.label(*action);
+                    ui.label(*binding);
+                    ui.end_row();
+                }
+            })
+        })
+    };
+    section(
+        "file",
+        &[
+            ("open", "ctrl + o"),
+            ("save", "ctrl + s"),
+            ("save as", "ctrl + shift + s"),
+            ("add pak folder", "alt + o"),
+        ],
+    );
+    section(
+        "camera",
+        &[
+            ("move", "w + a + s + d"),
+            ("rotate", "right-drag"),
+            ("change speed", "scroll"),
+        ],
+    );
+    section(
+        "viewport",
+        &[
+            ("toggle fullscreen", "alt + enter"),
+            ("hide ui", "h"),
+            ("select", "left-click"),
+            ("transplant", "ctrl + t"),
+        ],
+    );
+    section(
+        "actor",
+        &[
+            ("focus", "f"),
+            ("move", "left-drag"),
+            ("rotate", "right-drag"),
+            ("scale", "middle-drag"),
+            ("copy location", "ctrl + c"),
+            ("paste location", "ctrl + v"),
+            ("duplicate", "alt + left-drag"),
+            ("delete", "delete"),
+            ("lock x / y / z axis", "x / y / z"),
+            ("lock x / y / z plane", "shift + x / y / z"),
+        ],
+    );
 }

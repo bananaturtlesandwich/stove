@@ -1,13 +1,13 @@
 use super::*;
 
-pub fn shortcuts(mut events: EventWriter<Events>, keys: Res<Input<KeyCode>>) {
+pub fn shortcuts(mut dialog: EventWriter<Dialog>, keys: Res<Input<KeyCode>>) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     if keys.just_released(KeyCode::O) && ctrl {
-        events.send(Events::Open(None))
+        dialog.send(Dialog::Open(None))
     }
     if keys.just_released(KeyCode::S) && ctrl {
-        events.send(Events::SaveAs(shift))
+        dialog.send(Dialog::SaveAs(shift))
     }
 }
 
