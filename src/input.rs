@@ -6,14 +6,15 @@ pub fn shortcuts(
     keys: Res<Input<KeyCode>>,
 ) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-    let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     if keys.just_released(KeyCode::O) && ctrl {
         dialog.send(Dialog::Open(None))
     }
     if keys.just_released(KeyCode::S) && ctrl {
-        dialog.send(Dialog::SaveAs(shift))
+        dialog.send(Dialog::SaveAs(
+            keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
+        ))
     }
-    if keys.just_pressed(KeyCode::Delete) {
+    if keys.just_released(KeyCode::Delete) {
         action.send(Action::Delete)
     }
 }
@@ -25,12 +26,13 @@ pub fn pick(
     camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
     selected: Query<Entity, With<actor::Selected>>,
     mut ctx: bevy_egui::EguiContexts,
+    mut action: EventWriter<Action>,
 ) {
     // EguiContexts isn't a ReadOnlySystemParam so can't make into a conditional
     if ctx.ctx_mut().is_pointer_over_area() {
         return;
     }
-    if mouse.just_released(MouseButton::Left) {
+    if mouse.just_pressed(MouseButton::Left) {
         if !keys.any_pressed([
             KeyCode::ShiftLeft,
             KeyCode::ShiftRight,
@@ -43,6 +45,9 @@ pub fn pick(
         }
         if let Some((entity, _)) = camera.single().get_nearest_intersection() {
             commands.entity(entity).insert(actor::Selected);
+            if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+                action.send(Action::Duplicate)
+            }
         }
     }
 }
