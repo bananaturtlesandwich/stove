@@ -31,7 +31,7 @@ pub fn check_updates(mut notif: EventWriter<Notif>) {
     }
 }
 
-pub fn check_args(mut notif: EventWriter<Notif>, mut events: EventWriter<Events>) {
+pub fn check_args(mut notif: EventWriter<Notif>, mut dialog: EventWriter<Dialog>) {
     let Some(path) = std::env::args().nth(1) else {
         return;
     };
@@ -43,7 +43,7 @@ pub fn check_args(mut notif: EventWriter<Notif>, mut events: EventWriter<Events>
         });
         return;
     }
-    events.send(Events::Open(Some(path)))
+    dialog.send(Dialog::Open(Some(path)))
 }
 
 pub fn initialise(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {

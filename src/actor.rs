@@ -13,7 +13,7 @@ use unreal_asset::{
 // mod duplicate;
 mod transform;
 // mod transplant;
-// mod ui;
+mod ui;
 
 pub enum DrawType {
     Mesh(String),
