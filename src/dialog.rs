@@ -133,7 +133,7 @@ pub fn respond(
                                                                                     Ok(extras::get_tex_info(tex, bulk)?)
                                                                                 },
                                                                             ) {
-                                                                                Ok(o) => o,
+                                                                                Ok(o) => Some(o),
                                                                                 Err(e) => {
                                                                                     notif.send(
                                                                                         Notif {
@@ -146,11 +146,10 @@ pub fn respond(
                                                                                             kind: Warning
                                                                                         }
                                                                                     );
-                                                                                    // vec is rgba
-                                                                                    (1, 1, vec![255, 50, 125, 255])
+                                                                                    None
                                                                                 }
                                                                             },
-                                                                            _ => (1, 1, vec![125, 50, 255, 255]),
+                                                                            _ => None,
                                                                         }
                                                                     })
                                                                     .collect();
@@ -158,11 +157,11 @@ pub fn respond(
                                                         meshes.add(
                                                             Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList)
                                                                 .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-                                                        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>())
+                                                                .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>())
                                                                 .with_indices(Some(bevy::render::mesh::Indices::U32(indices)))
                                                         ),
-                                                        mats.into_iter().map(|(width, height, data)| {
-                                                            materials.add(StandardMaterial{
+                                                        mats.into_iter().flatten().map(|(width, height, data)| {
+                                                            materials.add(StandardMaterial {
                                                                 base_color_texture: Some(images.add(Image {
                                                                     data,
                                                                     texture_descriptor: bevy::render::render_resource::TextureDescriptor {
@@ -179,6 +178,14 @@ pub fn respond(
                                                                         usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
                                                                         view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8Unorm],
                                                                     },
+                                                                    sampler: bevy::render::texture::ImageSampler::Descriptor(
+                                                                        bevy::render::texture::ImageSamplerDescriptor {
+                                                                            address_mode_u: bevy::render::texture::ImageAddressMode::Repeat,
+                                                                            address_mode_v: bevy::render::texture::ImageAddressMode::Repeat,
+                                                                            address_mode_w: bevy::render::texture::ImageAddressMode::Repeat,
+                                                                            ..default()
+                                                                        },
+                                                                    ),
                                                                     ..default()
                                                                 })),
                                                                 ..default()
@@ -205,7 +212,7 @@ pub fn respond(
                                             commands.spawn((
                                                 MaterialMeshBundle {
                                                     mesh: mesh.clone_weak(),
-                                                    material: material.first().map(Handle::clone_weak).unwrap_or_default(),
+                                                    material: material.first().map(Handle::clone_weak).unwrap_or(consts.grid.clone_weak()),
                                                     transform: actor.transform(&asset),
                                                     ..default()
                                                 },

@@ -68,6 +68,7 @@ impl AppData {
 struct Constants {
     cube: Handle<Mesh>,
     bounds: Handle<Mesh>,
+    grid: Handle<StandardMaterial>,
 }
 
 enum Wrapper {

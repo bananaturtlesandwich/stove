@@ -40,7 +40,7 @@ pub fn follow(
                                     material: material
                                         .first()
                                         .map(Handle::clone_weak)
-                                        .unwrap_or_default(),
+                                        .unwrap_or(consts.grid.clone_weak()),
                                     transform: actor.transform(map),
                                     ..default()
                                 },
