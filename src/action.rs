@@ -5,9 +5,11 @@ pub fn follow(
     mut notif: EventWriter<Notif>,
     mut commands: Commands,
     mut map: NonSendMut<Map>,
-    selected: Query<(Entity, &actor::Actor), With<actor::Selected>>,
+    mut focus: ResMut<Focus>,
     registry: Res<Registry>,
     consts: Res<Constants>,
+    selected: Query<(Entity, &actor::Actor, &Transform), With<actor::Selected>>,
+    mut camera: Query<&mut smooth_bevy_cameras::LookTransform, With<Camera3d>>,
 ) {
     let Some((map, _)) = &mut map.0 else { return };
     for action in actions.read() {
@@ -19,7 +21,7 @@ pub fn follow(
                         kind: Warning,
                     })
                 }
-                for (entity, actor) in selected.iter() {
+                for (entity, actor, ..) in selected.iter() {
                     commands.entity(entity).remove::<actor::SelectedBundle>();
                     let insert = unreal_asset::types::PackageIndex::new(
                         map.asset_data.exports.len() as i32 + 1,
@@ -79,7 +81,7 @@ pub fn follow(
                         kind: Warning,
                     })
                 }
-                for (entity, actor) in selected.iter() {
+                for (entity, actor, ..) in selected.iter() {
                     actor.delete(map);
                     notif.send(Notif {
                         message: format!("{} deleted", actor.name),
@@ -88,6 +90,32 @@ pub fn follow(
                     commands.entity(entity).despawn_recursive()
                 }
             }
+            Action::Focus => {
+                if selected.is_empty() {
+                    notif.send(Notif {
+                        message: "no actors to focus".into(),
+                        kind: Warning,
+                    })
+                }
+                let (mut pos, mut sca) = selected
+                    .iter()
+                    .fold((Vec3::ZERO, Vec3::ZERO), |(pos, sca), (_, _, trans)| {
+                        (pos + trans.translation, sca + trans.scale)
+                    });
+                let len = selected.iter().len() as f32;
+                pos /= len;
+                sca /= len;
+                camera.single_mut().target = pos;
+                focus.0 = Some(
+                    pos - camera.single().look_direction().unwrap_or_default() * sca.length() * 5.0,
+                )
+            }
         }
+    }
+    let Some(target) = focus.0 else { return };
+    let trans = &mut camera.single_mut().eye;
+    *trans += target - *trans;
+    if trans.distance(target) < 1.0 {
+        focus.0 = None
     }
 }

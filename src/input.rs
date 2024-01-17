@@ -20,6 +20,9 @@ pub fn shortcuts(
     if keys.just_released(KeyCode::T) && ctrl {
         dialog.send(Dialog::Transplant)
     }
+    if keys.just_released(KeyCode::F) {
+        action.send(Action::Focus)
+    }
 }
 
 pub fn pick(
