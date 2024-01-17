@@ -31,6 +31,7 @@ struct Notif {
 enum Action {
     Duplicate,
     Delete,
+    Focus,
 }
 
 #[derive(Event)]
@@ -46,6 +47,9 @@ struct Notifs(egui_notify::Toasts);
 
 #[derive(Default, Resource)]
 struct Registry(std::collections::BTreeMap<String, (Handle<Mesh>, Vec<Handle<StandardMaterial>>)>);
+
+#[derive(Default, Resource)]
+struct Focus(Option<Vec3>);
 
 #[derive(Default, Resource)]
 struct AppData {
@@ -125,6 +129,7 @@ fn main() {
         })
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
+        .init_resource::<Focus>()
         .add_event::<Notif>()
         .add_event::<Action>()
         .add_event::<Dialog>()
