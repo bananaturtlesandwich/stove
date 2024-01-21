@@ -147,22 +147,14 @@ fn fname(ui: &mut egui::Ui, name: &mut FName) {
         FName::Backed {
             index, name_map, ..
         } => {
-            let mut map = name_map.get_mut();
             // inline text() to get the response
-            let res = egui::TextEdit::singleline(map.get_name_reference_mut(*index))
+            let res = egui::TextEdit::singleline(name_map.get_mut().get_name_reference_mut(*index))
                 .clip_text(false)
                 .show(ui)
                 .response;
-            drop(map);
             if res.gained_focus() {
                 let content = name_map.get_ref().get_owned_name(*index);
-                // create a unique fname for editing which shouldn't be used otherwise
                 let i = name_map.get_mut().add_name_reference(content, true);
-                let f = name_map.get_ref().create_fname(i, -1);
-                *name = f;
-            } else if res.lost_focus() {
-                let content = name_map.get_ref().get_owned_name(*index);
-                let i = name_map.get_mut().add_name_reference(content, false);
                 let f = name_map.get_ref().create_fname(i, 0);
                 *name = f;
             }
