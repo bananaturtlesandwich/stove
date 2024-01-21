@@ -1,17 +1,12 @@
-use unreal_asset::{
-    cast,
-    exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    reader::archive_trait::ArchiveTrait,
-    types::{fname::ToSerializedName, PackageIndex},
-    Import,
-};
+use super::*;
+use unreal_asset::{cast, types::fname::ToSerializedName, Import};
 
-impl super::Actor {
+impl Actor {
     pub fn transplant(&self, recipient: &mut crate::Asset, donor: &crate::Asset) {
         let mut children = self.get_actor_exports(donor, recipient.asset_data.exports.len());
 
         // make sure the actor has a unique object name
-        super::give_unique_name(
+        give_unique_name(
             &mut children[0].get_base_export_mut().object_name,
             recipient,
         );
@@ -105,7 +100,7 @@ impl super::Actor {
             .filter_map(ExportNormalTrait::get_normal_export_mut)
             .flat_map(|norm| &mut norm.properties)
         {
-            super::on_props(prop, &mut |prop| {
+            on_props(prop, &mut |prop| {
                 recipient.add_name_reference(prop.to_serialized_name(), false);
             })
         }
@@ -165,7 +160,7 @@ impl super::Actor {
 fn on_import_refs(export: &mut Export, func: &mut impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
-            super::on_prop_refs(prop, func);
+            on_prop_refs(prop, func);
         }
     }
     let export = export.get_base_export_mut();

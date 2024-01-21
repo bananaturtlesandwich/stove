@@ -24,7 +24,6 @@ bevy = { version = "0.12", default-features = false, features = [
     "bevy_pbr",
     "bevy_render",
     "multi-threaded",
-    "dynamic_linking"
 ] }
 winit = "0.28"
 bevy_mod_raycast = { version = "0.16", default-features = false }

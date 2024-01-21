@@ -1,24 +1,30 @@
-use unreal_asset::{
-    exports::{Export, ExportBaseTrait, ExportNormalTrait},
-    properties::{
-        array_property::ArrayProperty, int_property::BytePropertyValue,
-        object_property::SoftObjectPath, soft_path_property::SoftObjectPathPropertyValue, Property,
-        PropertyDataTrait,
-    },
-    types::fname::{FName, ToSerializedName},
+use super::*;
+use unreal_asset::properties::{
+    array_property::ArrayProperty, int_property::BytePropertyValue,
+    object_property::SoftObjectPath, soft_path_property::SoftObjectPathPropertyValue,
 };
+use unreal_asset::types::fname::ToSerializedName;
 
-impl super::Actor {
-    pub fn show(&self, asset: &mut crate::Asset, ui: &mut egui::Ui) {
+impl Actor {
+    pub fn show(
+        &self,
+        asset: &mut crate::Asset,
+        ui: &mut egui::Ui,
+        transform: &mut bevy::prelude::Transform,
+    ) {
         ui.heading(&self.name);
-        fn export(ui: &mut egui::Ui, export: &mut Export) {
+        fn export(
+            ui: &mut egui::Ui,
+            export: &mut Export,
+            transform: &mut bevy::prelude::Transform,
+        ) {
             if let Some(norm) = export.get_normal_export_mut() {
                 for prop in norm.properties.iter_mut() {
-                    property(ui, prop);
+                    property(ui, prop, transform);
                 }
             }
         }
-        export(ui, &mut asset.asset_data.exports[self.export]);
+        export(ui, &mut asset.asset_data.exports[self.export], transform);
         for i in asset.asset_data.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
@@ -36,7 +42,9 @@ impl super::Actor {
                 };
                 let response = ui
                     .push_id(id, |ui| {
-                        ui.collapsing(egui::RichText::new(name).strong(), |ui| export(ui, ex))
+                        ui.collapsing(egui::RichText::new(name).strong(), |ui| {
+                            export(ui, ex, transform)
+                        })
                     })
                     .response;
                 if let Some(import) = asset.imports.get(index as usize) {
@@ -74,10 +82,14 @@ fn option<T>(
     });
 }
 
-fn array_property(ui: &mut egui::Ui, arr: &mut ArrayProperty) {
+fn array_property(
+    ui: &mut egui::Ui,
+    arr: &mut ArrayProperty,
+    transform: &mut bevy::prelude::Transform,
+) {
     ui.collapsing("", |ui| {
         for (i, entry) in arr.value.iter_mut().enumerate() {
-            ui.push_id(i, |ui| property(ui, entry));
+            ui.push_id(i, |ui| property(ui, entry, transform));
         }
     });
 }
@@ -124,10 +136,6 @@ fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) {
             .clamp_range(Num::MIN..=Num::MAX)
             .speed(1.0),
     );
-}
-
-fn drag_angle(ui: &mut egui::Ui, val: &mut f64) {
-    ui.add(egui::widgets::DragValue::new(val).suffix("°"));
 }
 
 fn text(ui: &mut egui::Ui, val: &mut String) {
@@ -181,7 +189,7 @@ fn soft_property(ui: &mut egui::Ui, path: &mut SoftObjectPathPropertyValue) {
     }
 }
 
-fn property(ui: &mut egui::Ui, prop: &mut Property) {
+fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelude::Transform) {
     if let Property::ObjectProperty(_) = prop {
         return;
     }
@@ -235,7 +243,39 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                             vector!(ui, point.value.x, point.value.y)
                         }
                         Property::VectorProperty(vec) => {
-                            vector!(ui, vec.value.x.0, vec.value.y.0, vec.value.z.0)
+                            let mut drag = |num| {
+                                ui.add(
+                                    egui::widgets::DragValue::new(num)
+                                        .clamp_range(f64::MIN..=f64::MAX)
+                                        .speed(1.0),
+                                )
+                            };
+                            if (drag(&mut vec.value.x.0)
+                                | drag(&mut vec.value.y.0)
+                                | drag(&mut vec.value.z.0))
+                            .changed()
+                            {
+                                vec.name.get_content(|name| match name {
+                                    LOCATION => {
+                                        transform.translation = bevy::math::dvec3(
+                                            vec.value.x.0,
+                                            vec.value.z.0,
+                                            vec.value.y.0,
+                                        )
+                                        .as_vec3()
+                                            * 0.01
+                                    }
+                                    SCALE => {
+                                        transform.scale = bevy::math::dvec3(
+                                            vec.value.x.0,
+                                            vec.value.z.0,
+                                            vec.value.y.0,
+                                        )
+                                        .as_vec3()
+                                    }
+                                    _ => (),
+                                })
+                            }
                         }
                         Property::Vector4Property(vec) => vector!(
                             ui,
@@ -264,9 +304,22 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                         ),
 
                         Property::RotatorProperty(rot) => {
-                            drag_angle(ui, &mut rot.value.x);
-                            drag_angle(ui, &mut rot.value.y);
-                            drag_angle(ui, &mut rot.value.z);
+                            let mut drag =
+                                |num| ui.add(egui::widgets::DragValue::new(num).suffix("°"));
+                            if (drag(&mut rot.value.x.0)
+                                | drag(&mut rot.value.y.0)
+                                | drag(&mut rot.value.z.0))
+                            .changed()
+                                && rot.name == ROTATION
+                            {
+                                transform.rotation = bevy::math::DQuat::from_euler(
+                                    bevy::math::EulerRot::XYZ,
+                                    rot.value.x.0.to_radians(),
+                                    rot.value.y.0.to_radians(),
+                                    rot.value.z.0.to_radians(),
+                                )
+                                .as_f32()
+                            }
                         }
                         Property::LinearColorProperty(col) => {
                             let mut buf =
@@ -294,12 +347,12 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                                 drag(ui, val)
                             }
                         }
-                        Property::SetProperty(set) => array_property(ui, &mut set.value),
-                        Property::ArrayProperty(arr) => array_property(ui, arr),
+                        Property::SetProperty(set) => array_property(ui, &mut set.value, transform),
+                        Property::ArrayProperty(arr) => array_property(ui, arr, transform),
                         Property::MapProperty(map) => {
                             ui.collapsing("", |ui| {
                                 for (i, value) in map.value.values_mut().enumerate() {
-                                    ui.push_id(i, |ui| property(ui, value));
+                                    ui.push_id(i, |ui| property(ui, value, transform));
                                 }
                             });
                         }
@@ -358,7 +411,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property) {
                         Property::StructProperty(str) => {
                             ui.collapsing("", |ui| {
                                 for (i, val) in str.value.iter_mut().enumerate() {
-                                    ui.push_id(i, |ui| property(ui, val));
+                                    ui.push_id(i, |ui| property(ui, val, transform));
                                 }
                             });
                         }
