@@ -1,18 +1,13 @@
-use unreal_asset::{
-    cast,
-    exports::{Export, ExportBaseTrait},
-    types::PackageIndex,
-    Asset,
-};
+use super::*;
 
-impl super::Actor {
+impl Actor {
     /// adds an actor to a map where the actor is already present
     pub fn duplicate(&self, asset: &mut Asset<std::io::BufReader<std::fs::File>>) {
         let len = asset.asset_data.exports.len();
         let mut children = self.get_actor_exports(asset, len);
 
         // make sure the actor has a unique object name
-        super::give_unique_name(&mut children[0].get_base_export_mut().object_name, asset);
+        give_unique_name(&mut children[0].get_base_export_mut().object_name, asset);
 
         let actor_ref = PackageIndex::new(len as i32 + 1);
         // add the actor to persistent level

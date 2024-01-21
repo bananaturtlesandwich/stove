@@ -15,6 +15,10 @@ mod transform;
 mod transplant;
 mod ui;
 
+pub const LOCATION: &str = "RelativeLocation";
+pub const ROTATION: &str = "RelativeRotation";
+pub const SCALE: &str = "RelativeScale3D";
+
 pub enum DrawType {
     Mesh(String),
     Cube,
@@ -144,7 +148,7 @@ impl Actor {
         for prop in norm.properties.iter().rev() {
             match prop.get_name().get_owned_content().as_str() {
                 // of course this wouldn't be able to be detected if all transforms were left default
-                "RelativeLocation" | "RelativeRotation" | "RelativeScale3D" => {
+                LOCATION | ROTATION | SCALE => {
                     return Ok(Self {
                         export,
                         transform: export,

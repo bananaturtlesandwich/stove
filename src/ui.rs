@@ -10,7 +10,7 @@ pub fn ui(
     mut transplant: NonSendMut<Transplant>,
     consts: Res<Constants>,
     actors: Query<(Entity, &actor::Actor)>,
-    selected: Query<(Entity, &actor::Actor), With<actor::Selected>>,
+    mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
 ) {
     egui::SidePanel::left("sidepanel").show(ctx.ctx_mut(), |ui| {
@@ -152,7 +152,7 @@ pub fn ui(
                         .on_hover_text(&actor.class)
                         .clicked() {
                             ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
-                                for (entity, _) in selected.iter() {
+                                for (entity, ..) in selected.iter() {
                                     commands.entity(entity).remove::<actor::SelectedBundle>();
                                 }
                             });
@@ -167,12 +167,12 @@ pub fn ui(
                     ui.add_space(10.0);
                 })
             );
-        if let (Ok((_, actor)), Some((map, _))) = (selected.get_single(), &mut map.0) {
+        if let (Ok((_, actor, mut transform)), Some((map, _))) = (selected.get_single_mut(), &mut map.0) {
             egui::ScrollArea::both()
                 .id_source("properties")
                 .auto_shrink([false; 2])
                 .show(ui, |ui| {
-                    actor.show(map, ui);
+                    actor.show(map, ui, &mut transform);
                     // otherwise the scroll area bugs out at the bottom
                     ui.add_space(10.0);
                 });

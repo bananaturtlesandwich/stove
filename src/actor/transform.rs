@@ -1,19 +1,13 @@
+use super::*;
 use unreal_asset::{
-    cast,
-    exports::ExportNormalTrait,
     properties::{
         struct_property::StructProperty,
         vector_property::{RotatorProperty, VectorProperty},
-        Property, PropertyDataTrait,
     },
     types::vector::Vector,
 };
 
-pub const LOCATION: &str = "RelativeLocation";
-pub const ROTATION: &str = "RelativeRotation";
-pub const SCALE: &str = "RelativeScale3D";
-
-impl super::Actor {
+impl Actor {
     pub fn location(&self, map: &crate::Asset) -> bevy::math::Vec3 {
         map.asset_data.exports[self.transform]
             .get_normal_export()
@@ -31,12 +25,6 @@ impl super::Actor {
                 bevy::math::dvec3(pos.value.x.0, pos.value.z.0, pos.value.y.0).as_vec3() * 0.01
             })
             .unwrap_or_default()
-    }
-
-    pub fn coords(&self, map: &crate::Asset, proj: bevy::math::Mat4) -> bevy::math::Vec2 {
-        use bevy::math::Vec4Swizzles;
-        let coords = proj * self.location(map).extend(1.0);
-        coords.xy() / coords.w.abs()
     }
 
     pub fn add_location(&self, map: &mut crate::Asset, offset: bevy::math::Vec3) {

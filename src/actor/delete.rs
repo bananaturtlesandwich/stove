@@ -1,9 +1,6 @@
-use unreal_asset::{
-    cast,
-    exports::{Export, ExportBaseTrait},
-};
+use super::*;
 
-impl super::Actor {
+impl Actor {
     /// delete an actor from a map
     pub fn delete(&self, map: &mut crate::Asset) {
         let val = self.index();
