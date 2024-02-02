@@ -40,9 +40,9 @@ impl Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 += offset.x as f64;
-                        vec.value.y.0 += offset.z as f64;
-                        vec.value.z.0 += offset.y as f64;
+                        vec.value.x.0 += offset.x as f64 * 100.0;
+                        vec.value.y.0 += offset.z as f64 * 100.0;
+                        vec.value.z.0 += offset.y as f64 * 100.0;
                     }
                 }
             }

@@ -75,6 +75,15 @@ struct Constants {
     grid: Handle<StandardMaterial>,
 }
 
+#[derive(Default, Resource)]
+enum Drag {
+    #[default]
+    None,
+    Translate(Vec3),
+    Rotate,
+    Scale,
+}
+
 enum Wrapper {
     File(std::io::BufReader<std::fs::File>),
     Bytes(std::io::Cursor<Vec<u8>>),
@@ -130,6 +139,7 @@ fn main() {
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
         .init_resource::<Focus>()
+        .init_resource::<Drag>()
         .add_event::<Notif>()
         .add_event::<Action>()
         .add_event::<Dialog>()
@@ -155,6 +165,7 @@ fn main() {
         .add_systems(Update, input::shortcuts)
         // post update because egui isn't built until update
         .add_systems(PostUpdate, input::pick)
+        .add_systems(PostUpdate, input::drag.after(input::pick))
         .add_systems(PostUpdate, input::camera)
         .add_systems(
             Update,

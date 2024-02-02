@@ -29,6 +29,7 @@ pub fn pick(
     mut commands: Commands,
     mouse: Res<Input<MouseButton>>,
     keys: Res<Input<KeyCode>>,
+    mut drag: ResMut<Drag>,
     camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
     selected: Query<Entity, With<actor::Selected>>,
     mut ctx: bevy_egui::EguiContexts,
@@ -37,6 +38,9 @@ pub fn pick(
     // EguiContexts isn't a ReadOnlySystemParam so can't make into a conditional
     if ctx.ctx_mut().is_pointer_over_area() {
         return;
+    }
+    if mouse.any_just_released([MouseButton::Left, MouseButton::Middle, MouseButton::Right]) {
+        *drag = Drag::None
     }
     if mouse.just_pressed(MouseButton::Left) {
         if !keys.any_pressed([
@@ -49,14 +53,53 @@ pub fn pick(
                 commands.entity(entity).remove::<actor::SelectedBundle>();
             }
         }
-        if let Some((entity, _)) = camera.single().get_nearest_intersection() {
+        if let Some((entity, data)) = camera.single().get_nearest_intersection() {
+            if selected.contains(entity) {
+                if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+                    action.send(Action::Duplicate)
+                }
+                *drag = Drag::Translate(data.position());
+            }
             commands
                 .entity(entity)
                 .insert(actor::SelectedBundle::default());
-            if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-                action.send(Action::Duplicate)
+        }
+    }
+}
+
+pub fn drag(
+    mut drag: ResMut<Drag>,
+    mut map: NonSendMut<Map>,
+    camera: Query<(
+        &bevy_mod_raycast::deferred::RaycastSource<()>,
+        &smooth_bevy_cameras::LookTransform,
+    )>,
+    mut selected: Query<(&actor::Actor, &mut Transform), With<actor::Selected>>,
+) {
+    let Some((map, _)) = &mut map.0 else { return };
+    let camera = camera.single();
+    let normal = camera.1.look_direction().unwrap_or_default();
+    match drag.as_ref() {
+        Drag::None => (),
+        Drag::Translate(pos) => {
+            if let Some(data) =
+                camera
+                    .0
+                    .intersect_primitive(bevy_mod_raycast::primitives::Primitive3d::Plane {
+                        point: *pos,
+                        normal,
+                    })
+            {
+                for (actor, mut transform) in selected.iter_mut() {
+                    let offset = data.position() - *pos;
+                    actor.add_location(map, offset);
+                    transform.translation += offset;
+                }
+                *drag = Drag::Translate(data.position());
             }
         }
+        Drag::Rotate => todo!(),
+        Drag::Scale => todo!(),
     }
 }
 

@@ -12,7 +12,7 @@ impl Actor {
         ui: &mut egui::Ui,
         transform: &mut bevy::prelude::Transform,
     ) {
-        ui.heading(&self.name);
+        ui.heading(format!("{} ({})", self.name, self.export));
         fn export(
             ui: &mut egui::Ui,
             export: &mut Export,
