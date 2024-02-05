@@ -84,6 +84,18 @@ enum Drag {
     Scale,
 }
 
+#[derive(Default, Resource)]
+enum Lock {
+    #[default]
+    XYZ,
+    XY,
+    YZ,
+    ZX,
+    X,
+    Y,
+    Z
+}
+
 enum Wrapper {
     File(std::io::BufReader<std::fs::File>),
     Bytes(std::io::Cursor<Vec<u8>>),
@@ -140,6 +152,7 @@ fn main() {
         .init_resource::<Registry>()
         .init_resource::<Focus>()
         .init_resource::<Drag>()
+        .init_resource::<Lock>()
         .add_event::<Notif>()
         .add_event::<Action>()
         .add_event::<Dialog>()
