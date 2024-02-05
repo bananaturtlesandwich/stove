@@ -30,14 +30,12 @@ pub fn shortcuts(
             true => Lock::YZ,
             false => Lock::X,
         }
-    }
-    else if keys.just_pressed(KeyCode::Y) {
+    } else if keys.just_pressed(KeyCode::Y) {
         *lock = match shift {
             true => Lock::ZX,
             false => Lock::Y,
         }
-    }
-    else if keys.just_pressed(KeyCode::Z) {
+    } else if keys.just_pressed(KeyCode::Z) {
         *lock = match shift {
             true => Lock::XY,
             false => Lock::Z,
@@ -66,6 +64,18 @@ pub fn pick(
         *drag = Drag::None
     }
     if mouse.just_pressed(MouseButton::Left) {
+        if let Some((entity, data)) = camera.single().get_nearest_intersection() {
+            if selected.contains(entity) {
+                if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+                    action.send(Action::Duplicate)
+                }
+                *drag = Drag::Translate(data.position());
+                return;
+            }
+            commands
+                .entity(entity)
+                .insert(actor::SelectedBundle::default());
+        }
         if !keys.any_pressed([
             KeyCode::ShiftLeft,
             KeyCode::ShiftRight,
@@ -75,17 +85,6 @@ pub fn pick(
             for entity in selected.iter() {
                 commands.entity(entity).remove::<actor::SelectedBundle>();
             }
-        }
-        if let Some((entity, data)) = camera.single().get_nearest_intersection() {
-            if selected.contains(entity) {
-                if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-                    action.send(Action::Duplicate)
-                }
-                *drag = Drag::Translate(data.position());
-            }
-            commands
-                .entity(entity)
-                .insert(actor::SelectedBundle::default());
         }
     }
 }
@@ -125,7 +124,7 @@ pub fn drag(
                         Lock::X => offset *= Vec3::X,
                         Lock::Y => offset *= Vec3::Y,
                         Lock::Z => offset *= Vec3::Z,
-                        _ => ()
+                        _ => (),
                     }
                     actor.add_location(map, offset);
                     transform.translation += offset;
