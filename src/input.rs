@@ -1,11 +1,13 @@
 use super::*;
 
 pub fn shortcuts(
+    mut lock: ResMut<Lock>,
     mut dialog: EventWriter<Dialog>,
     mut action: EventWriter<Action>,
     keys: Res<Input<KeyCode>>,
 ) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     if keys.just_released(KeyCode::O) && ctrl {
         dialog.send(Dialog::Open(None))
     }
@@ -22,6 +24,27 @@ pub fn shortcuts(
     }
     if keys.just_released(KeyCode::F) {
         action.send(Action::Focus)
+    }
+    if keys.just_pressed(KeyCode::X) {
+        *lock = match shift {
+            true => Lock::YZ,
+            false => Lock::X,
+        }
+    }
+    else if keys.just_pressed(KeyCode::Y) {
+        *lock = match shift {
+            true => Lock::ZX,
+            false => Lock::Y,
+        }
+    }
+    else if keys.just_pressed(KeyCode::Z) {
+        *lock = match shift {
+            true => Lock::XY,
+            false => Lock::Z,
+        }
+    }
+    if keys.any_just_released([KeyCode::X, KeyCode::Y, KeyCode::Z]) {
+        *lock = Lock::XYZ
     }
 }
 
@@ -69,6 +92,7 @@ pub fn pick(
 
 pub fn drag(
     mut drag: ResMut<Drag>,
+    lock: Res<Lock>,
     mut map: NonSendMut<Map>,
     camera: Query<(
         &bevy_mod_raycast::deferred::RaycastSource<()>,
@@ -78,7 +102,12 @@ pub fn drag(
 ) {
     let Some((map, _)) = &mut map.0 else { return };
     let camera = camera.single();
-    let normal = camera.1.look_direction().unwrap_or_default();
+    let normal = match lock.as_ref() {
+        Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
+        Lock::XY | Lock::X => Vec3::Z,
+        Lock::YZ | Lock::Y => Vec3::X,
+        Lock::ZX | Lock::Z => Vec3::Y,
+    };
     match drag.as_ref() {
         Drag::None => (),
         Drag::Translate(pos) => {
@@ -91,7 +120,13 @@ pub fn drag(
                     })
             {
                 for (actor, mut transform) in selected.iter_mut() {
-                    let offset = data.position() - *pos;
+                    let mut offset = data.position() - *pos;
+                    match lock.as_ref() {
+                        Lock::X => offset *= Vec3::X,
+                        Lock::Y => offset *= Vec3::Y,
+                        Lock::Z => offset *= Vec3::Z,
+                        _ => ()
+                    }
                     actor.add_location(map, offset);
                     transform.translation += offset;
                 }
