@@ -31,7 +31,10 @@ pub fn pick(
                     *drag = Drag::Scale(window.single().cursor_position().unwrap_or_default())
                 }
                 mouse if mouse.just_pressed(MouseButton::Right) => {
-                    // *drag = Drag::Rotate
+                    *drag = Drag::Rotate(
+                        window.single().cursor_position().unwrap_or_default(),
+                        Vec2::ZERO,
+                    )
                 }
                 _ => (),
             }
@@ -68,13 +71,8 @@ pub fn drag(
     mut selected: Query<(&actor::Actor, &mut Transform), With<actor::Selected>>,
 ) {
     let Some((map, _)) = &mut map.0 else { return };
+    let window = window.single();
     let camera = camera.single();
-    let normal = match lock.as_ref() {
-        Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
-        Lock::XY | Lock::X => Vec3::Z,
-        Lock::YZ | Lock::Y => Vec3::X,
-        Lock::ZX | Lock::Z => Vec3::Y,
-    };
     match drag.as_mut() {
         Drag::None => (),
         Drag::Translate(pos) => {
@@ -83,7 +81,12 @@ pub fn drag(
                     .0
                     .intersect_primitive(bevy_mod_raycast::primitives::Primitive3d::Plane {
                         point: *pos,
-                        normal,
+                        normal: match lock.as_ref() {
+                            Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
+                            Lock::XY | Lock::X => Vec3::Z,
+                            Lock::YZ | Lock::Y => Vec3::X,
+                            Lock::ZX | Lock::Z => Vec3::Y,
+                        },
                     })
             else {
                 return;
@@ -101,9 +104,30 @@ pub fn drag(
             }
             *drag = Drag::Translate(data.position());
         }
-        Drag::Rotate(_) => todo!(),
+        Drag::Rotate(start, prev) => {
+            let current =
+                (window.cursor_position().unwrap_or_default() - *start).normalize_or_zero();
+            if *prev == Vec2::ZERO {
+                *prev = current;
+                return;
+            }
+            let angle = current.angle_between(*prev);
+            *prev = current;
+            let rotation = Quat::from_axis_angle(
+                match lock.as_ref() {
+                    Lock::XYZ => -camera.1.look_direction().unwrap_or_default(),
+                    Lock::X | Lock::YZ => Vec3::X,
+                    Lock::Y | Lock::ZX => Vec3::Y,
+                    Lock::Z | Lock::XY => Vec3::Z,
+                },
+                angle,
+            );
+            for (actor, mut transform) in selected.iter_mut() {
+                actor.combine_rotation(map, rotation);
+                transform.rotation = rotation * transform.rotation;
+            }
+        }
         Drag::Scale(start) => {
-            let window = window.single();
             let current = window.cursor_position().unwrap_or_default();
             let centre = Vec2::new(window.width() / 2.0, window.height() / 2.0);
             let factor = (current - centre).length() / (*start - centre).length();

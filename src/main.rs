@@ -82,7 +82,7 @@ enum Drag {
     None,
     Translate(Vec3),
     Scale(Vec2),
-    Rotate(Vec3),
+    Rotate(Vec2, Vec2),
 }
 
 #[derive(Default, Resource)]
