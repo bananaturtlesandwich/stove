@@ -70,7 +70,8 @@ pub fn camera(
         ..
     } = *controller;
 
-    let right_pressed = mouse.pressed(MouseButton::Right);
+    let right_pressed =
+        mouse.pressed(MouseButton::Right) && !matches!(drag.as_ref(), Drag::Rotate(..));
     let middle_pressed =
         mouse.pressed(MouseButton::Middle) && !matches!(drag.as_ref(), Drag::Scale(_));
 
