@@ -6,6 +6,7 @@ pub fn respond(
     mut dialogs: EventReader<Dialog>,
     mut notif: EventWriter<Notif>,
     mut appdata: ResMut<AppData>,
+    mut client: ResMut<Client>,
     mut map: NonSendMut<Map>,
     mut transplant: NonSendMut<Transplant>,
     mut registry: ResMut<Registry>,
@@ -254,6 +255,14 @@ pub fn respond(
                             message: "map opened".into(),
                             kind: Success,
                         });
+                        use discord_rich_presence::DiscordIpc;
+                        if let (Some(client), Some(name)) = (client.0.as_mut(), path.to_str()) {
+                            let _ = client.set_activity(
+                                activity()
+                                    .details("currently editing:")
+                                    .state(name.split('\\').last().unwrap_or_default()),
+                            );
+                        }
                     }
                     Err(e) => notif.send(Notif {
                         message: e.to_string(),
