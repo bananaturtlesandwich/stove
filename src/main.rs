@@ -102,6 +102,9 @@ enum Lock {
 #[derive(Default, Resource)]
 struct Buffer(Vec3);
 
+#[derive(Default, Resource)]
+struct Client(Option<discord_rich_presence::DiscordIpcClient>);
+
 enum Wrapper {
     File(std::io::BufReader<std::fs::File>),
     Bytes(std::io::Cursor<Vec<u8>>),
@@ -127,6 +130,17 @@ impl std::io::Seek for Wrapper {
 
 fn config() -> Option<std::path::PathBuf> {
     dirs::config_dir().map(|path| path.join("stove"))
+}
+
+fn activity() -> discord_rich_presence::activity::Activity<'static> {
+    use discord_rich_presence::activity::*;
+    Activity::new()
+        .state("idle")
+        .assets(Assets::new().large_image("pot"))
+        .buttons(vec![Button::new(
+            "homepage",
+            "https://github.com/bananaturtlesandwich/stove",
+        )])
 }
 
 fn main() {
@@ -160,6 +174,7 @@ fn main() {
         .init_resource::<Drag>()
         .init_resource::<Lock>()
         .init_resource::<Buffer>()
+        .init_resource::<Client>()
         .add_event::<Notif>()
         .add_event::<Action>()
         .add_event::<Dialog>()

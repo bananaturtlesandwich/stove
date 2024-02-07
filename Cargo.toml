@@ -32,8 +32,7 @@ bevy_mod_outline = "0.6"
 bevy_egui = "0.24"
 egui = { version = "0.24", features = ["persistence", "serde"] }
 egui-notify = "0.11"
-# this hasn't been updated to current bevy
-# bevy-discord-presence = "0.4"
+discord-rich-presence = "0.2"
 dirs = "5.0"
 ron = "0.8"
 rfd = "0.12"

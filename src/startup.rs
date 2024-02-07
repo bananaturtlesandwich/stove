@@ -43,15 +43,22 @@ pub fn check_args(mut notif: EventWriter<Notif>, mut dialog: EventWriter<Dialog>
         });
         return;
     }
-    dialog.send(Dialog::Open(Some(path)))
+    dialog.send(Dialog::Open(Some(path)));
 }
 
 pub fn initialise(
     mut commands: Commands,
+    mut client: ResMut<Client>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
 ) {
+    use discord_rich_presence::DiscordIpc;
+    client.0 = discord_rich_presence::DiscordIpcClient::new("1059578289737433249")
+        .ok()
+        .and_then(|mut cl| {
+            (cl.connect().is_ok() && cl.set_activity(activity()).is_ok()).then_some(cl)
+        });
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn((
