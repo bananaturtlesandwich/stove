@@ -6,9 +6,10 @@ pub fn follow(
     mut commands: Commands,
     mut map: NonSendMut<Map>,
     mut focus: ResMut<Focus>,
+    mut buffer: ResMut<Buffer>,
     registry: Res<Registry>,
     consts: Res<Constants>,
-    selected: Query<(Entity, &actor::Actor, &Transform), With<actor::Selected>>,
+    mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
     mut camera: Query<&mut smooth_bevy_cameras::LookTransform, With<Camera3d>>,
 ) {
     let Some((map, _)) = &mut map.0 else { return };
@@ -19,7 +20,8 @@ pub fn follow(
                     notif.send(Notif {
                         message: "no actors to duplicate".into(),
                         kind: Warning,
-                    })
+                    });
+                    continue;
                 }
                 for (entity, actor, ..) in selected.iter() {
                     commands.entity(entity).remove::<actor::SelectedBundle>();
@@ -79,7 +81,8 @@ pub fn follow(
                     notif.send(Notif {
                         message: "no actors to delete".into(),
                         kind: Warning,
-                    })
+                    });
+                    continue;
                 }
                 for (entity, actor, ..) in selected.iter() {
                     actor.delete(map);
@@ -95,7 +98,8 @@ pub fn follow(
                     notif.send(Notif {
                         message: "no actors to focus".into(),
                         kind: Warning,
-                    })
+                    });
+                    continue;
                 }
                 let (mut pos, mut sca) = selected
                     .iter()
@@ -109,6 +113,45 @@ pub fn follow(
                 focus.0 = Some(
                     pos - camera.single().look_direction().unwrap_or_default() * sca.length() * 5.0,
                 )
+            }
+            Action::Copy => {
+                if selected.is_empty() {
+                    notif.send(Notif {
+                        message: "no actors to copy location from".into(),
+                        kind: Warning,
+                    });
+                    continue;
+                }
+                buffer.0 = selected
+                    .iter()
+                    .fold(Vec3::ZERO, |pos, (_, _, trans)| pos + trans.translation)
+                    / selected.iter().len() as f32;
+                notif.send(Notif {
+                    message: "location copied".into(),
+                    kind: Success,
+                });
+            }
+            Action::Paste => {
+                if selected.is_empty() {
+                    notif.send(Notif {
+                        message: "no actors to paste location to".into(),
+                        kind: Warning,
+                    });
+                    continue;
+                }
+                let offset = buffer.0
+                    - selected
+                        .iter()
+                        .fold(Vec3::ZERO, |pos, (_, _, trans)| pos + trans.translation)
+                        / selected.iter().len() as f32;
+                for (_, actor, mut trans) in selected.iter_mut() {
+                    actor.add_location(map, offset);
+                    trans.translation += offset;
+                }
+                notif.send(Notif {
+                    message: "location pasted".into(),
+                    kind: Success,
+                });
             }
         }
     }

@@ -33,6 +33,8 @@ enum Action {
     Duplicate,
     Delete,
     Focus,
+    Copy,
+    Paste,
 }
 
 #[derive(Event)]
@@ -97,6 +99,9 @@ enum Lock {
     Z,
 }
 
+#[derive(Default, Resource)]
+struct Buffer(Vec3);
+
 enum Wrapper {
     File(std::io::BufReader<std::fs::File>),
     Bytes(std::io::Cursor<Vec<u8>>),
@@ -154,6 +159,7 @@ fn main() {
         .init_resource::<Focus>()
         .init_resource::<Drag>()
         .init_resource::<Lock>()
+        .init_resource::<Buffer>()
         .add_event::<Notif>()
         .add_event::<Action>()
         .add_event::<Dialog>()
