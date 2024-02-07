@@ -25,6 +25,12 @@ pub fn shortcuts(
     if keys.just_released(KeyCode::F) {
         action.send(Action::Focus)
     }
+    if keys.just_released(KeyCode::C) && ctrl {
+        action.send(Action::Copy)
+    }
+    if keys.just_released(KeyCode::V) && ctrl {
+        action.send(Action::Paste)
+    }
     if keys.just_pressed(KeyCode::X) {
         *lock = match shift {
             true => Lock::YZ,
