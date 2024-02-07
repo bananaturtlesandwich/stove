@@ -10,6 +10,7 @@ mod dialog;
 mod extras;
 mod input;
 mod persistence;
+mod picking;
 mod startup;
 mod ui;
 
@@ -80,8 +81,8 @@ enum Drag {
     #[default]
     None,
     Translate(Vec3),
-    Rotate,
-    Scale,
+    Scale(Vec2),
+    Rotate(Vec3),
 }
 
 #[derive(Default, Resource)]
@@ -93,7 +94,7 @@ enum Lock {
     ZX,
     X,
     Y,
-    Z
+    Z,
 }
 
 enum Wrapper {
@@ -177,8 +178,8 @@ fn main() {
         .add_systems(Update, ui::ui)
         .add_systems(Update, input::shortcuts)
         // post update because egui isn't built until update
-        .add_systems(PostUpdate, input::pick)
-        .add_systems(PostUpdate, input::drag.after(input::pick))
+        .add_systems(PostUpdate, picking::pick)
+        .add_systems(PostUpdate, picking::drag.after(picking::pick))
         .add_systems(PostUpdate, input::camera)
         .add_systems(
             Update,
