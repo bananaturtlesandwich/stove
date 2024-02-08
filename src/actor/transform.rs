@@ -78,67 +78,6 @@ impl Actor {
         }
     }
 
-    pub fn get_raw_location(&self, map: &crate::Asset) -> bevy::math::DVec3 {
-        map.asset_data.exports[self.transform]
-            .get_normal_export()
-            .and_then(|norm| {
-                norm.properties.iter().rev().find_map(|prop| {
-                    if let Property::StructProperty(struc) = prop {
-                        if struc.name == LOCATION {
-                            return cast!(Property, VectorProperty, &struc.value[0]);
-                        }
-                    }
-                    None
-                })
-            })
-            .map(|pos| bevy::math::dvec3(pos.value.x.0, pos.value.y.0, pos.value.z.0))
-            .unwrap_or_default()
-    }
-
-    pub fn add_raw_location(&self, map: &mut crate::Asset, offset: bevy::math::DVec3) {
-        let mut names = map.get_name_map();
-        let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
-            return;
-        };
-        match norm
-            .properties
-            .iter_mut()
-            .find(|prop| prop.get_name() == LOCATION)
-        {
-            Some(scale) => {
-                if let Property::StructProperty(struc) = scale {
-                    if let Property::VectorProperty(vec) = &mut struc.value[0] {
-                        vec.value.x.0 += offset.x;
-                        vec.value.y.0 += offset.y;
-                        vec.value.z.0 += offset.z;
-                    }
-                }
-            }
-            None => norm
-                .properties
-                .push(Property::StructProperty(StructProperty {
-                    name: names.clone_resource().get_mut().add_fname(LOCATION),
-                    ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                        ancestry: Vec::new(),
-                    },
-                    struct_type: Some(names.clone_resource().get_mut().add_fname("Vector")),
-                    struct_guid: Some([0; 16].into()),
-                    property_guid: None,
-                    duplication_index: 0,
-                    serialize_none: true,
-                    value: vec![Property::VectorProperty(VectorProperty {
-                        name: names.get_mut().add_fname(LOCATION),
-                        ancestry: unreal_asset::unversioned::ancestry::Ancestry {
-                            ancestry: Vec::new(),
-                        },
-                        property_guid: None,
-                        duplication_index: 0,
-                        value: Vector::new(offset.x.into(), offset.z.into(), offset.y.into()),
-                    })],
-                })),
-        }
-    }
-
     pub fn rotation(&self, map: &crate::Asset) -> bevy::math::Quat {
         map.asset_data.exports[self.transform]
             .get_normal_export()

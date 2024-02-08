@@ -123,27 +123,6 @@ impl Actor {
             .map_or(DrawType::Cube, |path| {
                 DrawType::Mesh(path.object_name.get_owned_content())
             });
-        // .base_export
-        // .create_before_serialization_dependencies
-        // .iter()
-        // .filter_map(|i| asset.get_export(*i))
-        // .filter_map(Export::get_normal_export)
-        // .find(|i| {
-        //     asset
-        //         .get_import(i.get_base_export().class_index)
-        //         .is_some_and(|import| import.object_name == "StaticMeshComponent")
-        // })
-        // .and_then(|norm| {
-        //     norm.properties.iter().find_map(|prop| {
-        //         cast!(Property, ObjectProperty, prop)
-        //             .filter(|prop| prop.get_name() == "StaticMesh")
-        //     })
-        // })
-        // .and_then(|obj| asset.get_import(obj.value))
-        // .and_then(|import| asset.get_import(import.outer_index))
-        // .map_or(DrawType::Cube, |path| {
-        //     DrawType::Mesh(path.object_name.get_owned_content())
-        // });
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
             match prop.get_name().get_owned_content().as_str() {

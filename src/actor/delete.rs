@@ -13,16 +13,17 @@ impl Actor {
             level
                 .actors
                 .remove(level.actors.iter().position(|i| i == &val).unwrap());
-            let pos = level
+            if let Some(pos) = level
                 .get_base_export()
                 .create_before_serialization_dependencies
                 .iter()
                 .position(|i| i == &val)
-                .unwrap();
-            level
-                .get_base_export_mut()
-                .create_before_serialization_dependencies
-                .remove(pos);
+            {
+                level
+                    .get_base_export_mut()
+                    .create_before_serialization_dependencies
+                    .remove(pos);
+            }
         }
     }
 }

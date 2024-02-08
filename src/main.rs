@@ -87,6 +87,7 @@ enum Drag {
     Rotate(Vec2, Vec2),
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Default, Resource)]
 enum Lock {
     #[default]

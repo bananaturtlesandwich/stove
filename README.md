@@ -2,7 +2,7 @@
 
 **<h1 align="center">[get the latest alpha build!](https://github.com/bananaturtlesandwich/stove/releases)</h1>**
 
-<h1 align="center"><img width=900 src=https://github.com/bananaturtlesandwich/stove/assets/71292624/3ee1db0f-7509-4ef8-9205-6c461d65e563></h1>
+<h1 align="center"><img width=900 src=https://github.com/bananaturtlesandwich/stove/assets/71292624/72571954-59b6-469b-9f67-8cb6ae95d7c1></h1>
 
 # features
 - visualise maps as they would be in-game
@@ -36,8 +36,8 @@
 - [x] retrieve and display static meshes
 - [ ] retrieve and display skeletal meshes
 - [ ] get meshes for all types of actor
-- [ ] display the best LOD
-- [ ] retrieve and display textures on meshes
+- [x] retrieve and display textures
+- [ ] parse materials properly
 - [x] discord RPC (show your internet friends what you're doing)
 </details>
 
