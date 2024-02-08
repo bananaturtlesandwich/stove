@@ -42,6 +42,7 @@ pub fn respond(
                                 None
                             }
                         };
+                        #[cfg(target_os = "windows")]
                         #[link(name = "oo2core_win64", kind = "static")]
                         extern "C" {
                             fn OodleLZ_Decompress(
