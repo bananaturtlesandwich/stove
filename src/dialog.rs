@@ -190,6 +190,7 @@ pub fn respond(
                                                                     ),
                                                                     ..default()
                                                                 })),
+                                                                unlit: true,
                                                                 ..default()
                                                             })
                                                         }).collect()

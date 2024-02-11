@@ -165,10 +165,6 @@ fn main() {
         ))
         .init_non_send_resource::<Map>()
         .init_non_send_resource::<Transplant>()
-        .insert_resource(AmbientLight {
-            color: Color::ANTIQUE_WHITE,
-            brightness: 0.3,
-        })
         .init_resource::<Notifs>()
         .init_resource::<Registry>()
         .init_resource::<Focus>()

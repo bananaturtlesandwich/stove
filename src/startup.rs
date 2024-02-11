@@ -126,6 +126,7 @@ pub fn initialise(
                 ),
                 ..default()
             })),
+            unlit: true,
             ..default()
         }),
     })
