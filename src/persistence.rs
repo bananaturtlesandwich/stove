@@ -3,6 +3,7 @@ use super::*;
 pub fn load(mut commands: Commands, mut ctx: bevy_egui::EguiContexts) {
     let mut appdata = AppData {
         distance: 100000.0,
+        textures: true,
         ..default()
     };
     ctx.ctx_mut().memory_mut(|storage| {
@@ -28,6 +29,7 @@ pub fn load(mut commands: Commands, mut ctx: bevy_egui::EguiContexts) {
         retrieve(&mut appdata.distance, "DIST", data);
         retrieve(&mut appdata.aes, "AES", data);
         retrieve(&mut appdata.cache, "CACHE", data);
+        retrieve(&mut appdata.textures, "TEXTURES", data);
         retrieve(&mut appdata.script, "SCRIPT", data);
     });
     commands.insert_resource(appdata);
@@ -45,6 +47,7 @@ pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>) {
         storage.insert_persisted(Id::new("DIST"), appdata.distance);
         storage.insert_persisted(Id::new("AES"), appdata.aes.clone());
         storage.insert_persisted(Id::new("CACHE"), appdata.cache);
+        storage.insert_persisted(Id::new("TEXTURES"), appdata.textures);
         storage.insert_persisted(Id::new("SCRIPT"), appdata.script.clone());
         if let Some(config) = config() {
             let _ = std::fs::create_dir_all(&config);

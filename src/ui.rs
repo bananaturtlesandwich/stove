@@ -86,6 +86,10 @@ pub fn ui(
                     ui.label("cache meshes:");
                     ui.add(egui::Checkbox::without_text(&mut appdata.cache));
                 });
+                ui.horizontal(|ui|{
+                    ui.label("use textures:");
+                    ui.add(egui::Checkbox::without_text(&mut appdata.textures));
+                });
                 if ui.button("clear cache").clicked() {
                     match config() {
                         Some(cache) => match std::fs::remove_dir_all(cache.join("cache")) {

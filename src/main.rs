@@ -61,6 +61,7 @@ struct AppData {
     distance: f32,
     aes: String,
     cache: bool,
+    textures: bool,
     script: String,
     query: String,
 }
