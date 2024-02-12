@@ -46,7 +46,7 @@ pub fn respond(
                         #[link(name = "oo2core_win64", kind = "static")]
                         extern "C" {
                             fn OodleLZ_Decompress(
-                                compBuf: *mut u8,
+                                compBuf: *const u8,
                                 compBufSize: usize,
                                 rawBuf: *mut u8,
                                 rawLen: usize,
@@ -82,7 +82,26 @@ pub fn respond(
                                 }
                                 #[cfg(target_os = "windows")]
                                 {
-                                    pak = pak.oodle(|| OodleLZ_Decompress);
+                                    pak = pak.oodle(|| {
+                                        Ok(|comp_buf, raw_buf| unsafe {
+                                            OodleLZ_Decompress(
+                                                comp_buf.as_ptr(),
+                                                comp_buf.len(),
+                                                raw_buf.as_mut_ptr(),
+                                                raw_buf.len(),
+                                                1,
+                                                1,
+                                                0,
+                                                0,
+                                                0,
+                                                0,
+                                                0,
+                                                std::ptr::null_mut(),
+                                                0,
+                                                3,
+                                            )
+                                        })
+                                    });
                                 }
                                 let pak = pak.reader(&mut pak_file).ok()?;
                                 Some((pak_file, pak))
