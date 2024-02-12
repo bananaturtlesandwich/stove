@@ -132,33 +132,38 @@ pub fn respond(
                                                                             cache.as_deref(),
                                                                             &path,
                                                                             version,
-                                                                            |mat, _| Ok(extras::get_tex_path(mat)),
+                                                                            |mat, _| Ok(extras::get_tex_paths(mat)),
                                                                         ) {
-                                                                            Ok(Some(path)) => match asset::get(
-                                                                                pak,
-                                                                                pak_file,
-                                                                                cache.as_deref(),
-                                                                                &path,
-                                                                                version,
-                                                                                |tex, bulk| {
-                                                                                    Ok(extras::get_tex_info(tex, bulk)?)
-                                                                                },
-                                                                            ) {
-                                                                                Ok(o) => Some(o),
-                                                                                Err(e) => {
-                                                                                    notif.send(
-                                                                                        Notif {
-                                                                                            message: format!(
-                                                                                                "{}: {e}",
-                                                                                                path.split('/')
-                                                                                                    .last()
-                                                                                                    .unwrap_or_default()
-                                                                                            ),
-                                                                                            kind: Warning
+                                                                            Ok(paths) => {
+                                                                                paths.into_iter().find_map(|path|
+                                                                                    match asset::get(
+                                                                                        pak,
+                                                                                        pak_file,
+                                                                                        cache.as_deref(),
+                                                                                        &path,
+                                                                                        version,
+                                                                                        |tex, bulk| {
+                                                                                            Ok(extras::get_tex_info(tex, bulk)?)
+                                                                                        },
+                                                                                    ) {
+                                                                                        Ok((false, x, y, data)) => Some((x,y,data)),
+                                                                                        Ok((true, ..)) => None,
+                                                                                        Err(e) => {
+                                                                                            notif.send(
+                                                                                                Notif {
+                                                                                                    message: format!(
+                                                                                                        "{}: {e}",
+                                                                                                        path.split('/')
+                                                                                                            .last()
+                                                                                                            .unwrap_or_default()
+                                                                                                    ),
+                                                                                                    kind: Warning
+                                                                                                }
+                                                                                            );
+                                                                                            None
                                                                                         }
-                                                                                    );
-                                                                                    None
-                                                                                }
+                                                                                    }
+                                                                                )
                                                                             },
                                                                             _ => None,
                                                                         }

@@ -11,7 +11,7 @@ use unreal_asset::{
 #[test]
 fn parse_tex() -> Result<(), unreal_asset::error::Error> {
     let parse = |asset, exp, bulk: Option<_>, name, version| {
-        let (x, y, rgba) = get_tex_info(
+        let (_, x, y, rgba) = get_tex_info(
             unreal_asset::Asset::new(
                 io::Cursor::new(asset),
                 Some(io::Cursor::new(exp)),
@@ -47,12 +47,26 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
     Ok(())
 }
 
-pub fn get_tex_path<C: io::Read + io::Seek>(mat: unreal_asset::Asset<C>) -> Option<String> {
+pub fn get_tex_paths<C: io::Read + io::Seek>(mat: unreal_asset::Asset<C>) -> Vec<String> {
     mat.imports
         .iter()
-        .find(|imp| imp.class_name == "Texture2D")
-        .and_then(|imp| mat.get_import(imp.outer_index))
+        .filter(|imp| imp.class_name == "Texture2D")
+        .filter_map(|imp| mat.get_import(imp.outer_index))
+        .filter(|imp| {
+            imp.object_name.get_content(|path| {
+                !matches!(
+                    path,
+                    "/Engine/EngineResources/Black"
+                        | "/Engine/EngineResources/Black_Low"
+                        | "/Engine/EngineResources/DefaultTexture"
+                        | "/Engine/EngineResources/DefaultTexture_Low"
+                        | "/Engine/EngineMaterials/DefaultWhiteGrid"
+                        | "/Engine/EngineMaterials/DefaultWhiteGrid_Low"
+                )
+            })
+        })
         .map(|imp| imp.object_name.get_owned_content())
+        .collect()
 }
 
 // reference implementations:
@@ -64,7 +78,7 @@ pub fn get_tex_path<C: io::Read + io::Seek>(mat: unreal_asset::Asset<C>) -> Opti
 pub fn get_tex_info<C: io::Read + io::Seek>(
     asset: unreal_asset::Asset<C>,
     bulk: Option<C>,
-) -> Result<(u32, u32, Vec<u8>), io::Error> {
+) -> Result<(bool, u32, u32, Vec<u8>), io::Error> {
     use io::Read;
     // get the static mesh
     let Some(tex) = asset.asset_data.exports.iter().find(|ex| {
@@ -193,7 +207,12 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
     for i in (0..rgba.len()).step_by(4) {
         rgba.swap(i, i + 2)
     }
-    Ok((x as u32, y as u32, rgba))
+    Ok((
+        matches!(format.as_str(), "PF_G8" | "PF_BC5"),
+        x as u32,
+        y as u32,
+        rgba,
+    ))
 }
 
 const HAS_OPT_DATA: u32 = 1 << 30;
