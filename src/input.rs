@@ -5,31 +5,23 @@ pub fn shortcuts(
     mut dialog: EventWriter<Dialog>,
     mut action: EventWriter<Action>,
     keys: Res<Input<KeyCode>>,
+    mut ctx: bevy_egui::EguiContexts,
 ) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     if keys.just_released(KeyCode::O) && ctrl {
         dialog.send(Dialog::Open(None))
     }
+    if keys.just_released(KeyCode::O) && keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+        dialog.send(Dialog::AddPak)
+    }
     if keys.just_released(KeyCode::S) && ctrl {
         dialog.send(Dialog::SaveAs(
             keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
         ))
     }
-    if keys.just_released(KeyCode::Delete) {
-        action.send(Action::Delete)
-    }
     if keys.just_released(KeyCode::T) && ctrl {
         dialog.send(Dialog::Transplant)
-    }
-    if keys.just_released(KeyCode::F) {
-        action.send(Action::Focus)
-    }
-    if keys.just_released(KeyCode::C) && ctrl {
-        action.send(Action::Copy)
-    }
-    if keys.just_released(KeyCode::V) && ctrl {
-        action.send(Action::Paste)
     }
     if keys.just_pressed(KeyCode::X) {
         *lock = match shift {
@@ -49,6 +41,21 @@ pub fn shortcuts(
     }
     if keys.any_just_released([KeyCode::X, KeyCode::Y, KeyCode::Z]) {
         *lock = Lock::XYZ
+    }
+    if ctx.ctx_mut().wants_keyboard_input() {
+        return;
+    }
+    if keys.just_released(KeyCode::Delete) {
+        action.send(Action::Delete)
+    }
+    if keys.just_released(KeyCode::F) {
+        action.send(Action::Focus)
+    }
+    if keys.just_released(KeyCode::C) && ctrl {
+        action.send(Action::Copy)
+    }
+    if keys.just_released(KeyCode::V) && ctrl {
+        action.send(Action::Paste)
     }
 }
 

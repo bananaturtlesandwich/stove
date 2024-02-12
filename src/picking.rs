@@ -20,11 +20,11 @@ pub fn pick(
     }
     if let Some((entity, data)) = camera.single().get_nearest_intersection() {
         if selected.contains(entity) {
-            if keys.any_just_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-                action.send(Action::Duplicate)
-            }
             match &mouse {
                 mouse if mouse.just_pressed(MouseButton::Left) => {
+                    if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+                        action.send(Action::Duplicate)
+                    }
                     *drag = Drag::Translate(data.position())
                 }
                 mouse if mouse.just_pressed(MouseButton::Middle) => {

@@ -236,7 +236,7 @@ pub fn ui(
                 egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
                     ui,
                     ui.text_style_height(&egui::TextStyle::Body),
-                    actors.iter().len(),
+                    others.iter().len(),
                     |ui, range| {
                         ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
                             for (i, actor) in range.clone().zip(others[range].iter()) {
