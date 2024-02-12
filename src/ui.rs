@@ -108,13 +108,6 @@ pub fn ui(
                         }),
                     };
                 }
-                ui.horizontal(|ui| {
-                    ui.label("render distance:");
-                    ui.add(
-                        egui::widgets::DragValue::new(&mut appdata.distance)
-                            .clamp_range(0..=100000)
-                    )
-                });
                 ui.label("post-save commands");
                 ui.text_edit_multiline(&mut appdata.script);
             });

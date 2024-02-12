@@ -58,7 +58,6 @@ struct Focus(Option<Vec3>);
 struct AppData {
     version: usize,
     paks: Vec<String>,
-    distance: f32,
     aes: String,
     cache: bool,
     textures: bool,

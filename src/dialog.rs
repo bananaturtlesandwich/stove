@@ -295,10 +295,46 @@ pub fn respond(
                     }
                 }
                 match asset::save(map, path) {
-                    Ok(_) => notif.send(Notif {
-                        message: "map saved".into(),
-                        kind: Success,
-                    }),
+                    Ok(_) => {
+                        // literally no idea why std::process::Command doesn't work
+                        #[cfg(target_os = "windows")]
+                        const PATH: &str = "./script.bat";
+                        #[cfg(not(target_os = "windows"))]
+                        const PATH: &str = "./script.sh";
+                        for line in appdata.script.lines() {
+                            if let Err(e) = std::fs::write(PATH, line) {
+                                notif.send(Notif {
+                                    message: format!("failed to make save script: {e}"),
+                                    kind: Error,
+                                })
+                            }
+                            match std::process::Command::new(PATH)
+                                .stdout(std::process::Stdio::piped())
+                                .output()
+                            {
+                                Ok(out) => notif.send(Notif {
+                                    message: String::from_utf8(out.stdout).unwrap_or_default(),
+                                    kind: Success,
+                                }),
+                                Err(e) => notif.send(Notif {
+                                    message: format!("failed to run save script: {e}"),
+                                    kind: Error,
+                                }),
+                            };
+                        }
+                        if !appdata.script.is_empty() {
+                            if let Err(e) = std::fs::remove_file(PATH) {
+                                notif.send(Notif {
+                                    message: format!("failed to remove save script: {e}"),
+                                    kind: Error,
+                                })
+                            }
+                        }
+                        notif.send(Notif {
+                            message: "map saved".into(),
+                            kind: Success,
+                        });
+                    }
                     Err(e) => notif.send(Notif {
                         message: e.to_string(),
                         kind: Error,
