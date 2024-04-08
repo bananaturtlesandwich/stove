@@ -5,7 +5,7 @@ use unreal_asset::{
     exports::{Export, ExportBaseTrait, ExportNormalTrait},
     properties::{Property, PropertyDataTrait},
     reader::archive_trait::ArchiveTrait,
-    types::{fname::FName, PackageIndex},
+    types::{fname::FName, PackageIndex, PackageIndexTrait},
     Asset,
 };
 
@@ -164,7 +164,7 @@ impl Actor {
         &self,
         asset: &Asset<std::io::BufReader<File>>,
         offset: usize,
-    ) -> Vec<Export> {
+    ) -> Vec<super::Export> {
         let level = asset
             .asset_data
             .exports
@@ -193,7 +193,7 @@ impl Actor {
         child_indexes.insert(0, self.index());
 
         // get all the exports from those indexes
-        let mut children: Vec<Export> = child_indexes
+        let mut children: Vec<_> = child_indexes
             .iter()
             .filter_map(|index| asset.get_export(*index))
             // i'm pretty sure i have to clone here so i can modify then insert data
@@ -257,7 +257,7 @@ fn give_unique_name(orig: &mut FName, asset: &mut crate::Asset) {
 }
 
 /// on all possible export references
-fn on_export_refs(export: &mut Export, mut func: impl FnMut(&mut PackageIndex)) {
+fn on_export_refs(export: &mut super::Export, mut func: impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
             on_prop_refs(prop, &mut func);

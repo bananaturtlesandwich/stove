@@ -15,7 +15,7 @@ impl Actor {
         ui.heading(format!("{} ({})", self.name, self.export));
         fn export(
             ui: &mut egui::Ui,
-            export: &mut Export,
+            export: &mut crate::Export,
             transform: &mut bevy::prelude::Transform,
         ) {
             if let Some(norm) = export.get_normal_export_mut() {

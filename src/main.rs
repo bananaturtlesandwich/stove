@@ -15,6 +15,7 @@ mod startup;
 mod ui;
 
 type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
+type Export = unreal_asset::Export<unreal_asset::types::PackageIndex>;
 
 #[derive(Default)]
 struct Map(Option<(Asset, std::path::PathBuf)>);

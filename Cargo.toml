@@ -5,15 +5,15 @@ repository = "https://github.com/bananaturtlesandwich/stove"
 description = "an editor for cooked unreal engine map files"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-version = "0.13.1"
+version = "0.13.2"
 edition = "2021"
 
 [dependencies]
-unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "40bc421" }
+unreal_asset = { git = "https://github.com/astrotechies/unrealmodding", rev = "84e60cc" }
 byteorder = "1.5"
 bitflags = "2.4"
 texture2ddecoder = "0.0"
-repak = { git = "https://github.com/trumank/repak", rev = "abda6da", features = ["oodle"] }
+repak = { git = "https://github.com/trumank/repak", rev = "76c5ee8", features = ["oodle_explicit"] }
 aes = "0.8"
 hex = "0.4"
 bevy = { version = "0.12", default-features = false, features = [

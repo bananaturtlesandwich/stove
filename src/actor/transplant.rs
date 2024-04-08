@@ -157,7 +157,7 @@ impl Actor {
 }
 
 /// on all of an export's possible references to imports
-fn on_import_refs(export: &mut Export, func: &mut impl FnMut(&mut PackageIndex)) {
+fn on_import_refs(export: &mut crate::Export, func: &mut impl FnMut(&mut PackageIndex)) {
     if let Some(norm) = export.get_normal_export_mut() {
         for prop in norm.properties.iter_mut() {
             on_prop_refs(prop, func);
@@ -184,7 +184,7 @@ fn on_import_refs(export: &mut Export, func: &mut impl FnMut(&mut PackageIndex))
 fn on_extra_import_refs(
     donor: unreal_asset::containers::SharedResource<unreal_asset::containers::NameMap>,
     mut recipient: unreal_asset::containers::SharedResource<unreal_asset::containers::NameMap>,
-    export: &mut Export,
+    export: &mut crate::Export,
     func: &mut impl FnMut(&mut PackageIndex),
 ) {
     use byteorder::{ReadBytesExt, WriteBytesExt, LE};
