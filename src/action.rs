@@ -68,6 +68,7 @@ pub fn follow(
                                 .with_children(|parent| {
                                     parent.spawn(PbrBundle {
                                         mesh: consts.cube.clone_weak(),
+                                        material: consts.wire.clone_weak(),
                                         visibility: Visibility::Visible,
                                         ..default()
                                     });

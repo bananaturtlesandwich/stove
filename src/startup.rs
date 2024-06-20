@@ -62,10 +62,7 @@ pub fn initialise(
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn((
-            Camera3dBundle {
-                tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
-                ..Default::default()
-            },
+            Camera3dBundle::default(),
             bevy_mod_raycast::deferred::RaycastSource::<()>::new_cursor()
                 .with_visibility(bevy_mod_raycast::immediate::RaycastVisibility::Ignore),
         ))
@@ -102,6 +99,11 @@ pub fn initialise(
             ])),
         ),
         bounds: meshes.add(Cuboid::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5))),
+        wire: materials.add(StandardMaterial {
+            base_color: Color::rgb(0.0, 1.0, 0.5),
+            unlit: true,
+            ..default()
+        }),
         grid: materials.add(StandardMaterial {
             base_color_texture: Some(images.add(Image {
                 data: include_bytes!("../assets/DefaultWhiteGrid.rgba").into(),

@@ -76,6 +76,7 @@ impl AppData {
 struct Constants {
     cube: Handle<Mesh>,
     bounds: Handle<Mesh>,
+    wire: Handle<StandardMaterial>,
     grid: Handle<StandardMaterial>,
 }
 
