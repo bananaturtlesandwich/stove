@@ -135,10 +135,10 @@ pub fn respond(
                                                 )) => {
                                                     registry.0.insert(path.clone(), (
                                                         meshes.add(
-                                                            Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList)
+                                                            Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList, default())
                                                                 .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
                                                                 .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>())
-                                                                .with_indices(Some(bevy::render::mesh::Indices::U32(indices)))
+                                                                .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
                                                         ),
                                                         match appdata.textures {
                                                             true => {
@@ -275,10 +275,12 @@ pub fn respond(
                                         }
                                     }
                                 }
-                                Err(e) => notif.send(Notif {
-                                    message: e.to_string(),
-                                    kind: Warning,
-                                }),
+                                Err(e) => {
+                                    notif.send(Notif {
+                                        message: e.to_string(),
+                                        kind: Warning,
+                                    });
+                                }
                             }
                         }
                         map.0 = Some((asset, path.clone()));
@@ -295,10 +297,12 @@ pub fn respond(
                             );
                         }
                     }
-                    Err(e) => notif.send(Notif {
-                        message: e.to_string(),
-                        kind: Error,
-                    }),
+                    Err(e) => {
+                        notif.send(Notif {
+                            message: e.to_string(),
+                            kind: Error,
+                        });
+                    }
                 }
             }
             Dialog::SaveAs(ask) => {
@@ -330,7 +334,7 @@ pub fn respond(
                                 notif.send(Notif {
                                     message: format!("failed to make save script: {e}"),
                                     kind: Error,
-                                })
+                                });
                             }
                             match std::process::Command::new(PATH)
                                 .stdout(std::process::Stdio::piped())
@@ -351,7 +355,7 @@ pub fn respond(
                                 notif.send(Notif {
                                     message: format!("failed to remove save script: {e}"),
                                     kind: Error,
-                                })
+                                });
                             }
                         }
                         notif.send(Notif {
@@ -359,10 +363,12 @@ pub fn respond(
                             kind: Success,
                         });
                     }
-                    Err(e) => notif.send(Notif {
-                        message: e.to_string(),
-                        kind: Error,
-                    }),
+                    Err(e) => {
+                        notif.send(Notif {
+                            message: e.to_string(),
+                            kind: Error,
+                        });
+                    }
                 }
             }
             Dialog::AddPak => {
@@ -392,10 +398,12 @@ pub fn respond(
                         let selected = Vec::with_capacity(actors.len());
                         transplant.0 = Some((donor, actors, selected));
                     }
-                    Err(e) => notif.send(Notif {
-                        message: e.to_string(),
-                        kind: Error,
-                    }),
+                    Err(e) => {
+                        notif.send(Notif {
+                            message: e.to_string(),
+                            kind: Error,
+                        });
+                    }
                 }
             }
         }

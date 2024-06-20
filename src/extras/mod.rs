@@ -5,7 +5,7 @@ mod texture;
 
 use std::io;
 
-use byteorder::ReadBytesExt;
+use byteorder::{ReadBytesExt, LE};
 pub use mesh::*;
 pub use texture::*;
 
@@ -46,7 +46,6 @@ impl BulkData {
         mut bulk: Option<R>,
         data_offset: i64,
     ) -> io::Result<Self> {
-        use byteorder::LE;
         use io::Read;
         // bulk data flags
         let mut flags = BulkDataFlags::from_bits_truncate(data.read_u32::<LE>()?);

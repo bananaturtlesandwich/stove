@@ -100,7 +100,7 @@ impl Actor {
                             rot.value.y.0.to_radians(),
                             rot.value.z.0.to_radians(),
                         )
-                        .as_f32()
+                        .as_quat()
                     })
                     .unwrap_or_default()
             })
@@ -120,7 +120,7 @@ impl Actor {
             Some(scale) => {
                 if let Property::StructProperty(struc) = scale {
                     if let Property::RotatorProperty(vec) = &mut struc.value[0] {
-                        (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (offset.as_f64()
+                        (vec.value.x.0, vec.value.y.0, vec.value.z.0) = (offset.as_dquat()
                             * bevy::math::DQuat::from_euler(
                                 bevy::math::EulerRot::XYZ,
                                 vec.value.x.0.to_radians(),

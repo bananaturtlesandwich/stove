@@ -4,58 +4,59 @@ pub fn shortcuts(
     mut lock: ResMut<Lock>,
     mut dialog: EventWriter<Dialog>,
     mut action: EventWriter<Action>,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut ctx: bevy_egui::EguiContexts,
 ) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
-    if keys.just_released(KeyCode::O) && ctrl {
-        dialog.send(Dialog::Open(None))
+    if keys.just_released(KeyCode::KeyO) && ctrl {
+        dialog.send(Dialog::Open(None));
     }
-    if keys.just_released(KeyCode::O) && keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-        dialog.send(Dialog::AddPak)
+    if keys.just_released(KeyCode::KeyO) && keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight])
+    {
+        dialog.send(Dialog::AddPak);
     }
-    if keys.just_released(KeyCode::S) && ctrl {
+    if keys.just_released(KeyCode::KeyS) && ctrl {
         dialog.send(Dialog::SaveAs(
             keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
-        ))
+        ));
     }
-    if keys.just_released(KeyCode::T) && ctrl {
-        dialog.send(Dialog::Transplant)
+    if keys.just_released(KeyCode::KeyT) && ctrl {
+        dialog.send(Dialog::Transplant);
     }
-    if keys.just_pressed(KeyCode::X) {
+    if keys.just_pressed(KeyCode::KeyX) {
         *lock = match shift {
             true => Lock::YZ,
             false => Lock::X,
         }
-    } else if keys.just_pressed(KeyCode::Y) {
+    } else if keys.just_pressed(KeyCode::KeyY) {
         *lock = match shift {
             true => Lock::ZX,
             false => Lock::Y,
         }
-    } else if keys.just_pressed(KeyCode::Z) {
+    } else if keys.just_pressed(KeyCode::KeyZ) {
         *lock = match shift {
             true => Lock::XY,
             false => Lock::Z,
         }
     }
-    if keys.any_just_released([KeyCode::X, KeyCode::Y, KeyCode::Z]) {
+    if keys.any_just_released([KeyCode::KeyX, KeyCode::KeyY, KeyCode::KeyZ]) {
         *lock = Lock::XYZ
     }
     if ctx.ctx_mut().wants_keyboard_input() {
         return;
     }
     if keys.just_released(KeyCode::Delete) {
-        action.send(Action::Delete)
+        action.send(Action::Delete);
     }
-    if keys.just_released(KeyCode::F) {
-        action.send(Action::Focus)
+    if keys.just_released(KeyCode::KeyF) {
+        action.send(Action::Focus);
     }
-    if keys.just_released(KeyCode::C) && ctrl {
-        action.send(Action::Copy)
+    if keys.just_released(KeyCode::KeyC) && ctrl {
+        action.send(Action::Copy);
     }
-    if keys.just_released(KeyCode::V) && ctrl {
-        action.send(Action::Paste)
+    if keys.just_released(KeyCode::KeyV) && ctrl {
+        action.send(Action::Paste);
     }
 }
 
@@ -64,8 +65,8 @@ pub fn camera(
     mut events: EventWriter<smooth_bevy_cameras::controllers::unreal::ControlEvent>,
     mut wheel: EventReader<bevy::input::mouse::MouseWheel>,
     mut motion: EventReader<bevy::input::mouse::MouseMotion>,
-    mouse: Res<Input<MouseButton>>,
-    keyboard: Res<Input<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     drag: Res<Drag>,
     mut controllers: Query<&mut smooth_bevy_cameras::controllers::unreal::UnrealCameraController>,
     mut ctx: bevy_egui::EguiContexts,
@@ -103,12 +104,12 @@ pub fn camera(
 
     for key in keyboard.get_pressed() {
         match key {
-            KeyCode::W => translation_dir.y += 1.0,
-            KeyCode::A => panning_dir.x -= 1.0,
-            KeyCode::S => translation_dir.y -= 1.0,
-            KeyCode::D => panning_dir.x += 1.0,
-            KeyCode::E => panning_dir.y += 1.0,
-            KeyCode::Q => panning_dir.y -= 1.0,
+            KeyCode::KeyW => translation_dir.y += 1.0,
+            KeyCode::KeyA => panning_dir.x -= 1.0,
+            KeyCode::KeyS => translation_dir.y -= 1.0,
+            KeyCode::KeyD => panning_dir.x += 1.0,
+            KeyCode::KeyE => panning_dir.y += 1.0,
+            KeyCode::KeyQ => panning_dir.y -= 1.0,
             _ => {}
         }
     }

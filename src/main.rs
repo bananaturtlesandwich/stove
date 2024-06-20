@@ -189,7 +189,7 @@ fn main() {
              mut dialog: EventWriter<Dialog>| {
                 for drop in drops.read() {
                     if let bevy::window::FileDragAndDrop::DroppedFile { path_buf, .. } = drop {
-                        dialog.send(Dialog::Open(Some(path_buf.clone())))
+                        dialog.send(Dialog::Open(Some(path_buf.clone())));
                     }
                 }
             },

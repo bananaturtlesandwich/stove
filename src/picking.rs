@@ -3,8 +3,8 @@ use super::*;
 pub fn pick(
     mut commands: Commands,
     mut drag: ResMut<Drag>,
-    mouse: Res<Input<MouseButton>>,
-    keys: Res<Input<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    keys: Res<ButtonInput<KeyCode>>,
     window: Query<&Window, With<bevy::window::PrimaryWindow>>,
     camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
     selected: Query<(Entity, &Transform), With<actor::Selected>>,
@@ -23,7 +23,7 @@ pub fn pick(
             match &mouse {
                 mouse if mouse.just_pressed(MouseButton::Left) => {
                     if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-                        action.send(Action::Duplicate)
+                        action.send(Action::Duplicate);
                     }
                     *drag = Drag::Translate(data.position())
                 }

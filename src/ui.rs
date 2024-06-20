@@ -68,7 +68,7 @@ pub fn ui(
                     .add(egui::Button::new("add pak folder").shortcut_text("alt + o"))
                     .clicked()
                 {
-                    dialog.send(Dialog::AddPak)
+                    dialog.send(Dialog::AddPak);
                 }
             });
             ui.menu_button("options", |ui| {

@@ -27,7 +27,7 @@ pub fn check_updates(mut notif: EventWriter<Notif>) {
                 new.semver().patch
             ),
             kind: Info,
-        })
+        });
     }
 }
 
@@ -78,27 +78,30 @@ pub fn initialise(
         ));
     commands.insert_resource(Constants {
         cube: meshes.add(
-            Mesh::new(bevy::render::render_resource::PrimitiveTopology::LineList)
-                .with_inserted_attribute(
-                    Mesh::ATTRIBUTE_POSITION,
-                    vec![
-                        // front verts
-                        bevy::math::vec3(-0.5, -0.5, -0.5),
-                        bevy::math::vec3(-0.5, 0.5, -0.5),
-                        bevy::math::vec3(0.5, -0.5, -0.5),
-                        bevy::math::vec3(0.5, 0.5, -0.5),
-                        // back verts
-                        bevy::math::vec3(-0.5, -0.5, 0.5),
-                        bevy::math::vec3(-0.5, 0.5, 0.5),
-                        bevy::math::vec3(0.5, -0.5, 0.5),
-                        bevy::math::vec3(0.5, 0.5, 0.5),
-                    ],
-                )
-                .with_indices(Some(bevy::render::mesh::Indices::U16(vec![
-                    0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
-                ]))),
+            Mesh::new(
+                bevy::render::render_resource::PrimitiveTopology::LineList,
+                default(),
+            )
+            .with_inserted_attribute(
+                Mesh::ATTRIBUTE_POSITION,
+                vec![
+                    // front verts
+                    bevy::math::vec3(-0.5, -0.5, -0.5),
+                    bevy::math::vec3(-0.5, 0.5, -0.5),
+                    bevy::math::vec3(0.5, -0.5, -0.5),
+                    bevy::math::vec3(0.5, 0.5, -0.5),
+                    // back verts
+                    bevy::math::vec3(-0.5, -0.5, 0.5),
+                    bevy::math::vec3(-0.5, 0.5, 0.5),
+                    bevy::math::vec3(0.5, -0.5, 0.5),
+                    bevy::math::vec3(0.5, 0.5, 0.5),
+                ],
+            )
+            .with_inserted_indices(bevy::render::mesh::Indices::U16(vec![
+                0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 4, 0, 5, 1, 6, 2, 7, 3,
+            ])),
         ),
-        bounds: meshes.add(shape::Box::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5)).into()),
+        bounds: meshes.add(Cuboid::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5))),
         grid: materials.add(StandardMaterial {
             base_color_texture: Some(images.add(Image {
                 data: include_bytes!("../assets/DefaultWhiteGrid.rgba").into(),

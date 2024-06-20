@@ -16,26 +16,28 @@ texture2ddecoder = "0.0"
 repak = { git = "https://github.com/trumank/repak", rev = "76c5ee8", features = ["oodle_explicit"] }
 aes = "0.8"
 hex = "0.4"
-bevy = { version = "0.12", default-features = false, features = [
+bevy = { version = "0.13", default-features = false, features = [
     "x11",
     "wayland",
+    "bevy_asset",
     "bevy_winit",
     "bevy_core_pipeline",
     "bevy_pbr",
     "bevy_render",
     "multi-threaded",
+    "tonemapping_luts"
 ] }
-winit = "0.28"
-bevy_mod_raycast = { version = "0.16", default-features = false }
-smooth-bevy-cameras = "0.10"
-bevy_mod_outline = "0.6"
-bevy_egui = "0.24"
-egui = { version = "0.24", features = ["persistence", "serde"] }
-egui-notify = "0.11"
+winit = "0.29"
+bevy_mod_raycast = { version = "0.17", default-features = false }
+smooth-bevy-cameras = "0.11"
+bevy_mod_outline = "0.7"
+bevy_egui = "0.27"
+egui = { version = "0.27", features = ["persistence", "serde"] }
+egui-notify = "0.14"
 discord-rich-presence = "0.2"
 dirs = "5.0"
 ron = "0.8"
-rfd = "0.12"
+rfd = "0.14"
 update-informer = { version = "1.1", default-features = false, features = [
     "github",
     "rustls-tls",

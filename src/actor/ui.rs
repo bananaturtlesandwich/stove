@@ -310,7 +310,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelud
                                     rot.value.y.0.to_radians(),
                                     rot.value.z.0.to_radians(),
                                 )
-                                .as_f32()
+                                .as_quat()
                             }
                         }
                         Property::LinearColorProperty(col) => {
