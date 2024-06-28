@@ -13,6 +13,7 @@ mod persistence;
 mod picking;
 mod startup;
 mod ui;
+mod wire;
 
 type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
 type Export = unreal_asset::Export<unreal_asset::types::PackageIndex>;
@@ -76,7 +77,8 @@ impl AppData {
 struct Constants {
     cube: Handle<Mesh>,
     bounds: Handle<Mesh>,
-    wire: Handle<StandardMaterial>,
+    unselected: Handle<wire::Wire>,
+    selected: Handle<wire::Wire>,
     grid: Handle<StandardMaterial>,
 }
 
@@ -156,6 +158,7 @@ fn main() {
                 }),
                 ..default()
             }),
+            wire::WirePlugin,
             bevy_egui::EguiPlugin,
             smooth_bevy_cameras::LookTransformPlugin,
             smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin {

@@ -10,6 +10,8 @@ pub fn follow(
     registry: Res<Registry>,
     consts: Res<Constants>,
     mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
+    children: Query<&Children>,
+    mut cubes: Query<&mut Handle<wire::Wire>>,
     mut camera: Query<&mut smooth_bevy_cameras::LookTransform, With<Camera3d>>,
 ) {
     let Some((map, _)) = &mut map.0 else { return };
@@ -24,7 +26,20 @@ pub fn follow(
                     continue;
                 }
                 for (entity, actor, ..) in selected.iter() {
-                    commands.entity(entity).remove::<actor::SelectedBundle>();
+                    match children.get(entity) {
+                        Ok(children) => {
+                            if let Some(mut mat) = children
+                                .first()
+                                .and_then(|child| cubes.get_mut(*child).ok())
+                            {
+                                commands.entity(entity).remove::<actor::Selected>();
+                                *mat = consts.unselected.clone_weak();
+                            }
+                        }
+                        Err(_) => {
+                            commands.entity(entity).remove::<actor::SelectedBundle>();
+                        }
+                    }
                     let insert = unreal_asset::types::PackageIndex::new(
                         map.asset_data.exports.len() as i32 + 1,
                     );
@@ -55,20 +70,19 @@ pub fn follow(
                         actor::DrawType::Cube => {
                             commands
                                 .spawn((
-                                    actor::SelectedBundle::default(),
-                                    PbrBundle {
-                                        mesh: consts.bounds.clone_weak(),
+                                    SpatialBundle {
                                         transform: actor.transform(map),
                                         visibility: Visibility::Hidden,
                                         ..default()
                                     },
+                                    consts.bounds.clone_weak(),
                                     bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
                                     new, // child because it's LineList which picking can't do
                                 ))
                                 .with_children(|parent| {
-                                    parent.spawn(PbrBundle {
+                                    parent.spawn(MaterialMeshBundle {
                                         mesh: consts.cube.clone_weak(),
-                                        material: consts.wire.clone_weak(),
+                                        material: consts.unselected.clone_weak(),
                                         visibility: Visibility::Visible,
                                         ..default()
                                     });

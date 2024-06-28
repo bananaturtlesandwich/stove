@@ -11,6 +11,8 @@ pub fn ui(
     consts: Res<Constants>,
     actors: Query<(Entity, &actor::Actor)>,
     mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
+    children: Query<&Children>,
+    mut cubes: Query<&mut Handle<wire::Wire>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
 ) {
     egui::SidePanel::left("sidepanel").show(ctx.ctx_mut(), |ui| {
@@ -148,15 +150,57 @@ pub fn ui(
                         )
                         .on_hover_text(&actor.class)
                         .clicked() {
-                            ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl{
+                            ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl {
                                 for (entity, ..) in selected.iter() {
-                                    commands.entity(entity).remove::<actor::SelectedBundle>();
+                                    match children.get(entity) {
+                                        Ok(children) => {
+                                            commands.entity(entity).remove::<actor::Selected>();
+                                            if let Some(mut mat) = children
+                                                .first()
+                                                .and_then(|child| cubes.get_mut(*child).ok())
+                                            {
+                                                commands.entity(entity).remove::<actor::Selected>();
+                                                *mat = consts.unselected.clone_weak();
+                                            }
+                                        }
+                                        Err(_) => {
+                                            commands.entity(entity).remove::<actor::SelectedBundle>();
+                                        }
+                                    }
                                 }
                             });
                             match highlighted {
-                                true => commands.entity(entity).remove::<actor::SelectedBundle>(),
+                                true => match children.get(entity) {
+                                    Ok(children) => {
+                                        if let Some(mut mat) = children
+                                            .first()
+                                            .and_then(|child| cubes.get_mut(*child).ok())
+                                        {
+                                            commands.entity(entity).remove::<actor::Selected>();
+                                            *mat = consts.unselected.clone_weak();
+                                        }
+                                    }
+                                    Err(_) => {
+                                        commands.entity(entity).remove::<actor::SelectedBundle>();
+                                    }
+                                },
                                 // false if ui.input(|input| input.modifiers.shift) => todo!(),
-                                false => commands.entity(entity).insert(actor::SelectedBundle::default()),
+                                false => match children.get(entity) {
+                                    Ok(children) => {
+                                        if let Some(mut mat) = children
+                                            .first()
+                                            .and_then(|child| cubes.get_mut(*child).ok())
+                                        {
+                                            commands.entity(entity).insert(actor::Selected);
+                                            *mat = consts.selected.clone_weak();
+                                        }
+                                    }
+                                    Err(_) => {
+                                        commands
+                                            .entity(entity)
+                                            .insert(actor::SelectedBundle::default());
+                                    }
+                                },
                             };
                         }
                     }
@@ -217,9 +261,9 @@ pub fn ui(
                                     actor, // child because it's LineList which picking can't do
                                 ))
                                 .with_children(|parent| {
-                                    parent.spawn(PbrBundle {
+                                    parent.spawn(MaterialMeshBundle {
                                         mesh: consts.cube.clone_weak(),
-                                        material: consts.wire.clone_weak(),
+                                        material: consts.unselected.clone_weak(),
                                         visibility: Visibility::Visible,
                                         ..default()
                                     });

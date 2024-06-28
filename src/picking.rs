@@ -3,11 +3,14 @@ use super::*;
 pub fn pick(
     mut commands: Commands,
     mut drag: ResMut<Drag>,
+    consts: Res<Constants>,
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     window: Query<&Window, With<bevy::window::PrimaryWindow>>,
     camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
     selected: Query<(Entity, &Transform), With<actor::Selected>>,
+    children: Query<&Children>,
+    mut cubes: Query<&mut Handle<wire::Wire>>,
     mut ctx: bevy_egui::EguiContexts,
     mut action: EventWriter<Action>,
 ) {
@@ -39,9 +42,22 @@ pub fn pick(
                 _ => (),
             }
         } else if mouse.just_pressed(MouseButton::Left) {
-            commands
-                .entity(entity)
-                .insert(actor::SelectedBundle::default());
+            match children.get(entity) {
+                Ok(children) => {
+                    if let Some(mut mat) = children
+                        .first()
+                        .and_then(|child| cubes.get_mut(*child).ok())
+                    {
+                        commands.entity(entity).insert(actor::Selected);
+                        *mat = consts.selected.clone_weak();
+                    }
+                }
+                Err(_) => {
+                    commands
+                        .entity(entity)
+                        .insert(actor::SelectedBundle::default());
+                }
+            }
         }
     }
     if mouse.just_pressed(MouseButton::Left)
@@ -54,7 +70,20 @@ pub fn pick(
         && matches!(drag.as_ref(), Drag::None)
     {
         for (entity, _) in selected.iter() {
-            commands.entity(entity).remove::<actor::SelectedBundle>();
+            match children.get(entity) {
+                Ok(children) => {
+                    if let Some(mut mat) = children
+                        .first()
+                        .and_then(|child| cubes.get_mut(*child).ok())
+                    {
+                        commands.entity(entity).remove::<actor::Selected>();
+                        *mat = consts.unselected.clone_weak();
+                    }
+                }
+                Err(_) => {
+                    commands.entity(entity).remove::<actor::SelectedBundle>();
+                }
+            }
         }
     }
 }

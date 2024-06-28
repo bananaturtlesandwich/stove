@@ -265,9 +265,9 @@ pub fn respond(
                                             // child because it's LineList which picking can't do
                                             )).with_children(|parent| {
                                                 parent.spawn(
-                                                    PbrBundle {
+                                                    MaterialMeshBundle {
                                                         mesh: consts.cube.clone_weak(),
-                                                        material: consts.wire.clone_weak(),
+                                                        material: consts.unselected.clone_weak(),
                                                         visibility: Visibility::Visible,
                                                         ..default()
                                                     },

@@ -51,6 +51,7 @@ pub fn initialise(
     mut client: ResMut<Client>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut wire: ResMut<Assets<wire::Wire>>,
     mut images: ResMut<Assets<Image>>,
 ) {
     use discord_rich_presence::DiscordIpc;
@@ -99,11 +100,8 @@ pub fn initialise(
             ])),
         ),
         bounds: meshes.add(Cuboid::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5))),
-        wire: materials.add(StandardMaterial {
-            base_color: Color::rgb(0.0, 1.0, 0.5),
-            unlit: true,
-            ..default()
-        }),
+        unselected: wire.add(wire::Wire { selected: false }),
+        selected: wire.add(wire::Wire { selected: true }),
         grid: materials.add(StandardMaterial {
             base_color_texture: Some(images.add(Image {
                 data: include_bytes!("../assets/DefaultWhiteGrid.rgba").into(),
