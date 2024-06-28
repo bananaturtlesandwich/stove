@@ -307,7 +307,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelud
                                 transform.rotation = bevy::math::DQuat::from_euler(
                                     bevy::math::EulerRot::XYZ,
                                     rot.value.x.0.to_radians(),
-                                    rot.value.y.0.to_radians(),
+                                    -rot.value.y.0.to_radians(),
                                     rot.value.z.0.to_radians(),
                                 )
                                 .as_quat()

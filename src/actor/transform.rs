@@ -97,7 +97,7 @@ impl Actor {
                         bevy::math::DQuat::from_euler(
                             bevy::math::EulerRot::XYZ,
                             rot.value.x.0.to_radians(),
-                            rot.value.y.0.to_radians(),
+                            -rot.value.y.0.to_radians(),
                             rot.value.z.0.to_radians(),
                         )
                         .as_quat()
