@@ -37,13 +37,13 @@ pub fn duplicate(
         let insert =
             unreal_asset::types::PackageIndex::new(map.asset_data.exports.len() as i32 + 1);
         actor.duplicate(map);
-        let new = actor::Actor::new(map, insert).unwrap();
+        let (path, new) = actor::Actor::new(map, insert).unwrap();
         notif.send(Notif {
             message: format!("{} duplicated", actor.name),
             kind: Warning,
         });
-        match &actor.draw_type {
-            actor::DrawType::Mesh(path) => {
+        match path {
+            Some(ref path) => {
                 let (mesh, material) = &registry.0[path];
                 commands.spawn((
                     actor::SelectedBundle::default(),
@@ -60,7 +60,7 @@ pub fn duplicate(
                     new,
                 ));
             }
-            actor::DrawType::Cube => {
+            None => {
                 commands
                     .spawn((
                         SpatialBundle {

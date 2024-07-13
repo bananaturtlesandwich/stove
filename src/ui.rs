@@ -258,8 +258,8 @@ pub fn ui(
                                 message: format!("transplanted {}", actor.name),
                                 kind: Success,
                             });
-                            let mut actor = actor::Actor::new(map, insert).unwrap();
-                            actor.draw_type = actor::DrawType::Cube;
+                            // don't process mesh for transplanted actor for now
+                            let (_, actor) = actor::Actor::new(map, insert).unwrap();
                             commands
                                 .spawn((
                                     actor::Selected,

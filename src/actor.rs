@@ -19,11 +19,6 @@ pub const LOCATION: &str = "RelativeLocation";
 pub const ROTATION: &str = "RelativeRotation";
 pub const SCALE: &str = "RelativeScale3D";
 
-pub enum DrawType {
-    Mesh(String),
-    Cube,
-}
-
 #[derive(bevy::prelude::Bundle)]
 pub struct SelectedBundle {
     selected: Selected,
@@ -58,7 +53,6 @@ pub struct Actor {
     transform: usize,
     pub name: String,
     pub class: String,
-    pub draw_type: DrawType,
 }
 
 impl Actor {
@@ -66,7 +60,10 @@ impl Actor {
         PackageIndex::new(self.export as i32 + 1)
     }
 
-    pub fn new(asset: &crate::Asset, package: PackageIndex) -> Result<Self, Error> {
+    pub fn new(
+        asset: &crate::Asset,
+        package: PackageIndex,
+    ) -> Result<(Option<String>, Self), Error> {
         if package.index == 0 {
             return Err(Error::invalid_package_index(
                 "actor was null reference".to_string(),
@@ -103,7 +100,7 @@ impl Actor {
             .get_import(norm.base_export.class_index)
             .map(|import| import.object_name.get_owned_content())
             .unwrap_or_default();
-        let draw_type = norm
+        let path = norm
             .properties
             .iter()
             .find_map(|comp| {
@@ -120,32 +117,34 @@ impl Actor {
             })
             .and_then(|i| asset.get_import(i.value))
             .and_then(|i| asset.get_import(i.outer_index))
-            .map_or(DrawType::Cube, |path| {
-                DrawType::Mesh(path.object_name.get_owned_content())
-            });
+            .map(|path| path.object_name.get_owned_content());
         // normally these are further back so reversed should be a bit faster
         for prop in norm.properties.iter().rev() {
             match prop.get_name().get_owned_content().as_str() {
                 // of course this wouldn't be able to be detected if all transforms were left default
                 LOCATION | ROTATION | SCALE => {
-                    return Ok(Self {
-                        export,
-                        transform: export,
-                        name,
-                        class,
-                        draw_type,
-                    })
+                    return Ok((
+                        path,
+                        Self {
+                            export,
+                            transform: export,
+                            name,
+                            class,
+                        },
+                    ))
                 }
                 "RootComponent" => {
                     if let Property::ObjectProperty(obj) = prop {
                         if obj.value.is_export() {
-                            return Ok(Self {
-                                export,
-                                transform: obj.value.index as usize - 1,
-                                name,
-                                class,
-                                draw_type,
-                            });
+                            return Ok((
+                                path,
+                                Self {
+                                    export,
+                                    transform: obj.value.index as usize - 1,
+                                    name,
+                                    class,
+                                },
+                            ));
                         }
                     }
                 }
