@@ -66,7 +66,7 @@ pub fn open(
             threadPhase: u32,
         ) -> i32;
     }
-    let mut paks: Vec<_> = appdata
+    let paks: Vec<_> = appdata
         .paks
         .iter()
         .filter_map(|dir| std::fs::read_dir(dir).ok())
@@ -75,7 +75,7 @@ pub fn open(
         .map(|dir| dir.path())
         .filter_map(|path| {
             use aes::cipher::KeyInit;
-            let mut pak_file = std::io::BufReader::new(std::fs::File::open(path).ok()?);
+            let mut pak_file = std::io::BufReader::new(std::fs::File::open(path.clone()).ok()?);
             let mut pak = repak::PakBuilder::new();
             if let Some(key) = key
                 .as_deref()
@@ -107,7 +107,7 @@ pub fn open(
                 });
             }
             let pak = pak.reader(&mut pak_file).ok()?;
-            Some((pak_file, pak))
+            Some((path, pak))
         })
         .collect();
     let cache = config()
@@ -133,129 +133,117 @@ pub fn open(
             }
         }
     }
-    for path in batch.keys().cloned().collect::<Vec<_>>() {
-        let Some(path) = path else { continue };
-        match paks.iter_mut().find_map(|(pak_file, pak)| {
-            asset::get(
-                pak,
-                pak_file,
-                cache.as_deref(),
-                &path,
-                version,
-                |asset, _| Ok(extras::get_mesh_info(asset)?),
-            )
-            .ok()
-            .map(|mesh| (mesh, pak_file, pak))
-        }) {
-            Some(((positions, indices, uvs, mats, _mat_data), pak_file, pak)) => {
-                registry.0.insert(path.clone(), (
-                    meshes.add(
-                        Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList, default())
-                            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-                            .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>())
-                            .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
-                    ),
-                    match appdata.textures {
-                        true => {
-                            let mats: Vec<_> = mats
-                                .into_iter()
-                                .map(|path| {
-                                    match asset::get(
-                                        pak,
-                                        pak_file,
-                                        cache.as_deref(),
-                                        &path,
-                                        version,
-                                        |mat, _| Ok(extras::get_tex_paths(mat)),
-                                    ) {
-                                        Ok(paths) => {
-                                            paths.into_iter().find_map(|path|
-                                                match asset::get(
-                                                    pak,
-                                                    pak_file,
-                                                    cache.as_deref(),
-                                                    &path,
-                                                    version,
-                                                    |tex, bulk| {
-                                                        Ok(extras::get_tex_info(tex, bulk)?)
-                                                    },
-                                                ) {
-                                                    Ok((false, x, y, data)) => Some((x,y,data)),
-                                                    Ok((true, ..)) => None,
-                                                    Err(e) => {
-                                                        notif.send(
-                                                            Notif {
-                                                                message: format!(
-                                                                    "{}: {e}",
-                                                                    path.split('/')
-                                                                        .last()
-                                                                        .unwrap_or_default()
-                                                                ),
-                                                                kind: Warning
-                                                            }
-                                                        );
-                                                        None
-                                                    }
-                                                }
-                                            )
-                                        },
-                                        _ => None,
-                                    }
-                                })
-                                .collect();
-                                mats.into_iter().flatten().map(|(width, height, data)| {
-                                    materials.add(unlit::Unlit {
-                                        texture: images.add(Image {
-                                            data,
-                                            texture_descriptor: bevy::render::render_resource::TextureDescriptor {
-                                                label: None,
-                                                size: bevy::render::render_resource::Extent3d {
-                                                    width,
-                                                    height,
-                                                    depth_or_array_layers: 1,
-                                                },
-                                                mip_level_count: 1,
-                                                sample_count: 1,
-                                                dimension: bevy::render::render_resource::TextureDimension::D2,
-                                                format: bevy::render::render_resource::TextureFormat::Rgba8Unorm,
-                                                usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
-                                                view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8Unorm],
+    let keys = batch.keys().cloned().filter_map(|k| k).collect::<Vec<_>>();
+    std::thread::scope(|s| {
+        let threads: Vec<_> = keys
+            .into_iter()
+            .map(|path| {
+                s.spawn(|| {
+                    // capture path
+                    let path = path;
+                    let ((positions, indices, uvs, mats, _mat_data), pak_file, pak) =
+                        paks.iter().find_map(|(pak_file, pak)| {
+                            asset::get(
+                                pak,
+                                pak_file,
+                                cache.as_deref(),
+                                &path,
+                                version,
+                                |asset, _| Ok(extras::get_mesh_info(asset)?),
+                            )
+                            .ok()
+                            .map(|mesh| (mesh, pak_file, pak))
+                        })?;
+                    let mut tex = None;
+                    if appdata.textures {
+                        'outer: for mat in mats {
+                            let Ok(paths) = asset::get(
+                                pak,
+                                pak_file,
+                                cache.as_deref(),
+                                &mat,
+                                version,
+                                |mat, _| Ok(extras::get_tex_paths(mat)),
+                            ) else {
+                                continue;
+                            };
+                            for path in paths {
+                                if let Ok((false, width, height, data)) = asset::get(
+                                    pak,
+                                    pak_file,
+                                    cache.as_deref(),
+                                    &path,
+                                    version,
+                                    |tex, bulk| Ok(extras::get_tex_info(tex, bulk)?),
+                                ) {
+                                    tex = Some(Image {
+                                        data,
+                                        texture_descriptor: bevy::render::render_resource::TextureDescriptor {
+                                            label: None,
+                                            size: bevy::render::render_resource::Extent3d {
+                                                width,
+                                                height,
+                                                depth_or_array_layers: 1,
                                             },
-                                            sampler: bevy::render::texture::ImageSampler::Descriptor(
-                                                bevy::render::texture::ImageSamplerDescriptor {
-                                                    address_mode_u: bevy::render::texture::ImageAddressMode::Repeat,
-                                                    address_mode_v: bevy::render::texture::ImageAddressMode::Repeat,
-                                                    address_mode_w: bevy::render::texture::ImageAddressMode::Repeat,
-                                                    ..default()
-                                                },
-                                            ),
-                                            ..default()
-                                        }),
-                                    })
-                                }).collect()
-                        },
-                        false => vec![consts.grid.clone_weak()],
-                    }
-                ));
-            }
-            None => {
-                notif.send(Notif {
-                    message: format!("mesh not found at {path}"),
-                    kind: Warning,
-                });
-                let removed = batch.remove(&Some(path));
-                if let Some(actors) = removed {
-                    match batch.get_mut(&None) {
-                        Some(vec) => vec.extend(actors),
-                        None => {
-                            batch.insert(None, actors);
+                                            mip_level_count: 1,
+                                            sample_count: 1,
+                                            dimension: bevy::render::render_resource::TextureDimension::D2,
+                                            format: bevy::render::render_resource::TextureFormat::Rgba8Unorm,
+                                            usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
+                                            view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8Unorm],
+                                        },
+                                        sampler: bevy::render::texture::ImageSampler::Descriptor(
+                                            bevy::render::texture::ImageSamplerDescriptor {
+                                                address_mode_u: bevy::render::texture::ImageAddressMode::Repeat,
+                                                address_mode_v: bevy::render::texture::ImageAddressMode::Repeat,
+                                                address_mode_w: bevy::render::texture::ImageAddressMode::Repeat,
+                                                ..default()
+                                            },
+                                        ),
+                                        ..default()
+                                    });
+                                    break 'outer;
+                                }
+                            }
                         }
                     }
+                    Some((
+                        path,
+                        Mesh::new(
+                            bevy::render::render_resource::PrimitiveTopology::TriangleList,
+                            default(),
+                        )
+                        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+                        .with_inserted_attribute(
+                            Mesh::ATTRIBUTE_UV_0,
+                            uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>(),
+                        )
+                        .with_inserted_indices(bevy::render::mesh::Indices::U32(indices)),
+                        tex
+                    ))
+                })
+            })
+            .collect();
+        for thread in threads {
+            match thread.join() {
+                Ok(Some((path, mesh, tex))) => {
+                    registry.0.insert(
+                        path.clone(),
+                        (
+                            meshes.add(mesh),
+                            tex.map(|tex| {
+                                materials.add(unlit::Unlit {
+                                    texture: images.add(tex),
+                                })
+                            }),
+                        ),
+                    );
                 }
-                continue;
+                Ok(None) => todo!(),
+                Err(_) => continue,
             }
         }
-    }
+    });
     for (path, actors) in batch {
         match path {
             Some(path) => {
@@ -265,7 +253,7 @@ pub fn open(
                         MaterialMeshBundle {
                             mesh: mesh.clone_weak(),
                             material: material
-                                .first()
+                                .as_ref()
                                 .map(Handle::clone_weak)
                                 .unwrap_or(consts.grid.clone_weak()),
                             transform: actor.transform(&asset),

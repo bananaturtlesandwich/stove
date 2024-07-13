@@ -36,7 +36,7 @@ struct Notif {
 struct Notifs(egui_notify::Toasts);
 
 #[derive(Default, Resource)]
-struct Registry(std::collections::BTreeMap<String, (Handle<Mesh>, Vec<Handle<unlit::Unlit>>)>);
+struct Registry(std::collections::BTreeMap<String, (Handle<Mesh>, Option<Handle<unlit::Unlit>>)>);
 
 #[derive(Default, Resource)]
 struct Focus(Option<Vec3>);

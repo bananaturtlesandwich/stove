@@ -50,7 +50,7 @@ pub fn duplicate(
                     MaterialMeshBundle {
                         mesh: mesh.clone_weak(),
                         material: material
-                            .first()
+                            .as_ref()
                             .map(Handle::clone_weak)
                             .unwrap_or(consts.grid.clone_weak()),
                         transform: actor.transform(map),

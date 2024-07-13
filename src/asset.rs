@@ -33,7 +33,7 @@ pub fn save<C: std::io::Read + std::io::Seek>(
 
 pub fn get<T>(
     pak: &repak::PakReader,
-    pak_file: &mut std::io::BufReader<std::fs::File>,
+    pak_file: &std::path::Path,
     cache: Option<&std::path::Path>,
     path: &str,
     version: unreal_asset::engine_version::EngineVersion,
@@ -59,6 +59,7 @@ pub fn get<T>(
         }
         None
     }
+    let pak_file = &mut std::io::BufReader::new(std::fs::File::open(pak_file)?);
     let path = path
         .replace(
             "/Game",
