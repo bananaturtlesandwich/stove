@@ -250,10 +250,10 @@ pub fn ui(
                             commands
                                 .spawn((
                                     actor::Selected,
-                                    PbrBundle {
-                                        mesh: consts.bounds.clone_weak(),
-                                        transform: actor.transform(map),
+                                    consts.bounds.clone_weak(),
+                                    SpatialBundle {
                                         visibility: Visibility::Hidden,
+                                        transform: actor.transform(map),
                                         ..default()
                                     },
                                     bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
@@ -262,7 +262,7 @@ pub fn ui(
                                 .with_children(|parent| {
                                     parent.spawn(MaterialMeshBundle {
                                         mesh: consts.cube.clone_weak(),
-                                        material: consts.unselected.clone_weak(),
+                                        material: consts.selected.clone_weak(),
                                         visibility: Visibility::Visible,
                                         ..default()
                                     });
