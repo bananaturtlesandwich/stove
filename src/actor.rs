@@ -37,7 +37,7 @@ impl Default for SelectedBundle {
             outline: bevy_mod_outline::OutlineBundle {
                 outline: bevy_mod_outline::OutlineVolume {
                     visible: true,
-                    colour: bevy::prelude::Color::rgb(1.0, 1.0, 0.5),
+                    colour: bevy::prelude::Color::srgb(1.0, 1.0, 0.5),
                     width: 15.0,
                 },
                 ..Default::default()

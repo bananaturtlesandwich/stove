@@ -36,7 +36,7 @@ impl Material for Wire {
     fn specialize(
         _: &bevy::pbr::MaterialPipeline<Self>,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _: &bevy::render::mesh::MeshVertexBufferLayout,
+        _: &bevy::render::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         if key.bind_group_data.selected {

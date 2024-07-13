@@ -133,7 +133,7 @@ macro_rules! delegate {
 fn drag<Num: egui::emath::Numeric>(ui: &mut egui::Ui, val: &mut Num) {
     ui.add(
         egui::widgets::DragValue::new(val)
-            .clamp_range(Num::MIN..=Num::MAX)
+            .range(Num::MIN..=Num::MAX)
             .speed(1.0),
     );
 }
@@ -238,7 +238,7 @@ fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelud
                             let mut drag = |num| {
                                 ui.add(
                                     egui::widgets::DragValue::new(num)
-                                        .clamp_range(f64::MIN..=f64::MAX)
+                                        .range(f64::MIN..=f64::MAX)
                                         .speed(1.0),
                                 )
                             };

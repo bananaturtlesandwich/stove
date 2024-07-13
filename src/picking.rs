@@ -105,22 +105,32 @@ pub fn drag(
     match drag.as_mut() {
         Drag::None => (),
         Drag::Translate(pos) => {
-            let Some(data) =
-                camera
-                    .0
-                    .intersect_primitive(bevy_mod_raycast::primitives::Primitive3d::Plane {
-                        point: *pos,
-                        normal: match lock.as_ref() {
-                            Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
-                            Lock::XY | Lock::X => Vec3::Z,
-                            Lock::YZ | Lock::Y => Vec3::X,
-                            Lock::ZX | Lock::Z => Vec3::Y,
-                        },
-                    })
+            let Some(ray) = camera.0.ray else { return };
+            let Some(dist) = ray.intersect_plane(
+                *pos,
+                InfinitePlane3d::new(match lock.as_ref() {
+                    Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
+                    Lock::XY | Lock::X => Vec3::Z,
+                    Lock::YZ | Lock::Y => Vec3::X,
+                    Lock::ZX | Lock::Z => Vec3::Y,
+                }),
+            )
+            // camera
+            //     .0
+            //     .intersect_primitive(bevy_mod_raycast::primitives::Primitive3d::Plane {
+            //         point: *pos,
+            //         normal: match lock.as_ref() {
+            //             Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
+            //             Lock::XY | Lock::X => Vec3::Z,
+            //             Lock::YZ | Lock::Y => Vec3::X,
+            //             Lock::ZX | Lock::Z => Vec3::Y,
+            //         },
+            //     })
             else {
                 return;
             };
-            let mut offset = data.position() - *pos;
+            let hit = ray.origin + ray.direction * dist;
+            let mut offset = hit - *pos;
             for (actor, mut transform) in selected.iter_mut() {
                 match lock.as_ref() {
                     Lock::X => offset.y = 0.0,
@@ -131,7 +141,7 @@ pub fn drag(
                 actor.add_location(map, offset);
                 transform.translation += offset;
             }
-            *drag = Drag::Translate(data.position());
+            *drag = Drag::Translate(hit);
         }
         Drag::Rotate(start, prev) => {
             let current =
