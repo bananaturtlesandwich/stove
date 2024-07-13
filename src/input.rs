@@ -1,28 +1,27 @@
 use super::*;
 
 pub fn shortcuts(
+    mut commands: Commands,
     mut lock: ResMut<Lock>,
-    mut dialog: EventWriter<Dialog>,
-    mut action: EventWriter<Action>,
     keys: Res<ButtonInput<KeyCode>>,
     mut ctx: bevy_egui::EguiContexts,
 ) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     if keys.just_released(KeyCode::KeyO) && ctrl {
-        dialog.send(Dialog::Open(None));
+        commands.trigger(triggers::Open(None));
     }
     if keys.just_released(KeyCode::KeyO) && keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight])
     {
-        dialog.send(Dialog::AddPak);
+        commands.trigger(triggers::AddPak);
     }
     if keys.just_released(KeyCode::KeyS) && ctrl {
-        dialog.send(Dialog::SaveAs(
+        commands.trigger(triggers::SaveAs(
             keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
         ));
     }
     if keys.just_released(KeyCode::KeyT) && ctrl {
-        dialog.send(Dialog::Transplant);
+        commands.trigger(triggers::Transplant);
     }
     if keys.just_pressed(KeyCode::KeyX) {
         *lock = match shift {
@@ -47,16 +46,16 @@ pub fn shortcuts(
         return;
     }
     if keys.just_released(KeyCode::Delete) {
-        action.send(Action::Delete);
+        commands.trigger(triggers::Delete);
     }
     if keys.just_released(KeyCode::KeyF) {
-        action.send(Action::Focus);
+        commands.trigger(triggers::Focus);
     }
     if keys.just_released(KeyCode::KeyC) && ctrl {
-        action.send(Action::Copy);
+        commands.trigger(triggers::Copy);
     }
     if keys.just_released(KeyCode::KeyV) && ctrl {
-        action.send(Action::Paste);
+        commands.trigger(triggers::Paste);
     }
 }
 

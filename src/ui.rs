@@ -4,7 +4,6 @@ pub fn ui(
     mut ctx: bevy_egui::EguiContexts,
     mut appdata: ResMut<AppData>,
     mut commands: Commands,
-    mut dialog: EventWriter<Dialog>,
     mut notif: EventWriter<Notif>,
     mut map: NonSendMut<Map>,
     mut transplant: NonSendMut<Transplant>,
@@ -22,21 +21,21 @@ pub fn ui(
                     .add(egui::Button::new("open").shortcut_text("ctrl + o"))
                     .clicked()
                 {
-                    dialog.send(Dialog::Open(None));
+                    commands.trigger(triggers::Open(None));
                     ui.close_menu();
                 }
                 if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
                     .clicked()
                 {
-                    dialog.send(Dialog::SaveAs(false));
+                    commands.trigger(triggers::SaveAs(false));
                     ui.close_menu();
                 }
                 if ui
                     .add(egui::Button::new("save as").shortcut_text("ctrl + shift + s"))
                     .clicked()
                 {
-                    dialog.send(Dialog::SaveAs(true));
+                    commands.trigger(triggers::SaveAs(true));
                     ui.close_menu();
                 }
             });
@@ -70,7 +69,7 @@ pub fn ui(
                     .add(egui::Button::new("add pak folder").shortcut_text("alt + o"))
                     .clicked()
                 {
-                    dialog.send(Dialog::AddPak);
+                    commands.trigger(triggers::AddPak);
                 }
             });
             ui.menu_button("options", |ui| {

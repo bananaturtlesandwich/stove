@@ -12,7 +12,6 @@ pub fn pick(
     children: Query<&Children>,
     mut cubes: Query<&mut Handle<wire::Wire>>,
     mut ctx: bevy_egui::EguiContexts,
-    mut action: EventWriter<Action>,
 ) {
     // EguiContexts isn't a ReadOnlySystemParam so can't make into a conditional
     if ctx.ctx_mut().is_pointer_over_area() {
@@ -26,7 +25,7 @@ pub fn pick(
             match &mouse {
                 mouse if mouse.just_pressed(MouseButton::Left) => {
                     if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-                        action.send(Action::Duplicate);
+                        commands.trigger(triggers::Duplicate);
                     }
                     *drag = Drag::Translate(data.position())
                 }

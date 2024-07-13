@@ -31,7 +31,7 @@ pub fn check_updates(mut notif: EventWriter<Notif>) {
     }
 }
 
-pub fn check_args(mut notif: EventWriter<Notif>, mut dialog: EventWriter<Dialog>) {
+pub fn check_args(mut notif: EventWriter<Notif>, mut commands: Commands) {
     let Some(path) = std::env::args().nth(1) else {
         return;
     };
@@ -43,7 +43,7 @@ pub fn check_args(mut notif: EventWriter<Notif>, mut dialog: EventWriter<Dialog>
         });
         return;
     }
-    dialog.send(Dialog::Open(Some(path)));
+    commands.trigger(triggers::Open(Some(path)));
 }
 
 pub fn initialise(

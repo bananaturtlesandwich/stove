@@ -12,6 +12,7 @@ mod input;
 mod persistence;
 mod picking;
 mod startup;
+mod triggers;
 mod ui;
 mod unlit;
 mod wire;
@@ -29,23 +30,6 @@ struct Transplant(Option<(Asset, Vec<actor::Actor>, Vec<usize>)>);
 struct Notif {
     message: String,
     kind: egui_notify::ToastLevel,
-}
-
-#[derive(Event)]
-enum Action {
-    Duplicate,
-    Delete,
-    Focus,
-    Copy,
-    Paste,
-}
-
-#[derive(Event)]
-enum Dialog {
-    Open(Option<std::path::PathBuf>),
-    SaveAs(bool),
-    AddPak,
-    Transplant,
 }
 
 #[derive(Default, Resource)]
@@ -180,8 +164,6 @@ fn main() {
         .init_resource::<Buffer>()
         .init_resource::<Client>()
         .add_event::<Notif>()
-        .add_event::<Action>()
-        .add_event::<Dialog>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
@@ -191,11 +173,10 @@ fn main() {
         .add_systems(Startup, startup::initialise)
         .add_systems(
             Update,
-            |mut drops: EventReader<bevy::window::FileDragAndDrop>,
-             mut dialog: EventWriter<Dialog>| {
+            |mut drops: EventReader<bevy::window::FileDragAndDrop>, mut commands: Commands| {
                 for drop in drops.read() {
                     if let bevy::window::FileDragAndDrop::DroppedFile { path_buf, .. } = drop {
-                        dialog.send(Dialog::Open(Some(path_buf.clone())));
+                        commands.trigger(triggers::Open(Some(path_buf.clone())));
                     }
                 }
             },
@@ -219,8 +200,16 @@ fn main() {
                 notifs.0.show(ctx.ctx_mut());
             },
         )
-        .add_systems(Update, dialog::respond)
-        .add_systems(Update, action::follow)
+        .observe(dialog::open)
+        .observe(dialog::save_as)
+        .observe(dialog::add_pak)
+        .observe(dialog::transplant)
+        .observe(action::duplicate)
+        .observe(action::delete)
+        .observe(action::focus)
+        .add_systems(Update, action::approach)
+        .observe(action::copy)
+        .observe(action::paste)
         .run();
 }
 
