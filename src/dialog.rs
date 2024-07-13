@@ -11,7 +11,7 @@ pub fn respond(
     mut transplant: NonSendMut<Transplant>,
     mut registry: ResMut<Registry>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<unlit::Unlit>>,
     mut images: ResMut<Assets<Image>>,
     consts: Res<Constants>,
 ) {
@@ -189,8 +189,8 @@ pub fn respond(
                                                                     })
                                                                     .collect();
                                                                     mats.into_iter().flatten().map(|(width, height, data)| {
-                                                                        materials.add(StandardMaterial {
-                                                                            base_color_texture: Some(images.add(Image {
+                                                                        materials.add(unlit::Unlit {
+                                                                            texture: images.add(Image {
                                                                                 data,
                                                                                 texture_descriptor: bevy::render::render_resource::TextureDescriptor {
                                                                                     label: None,
@@ -215,9 +215,7 @@ pub fn respond(
                                                                                     },
                                                                                 ),
                                                                                 ..default()
-                                                                            })),
-                                                                            unlit: true,
-                                                                            ..default()
+                                                                            }),
                                                                         })
                                                                     }).collect()
                                                             },

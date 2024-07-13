@@ -13,6 +13,7 @@ mod persistence;
 mod picking;
 mod startup;
 mod ui;
+mod unlit;
 mod wire;
 
 type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
@@ -51,7 +52,7 @@ enum Dialog {
 struct Notifs(egui_notify::Toasts);
 
 #[derive(Default, Resource)]
-struct Registry(std::collections::BTreeMap<String, (Handle<Mesh>, Vec<Handle<StandardMaterial>>)>);
+struct Registry(std::collections::BTreeMap<String, (Handle<Mesh>, Vec<Handle<unlit::Unlit>>)>);
 
 #[derive(Default, Resource)]
 struct Focus(Option<Vec3>);
@@ -79,7 +80,7 @@ struct Constants {
     bounds: Handle<Mesh>,
     unselected: Handle<wire::Wire>,
     selected: Handle<wire::Wire>,
-    grid: Handle<StandardMaterial>,
+    grid: Handle<unlit::Unlit>,
 }
 
 #[derive(Default, Resource)]
@@ -158,6 +159,7 @@ fn main() {
                 }),
                 ..default()
             }),
+            unlit::UnlitPlugin,
             wire::WirePlugin,
             bevy_egui::EguiPlugin,
             smooth_bevy_cameras::LookTransformPlugin,

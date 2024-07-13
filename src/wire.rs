@@ -5,7 +5,7 @@ pub struct WirePlugin;
 impl Plugin for WirePlugin {
     fn build(&self, app: &mut App) {
         use bevy::asset::embedded_asset;
-        embedded_asset!(app, "../assets/wire.wgsl");
+        embedded_asset!(app, "wire.wgsl");
         app.add_plugins(MaterialPlugin::<Wire>::default());
     }
 }
@@ -31,7 +31,7 @@ impl From<&Wire> for Key {
 
 impl Material for Wire {
     fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
-        "embedded://stove/../assets/wire.wgsl".into()
+        "embedded://stove/wire.wgsl".into()
     }
     fn specialize(
         _: &bevy::pbr::MaterialPipeline<Self>,

@@ -50,7 +50,7 @@ pub fn initialise(
     mut commands: Commands,
     mut client: ResMut<Client>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<unlit::Unlit>>,
     mut wire: ResMut<Assets<wire::Wire>>,
     mut images: ResMut<Assets<Image>>,
 ) {
@@ -102,8 +102,8 @@ pub fn initialise(
         bounds: meshes.add(Cuboid::from_corners(Vec3::splat(-0.5), Vec3::splat(0.5))),
         unselected: wire.add(wire::Wire { selected: false }),
         selected: wire.add(wire::Wire { selected: true }),
-        grid: materials.add(StandardMaterial {
-            base_color_texture: Some(images.add(Image {
+        grid: materials.add(unlit::Unlit {
+            texture: images.add(Image {
                 data: include_bytes!("../assets/DefaultWhiteGrid.rgba").into(),
                 texture_descriptor: bevy::render::render_resource::TextureDescriptor {
                     label: None,
@@ -128,9 +128,7 @@ pub fn initialise(
                     },
                 ),
                 ..default()
-            })),
-            unlit: true,
-            ..default()
+            }),
         }),
     })
 }
