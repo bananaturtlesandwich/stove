@@ -173,17 +173,7 @@ pub fn load_paks(mut notif: EventWriter<Notif>, appdata: Res<AppData>, mut paks:
     let Ok(files) = std::fs::read_dir(path) else {
         return;
     };
-    paks.0 = match path.split('\\').rev().nth(2) {
-        Some(name) => name.into(),
-        None => {
-            let len = path.len();
-            match len < 12 {
-                true => path.into(),
-                false => format!("...{}", &path[len - 12..len]),
-            }
-        }
-    };
-    paks.1 = files
+    paks.0 = files
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .filter_map(|path| {

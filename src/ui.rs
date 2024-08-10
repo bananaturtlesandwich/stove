@@ -44,13 +44,8 @@ pub fn ui(
             egui::ComboBox::from_id_source("version").width(0.0)
                 .show_index(ui, &mut appdata.version, VERSIONS.len(), |i| VERSIONS[i].1.to_string());
             let mut remove_at = None;
-            let mut text = false;
             // kinda wanna split appdata into components so this isn't necessary
-            let source = "pak list";
-            egui::ComboBox::from_id_source(source).selected_text(match appdata.pak.is_some() {
-                true => &paks.0,
-                false => "no paks",
-            }).show_ui(ui, |ui| {
+            ui.menu_button("paks", |ui| {
                 for i in 0..appdata.paks.len() {
                     ui.horizontal(|ui| {
                         let selected = appdata.pak == Some(i);
@@ -61,13 +56,11 @@ pub fn ui(
                             };
                             commands.trigger(triggers::LoadPaks);
                         }
-                        if egui::TextEdit::singleline(&mut appdata.paks[i].1)
+                        egui::TextEdit::singleline(&mut appdata.paks[i].1)
                             .clip_text(false)
                             .hint_text("aes key if needed")
                             .desired_width(100.0)
-                            .show(ui).response.clicked() {
-                                text = true
-                            }
+                            .show(ui);
                         if ui.button("x").clicked() {
                             if selected {
                                 appdata.pak = None;
@@ -84,12 +77,6 @@ pub fn ui(
                     commands.trigger(triggers::AddPak);
                 }
             });
-            // keep combobox open
-            if text {
-                let button = ui.make_persistent_id(source);
-                let popup = button.with("popup");
-                ui.memory_mut(|m| m.open_popup(popup));
-            }
             if let Some(i) = remove_at {
                 appdata.paks.remove(i);
             }

@@ -67,7 +67,7 @@ pub fn open(
                 s.spawn(|| {
                     // capture path
                     let path = path;
-                    match paks.1.iter().find_map(|(pak_file, pak)| {
+                    match paks.0.iter().find_map(|(pak_file, pak)| {
                         asset::get(
                             pak,
                             pak_file,
