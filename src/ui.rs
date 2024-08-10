@@ -3,6 +3,7 @@ use super::*;
 pub fn ui(
     mut ctx: bevy_egui::EguiContexts,
     mut appdata: ResMut<AppData>,
+    mut paks: ResMut<Paks>,
     mut commands: Commands,
     mut notif: EventWriter<Notif>,
     mut map: NonSendMut<Map>,
@@ -40,31 +41,41 @@ pub fn ui(
                     ui.close_menu();
                 }
             });
-            egui::ComboBox::from_id_source("version")
+            egui::ComboBox::from_id_source("version").width(0.0)
                 .show_index(ui, &mut appdata.version, VERSIONS.len(), |i| VERSIONS[i].1.to_string());
-            ui.menu_button("paks", |ui| {
-                egui::TextEdit::singleline(&mut appdata.aes)
-                    .clip_text(false)
-                    .hint_text("aes key if needed")
-                    .show(ui);
-                let mut remove_at = None;
-                egui::ScrollArea::vertical().show_rows(
-                    ui,
-                    ui.text_style_height(&egui::TextStyle::Body),
-                    appdata.paks.len(),
-                    |ui, range| {
-                        for i in range {
-                            ui.horizontal(|ui| {
-                                ui.label(&appdata.paks[i]);
-                                if ui.button("x").clicked() {
-                                    remove_at = Some(i);
-                                }
-                            });
+            let mut remove_at = None;
+            let mut text = false;
+            // kinda wanna split appdata into components so this isn't necessary
+            let source = "pak list";
+            egui::ComboBox::from_id_source(source).selected_text(match appdata.pak.is_some() {
+                true => &paks.0,
+                false => "no paks",
+            }).show_ui(ui, |ui| {
+                for i in 0..appdata.paks.len() {
+                    ui.horizontal(|ui| {
+                        let selected = appdata.pak == Some(i);
+                        if ui.selectable_label(selected, &appdata.paks[i].0).clicked() {
+                            appdata.pak = match selected {
+                                true => None,
+                                false => Some(i),
+                            };
+                            commands.trigger(triggers::LoadPaks);
                         }
-                    },
-                );
-                if let Some(i) = remove_at {
-                    appdata.paks.remove(i);
+                        if egui::TextEdit::singleline(&mut appdata.paks[i].1)
+                            .clip_text(false)
+                            .hint_text("aes key if needed")
+                            .desired_width(100.0)
+                            .show(ui).response.clicked() {
+                                text = true
+                            }
+                        if ui.button("x").clicked() {
+                            if selected {
+                                appdata.pak = None;
+                                paks.0.clear();
+                            }
+                            remove_at = Some(i)
+                        }
+                    });
                 }
                 if ui
                     .add(egui::Button::new("add pak folder").shortcut_text("alt + o"))
@@ -73,6 +84,15 @@ pub fn ui(
                     commands.trigger(triggers::AddPak);
                 }
             });
+            // keep combobox open
+            if text {
+                let button = ui.make_persistent_id(source);
+                let popup = button.with("popup");
+                ui.memory_mut(|m| m.open_popup(popup));
+            }
+            if let Some(i) = remove_at {
+                appdata.paks.remove(i);
+            }
             ui.menu_button("options", |ui| {
                 ui.menu_button("about",|ui| {
                     ui.horizontal_wrapped(|ui| {

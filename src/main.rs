@@ -47,8 +47,8 @@ struct Focus(Option<Vec3>);
 #[derive(Default, Resource)]
 struct AppData {
     version: usize,
-    paks: Vec<String>,
-    aes: String,
+    paks: Vec<(String, String)>,
+    pak: Option<usize>,
     cache: bool,
     textures: bool,
     script: String,
@@ -56,6 +56,9 @@ struct AppData {
     cap: bool,
     rate: f64,
 }
+
+#[derive(Default, Resource)]
+struct Paks(String, Vec<(std::path::PathBuf, repak::PakReader)>);
 
 impl AppData {
     fn version(&self) -> unreal_asset::engine_version::EngineVersion {
@@ -160,6 +163,10 @@ fn main() -> AppExit {
             bevy_mod_outline::AutoGenerateOutlineNormalsPlugin,
             bevy_framepace::FramepacePlugin,
         ))
+        .configure_schedules(bevy::ecs::schedule::ScheduleBuildSettings {
+            ambiguity_detection: bevy::ecs::schedule::LogLevel::Warn,
+            ..default()
+        })
         .init_non_send_resource::<Map>()
         .init_non_send_resource::<Transplant>()
         .init_resource::<Notifs>()
@@ -169,12 +176,14 @@ fn main() -> AppExit {
         .init_resource::<Lock>()
         .init_resource::<Buffer>()
         .init_resource::<Client>()
+        .init_resource::<Paks>()
         .add_event::<Notif>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
         .add_systems(Update, persistence::write)
         .add_systems(Startup, startup::check_args.after(persistence::load))
+        .add_systems(Startup, startup::load_paks.after(persistence::load))
         .add_systems(Startup, startup::check_updates)
         .add_systems(Startup, startup::initialise)
         .add_systems(
@@ -216,6 +225,12 @@ fn main() -> AppExit {
         .add_systems(Update, action::approach)
         .observe(action::copy)
         .observe(action::paste)
+        .observe(
+            |_: Trigger<triggers::LoadPaks>,
+             notif: EventWriter<Notif>,
+             appdata: Res<AppData>,
+             paks: ResMut<Paks>| startup::load_paks(notif, appdata, paks),
+        )
         .run()
 }
 

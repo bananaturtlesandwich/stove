@@ -12,6 +12,7 @@ pub fn open(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<unlit::Unlit>>,
     mut images: ResMut<Assets<Image>>,
+    paks: Res<Paks>,
     consts: Res<Constants>,
 ) {
     let Some(path) = trigger.event().0.clone().or_else(|| {
@@ -35,81 +36,6 @@ pub fn open(
     for actor in actors.iter() {
         commands.entity(actor).despawn_recursive();
     }
-    let key = match hex::decode(appdata.aes.trim_start_matches("0x")) {
-        Ok(key) if !appdata.aes.is_empty() => Some(key),
-        Ok(_) => None,
-        Err(_) => {
-            notif.send(Notif {
-                message: "aes key is invalid hex".into(),
-                kind: Warning,
-            });
-            None
-        }
-    };
-    #[cfg(target_os = "windows")]
-    #[link(name = "oo2core_win64", kind = "static")]
-    extern "C" {
-        fn OodleLZ_Decompress(
-            compBuf: *const u8,
-            compBufSize: usize,
-            rawBuf: *mut u8,
-            rawLen: usize,
-            fuzzSafe: u32,
-            checkCRC: u32,
-            verbosity: u32,
-            decBufBase: u64,
-            decBufSize: usize,
-            fpCallback: u64,
-            callbackUserData: u64,
-            decoderMemory: *mut u8,
-            decoderMemorySize: usize,
-            threadPhase: u32,
-        ) -> i32;
-    }
-    let paks: Vec<_> = appdata
-        .paks
-        .iter()
-        .filter_map(|dir| std::fs::read_dir(dir).ok())
-        .flatten()
-        .filter_map(Result::ok)
-        .map(|dir| dir.path())
-        .filter_map(|path| {
-            use aes::cipher::KeyInit;
-            let mut pak_file = std::io::BufReader::new(std::fs::File::open(path.clone()).ok()?);
-            let mut pak = repak::PakBuilder::new();
-            if let Some(key) = key
-                .as_deref()
-                .and_then(|bytes| aes::Aes256::new_from_slice(bytes).ok())
-            {
-                pak = pak.key(key);
-            }
-            #[cfg(target_os = "windows")]
-            {
-                pak = pak.oodle(|| {
-                    Ok(|comp_buf, raw_buf| unsafe {
-                        OodleLZ_Decompress(
-                            comp_buf.as_ptr(),
-                            comp_buf.len(),
-                            raw_buf.as_mut_ptr(),
-                            raw_buf.len(),
-                            1,
-                            1,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            std::ptr::null_mut(),
-                            0,
-                            3,
-                        )
-                    })
-                });
-            }
-            let pak = pak.reader(&mut pak_file).ok()?;
-            Some((path, pak))
-        })
-        .collect();
     let cache = config()
         .filter(|_| appdata.cache)
         .map(|path| path.join("cache"));
@@ -141,41 +67,43 @@ pub fn open(
                 s.spawn(|| {
                     // capture path
                     let path = path;
-                    let ((positions, indices, uvs, mats, _mat_data), pak_file, pak) =
-                        paks.iter().find_map(|(pak_file, pak)| {
-                            asset::get(
-                                pak,
-                                pak_file,
-                                cache.as_deref(),
-                                &path,
-                                version,
-                                |asset, _| Ok(extras::get_mesh_info(asset)?),
+                    match paks.1.iter().find_map(|(pak_file, pak)| {
+                        asset::get(
+                            pak,
+                            pak_file,
+                            cache.as_deref(),
+                            &path,
+                            version,
+                            |asset, _| Ok(extras::get_mesh_info(asset)?),
+                        )
+                        .ok()
+                        .map(|mesh| (mesh, pak_file, pak))
+                    }) {
+                        Some(((positions, indices, uvs, mats, _mat_data), pak_file, pak)) => Ok((
+                            path,
+                            Mesh::new(
+                                bevy::render::render_resource::PrimitiveTopology::TriangleList,
+                                default(),
                             )
-                            .ok()
-                            .map(|mesh| (mesh, pak_file, pak))
-                        })?;
-                    Some((
-                        path,
-                        Mesh::new(
-                            bevy::render::render_resource::PrimitiveTopology::TriangleList,
-                            default(),
-                        )
-                        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-                        .with_inserted_attribute(
-                            Mesh::ATTRIBUTE_UV_0,
-                            uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>(),
-                        )
-                        .with_inserted_indices(bevy::render::mesh::Indices::U32(indices)),
-                        mats,
-                        pak_file,
-                        pak,
-                    ))
+                            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+                            .with_inserted_attribute(
+                                Mesh::ATTRIBUTE_UV_0,
+                                uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>(),
+                            )
+                            .with_inserted_indices(bevy::render::mesh::Indices::U32(indices)),
+                            mats,
+                            pak_file,
+                            pak,
+                        )),
+                        None => Err(path),
+                    }
                 })
             })
             .collect();
         for thread in threads {
             match thread.join() {
-                Ok(Some((path, mesh, mats, pak_file, pak))) => {
+                Ok(Ok((path, mesh, mats, pak_file, pak))) => {
+                    // hard to multithread material loading since the material might not parse
                     let mut tex = None;
                     if appdata.textures {
                         'outer: for mat in mats {
@@ -248,7 +176,13 @@ pub fn open(
                         );
                     }
                 }
-                Ok(None) => todo!(),
+                Ok(Err(path)) => {
+                    notif.send(Notif {
+                        message: format!("couldn't find the mesh at {path}"),
+                        kind: egui_notify::ToastLevel::Warning,
+                    });
+                    batch.remove(&Some(path));
+                }
                 Err(_) => continue,
             }
         }
@@ -392,7 +326,7 @@ pub fn add_pak(_: Trigger<triggers::AddPak>, mut appdata: ResMut<AppData>) {
         .pick_folder()
         .and_then(|path| path.to_str().map(str::to_string))
     {
-        appdata.paks.push(path)
+        appdata.paks.push((path, String::new()))
     }
 }
 

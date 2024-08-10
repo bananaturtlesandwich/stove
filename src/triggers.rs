@@ -21,3 +21,7 @@ pub struct SaveAs(pub bool);
 pub struct AddPak;
 #[derive(Event)]
 pub struct Transplant;
+
+// refreshes
+#[derive(Event)]
+pub struct LoadPaks;

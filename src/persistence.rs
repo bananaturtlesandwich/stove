@@ -30,7 +30,7 @@ pub fn load(
         }
         retrieve(&mut appdata.version, "VERSION", data);
         retrieve(&mut appdata.paks, "PAKS", data);
-        retrieve(&mut appdata.aes, "AES", data);
+        retrieve(&mut appdata.pak, "PAK", data);
         retrieve(&mut appdata.cache, "CACHE", data);
         retrieve(&mut appdata.textures, "TEXTURES", data);
         retrieve(&mut appdata.script, "SCRIPT", data);
@@ -53,7 +53,7 @@ pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>) {
         let storage = &mut storage.data;
         storage.insert_persisted(Id::new("VERSION"), appdata.version);
         storage.insert_persisted(Id::new("PAKS"), appdata.paks.clone());
-        storage.insert_persisted(Id::new("AES"), appdata.aes.clone());
+        storage.insert_persisted(Id::new("PAK"), appdata.pak.clone());
         storage.insert_persisted(Id::new("CACHE"), appdata.cache);
         storage.insert_persisted(Id::new("TEXTURES"), appdata.textures);
         storage.insert_persisted(Id::new("SCRIPT"), appdata.script.clone());
