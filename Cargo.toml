@@ -33,6 +33,7 @@ bevy_mod_outline = "0.8"
 bevy_egui = "0.28"
 egui = { version = "0.28", features = ["persistence", "serde"] }
 egui-notify = "0.15"
+bevy_framepace = { version = "0.17", default-features = false }
 discord-rich-presence = "0.2"
 dirs = "5.0"
 ron = "0.8"

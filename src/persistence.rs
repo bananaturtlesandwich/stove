@@ -1,8 +1,13 @@
 use super::*;
 
-pub fn load(mut commands: Commands, mut ctx: bevy_egui::EguiContexts) {
+pub fn load(
+    mut commands: Commands,
+    mut ctx: bevy_egui::EguiContexts,
+    mut fps: ResMut<bevy_framepace::FramepaceSettings>,
+) {
     let mut appdata = AppData {
         textures: true,
+        rate: 60.0,
         ..default()
     };
     ctx.ctx_mut().memory_mut(|storage| {
@@ -29,7 +34,13 @@ pub fn load(mut commands: Commands, mut ctx: bevy_egui::EguiContexts) {
         retrieve(&mut appdata.cache, "CACHE", data);
         retrieve(&mut appdata.textures, "TEXTURES", data);
         retrieve(&mut appdata.script, "SCRIPT", data);
+        retrieve(&mut appdata.cap, "CAP", data);
+        retrieve(&mut appdata.rate, "RATE", data);
     });
+    fps.limiter = match appdata.cap {
+        true => bevy_framepace::Limiter::from_framerate(appdata.rate),
+        false => bevy_framepace::Limiter::Off,
+    };
     commands.insert_resource(appdata);
 }
 
@@ -46,6 +57,8 @@ pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>) {
         storage.insert_persisted(Id::new("CACHE"), appdata.cache);
         storage.insert_persisted(Id::new("TEXTURES"), appdata.textures);
         storage.insert_persisted(Id::new("SCRIPT"), appdata.script.clone());
+        storage.insert_persisted(Id::new("CAP"), appdata.cap);
+        storage.insert_persisted(Id::new("RATE"), appdata.rate);
         if let Some(config) = config() {
             let _ = std::fs::create_dir_all(&config);
             if let Ok(data) = ron::to_string(&storage) {

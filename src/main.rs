@@ -50,6 +50,8 @@ struct AppData {
     textures: bool,
     script: String,
     query: String,
+    cap: bool,
+    rate: f64,
 }
 
 impl AppData {
@@ -133,7 +135,7 @@ fn activity() -> discord_rich_presence::activity::Activity<'static> {
         )])
 }
 
-fn main() {
+fn main() -> AppExit {
     App::new()
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
@@ -153,6 +155,7 @@ fn main() {
             bevy_mod_raycast::deferred::DeferredRaycastingPlugin::<()>::default(),
             bevy_mod_outline::OutlinePlugin,
             bevy_mod_outline::AutoGenerateOutlineNormalsPlugin,
+            bevy_framepace::FramepacePlugin,
         ))
         .init_non_send_resource::<Map>()
         .init_non_send_resource::<Transplant>()
@@ -210,7 +213,7 @@ fn main() {
         .add_systems(Update, action::approach)
         .observe(action::copy)
         .observe(action::paste)
-        .run();
+        .run()
 }
 
 use unreal_asset::engine_version::EngineVersion::*;

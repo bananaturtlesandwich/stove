@@ -8,6 +8,7 @@ pub fn ui(
     mut map: NonSendMut<Map>,
     mut transplant: NonSendMut<Transplant>,
     consts: Res<Constants>,
+    mut fps: ResMut<bevy_framepace::FramepaceSettings>,
     actors: Query<(Entity, &actor::Actor)>,
     mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
     children: Query<&Children>,
@@ -73,8 +74,8 @@ pub fn ui(
                 }
             });
             ui.menu_button("options", |ui| {
-                ui.menu_button("about",|ui|{
-                    ui.horizontal_wrapped(|ui|{
+                ui.menu_button("about",|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
                         ui.spacing_mut().item_spacing.x = size;
                         ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
@@ -83,11 +84,23 @@ pub fn ui(
                     });
                 });
                 ui.menu_button("shortcuts", shortcuts);
-                ui.horizontal(|ui|{
+                ui.horizontal(|ui| {
+                    ui.label("frame rate cap:"); 
+                    if ui.add(egui::Checkbox::without_text(&mut appdata.cap)).changed() {
+                        fps.limiter = match appdata.cap {
+                            true => bevy_framepace::Limiter::from_framerate(appdata.rate),
+                            false => bevy_framepace::Limiter::Off,
+                        }
+                    }
+                    if ui.add_enabled(appdata.cap, egui::DragValue::new(&mut appdata.rate)).changed() {
+                        fps.limiter = bevy_framepace::Limiter::from_framerate(appdata.rate)
+                    }
+                });
+                ui.horizontal(|ui| {
                     ui.label("cache meshes:");
                     ui.add(egui::Checkbox::without_text(&mut appdata.cache));
                 });
-                ui.horizontal(|ui|{
+                ui.horizontal(|ui| {
                     ui.label("use textures:");
                     ui.add(egui::Checkbox::without_text(&mut appdata.textures));
                 });
