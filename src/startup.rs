@@ -63,7 +63,10 @@ pub fn initialise(
     use smooth_bevy_cameras::controllers::unreal::*;
     commands
         .spawn((
-            Camera3dBundle::default(),
+            Camera3dBundle {
+                tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
+                ..default()
+            },
             bevy_mod_raycast::deferred::RaycastSource::<()>::new_cursor()
                 .with_visibility(bevy_mod_raycast::immediate::RaycastVisibility::Ignore),
         ))

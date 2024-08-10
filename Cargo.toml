@@ -25,7 +25,6 @@ bevy = { version = "0.14", default-features = false, features = [
     "bevy_pbr",
     "bevy_render",
     "multi_threaded",
-    "tonemapping_luts"
 ] }
 winit = "0.30"
 bevy_mod_raycast = { version = "0.18", default-features = false }
