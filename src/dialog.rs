@@ -154,9 +154,34 @@ pub fn open(
                             .ok()
                             .map(|mesh| (mesh, pak_file, pak))
                         })?;
+                    Some((
+                        path,
+                        Mesh::new(
+                            bevy::render::render_resource::PrimitiveTopology::TriangleList,
+                            default(),
+                        )
+                        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+                        .with_inserted_attribute(
+                            Mesh::ATTRIBUTE_UV_0,
+                            uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>(),
+                        )
+                        .with_inserted_indices(bevy::render::mesh::Indices::U32(indices)),
+                        mats,
+                        pak_file,
+                        pak,
+                    ))
+                })
+            })
+            .collect();
+        for thread in threads {
+            match thread.join() {
+                Ok(Some((path, mesh, mats, pak_file, pak))) => {
                     let mut tex = None;
                     if appdata.textures {
                         'outer: for mat in mats {
+                            if registry.mats.contains_key(&mat) {
+                                break;
+                            }
                             let Ok(paths) = asset::get(
                                 pak,
                                 pak_file,
@@ -176,7 +201,7 @@ pub fn open(
                                     version,
                                     |tex, bulk| Ok(extras::get_tex_info(tex, bulk)?),
                                 ) {
-                                    tex = Some(Image {
+                                    tex = Some((path, Image {
                                         data,
                                         texture_descriptor: bevy::render::render_resource::TextureDescriptor {
                                             label: None,
@@ -189,8 +214,11 @@ pub fn open(
                                             sample_count: 1,
                                             dimension: bevy::render::render_resource::TextureDimension::D2,
                                             format: bevy::render::render_resource::TextureFormat::Bgra8Unorm,
-                                            usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
-                                            view_formats: &[bevy::render::render_resource::TextureFormat::Bgra8Unorm],
+                                            usage:
+                                                bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
+                                            view_formats: &[
+                                                bevy::render::render_resource::TextureFormat::Bgra8Unorm,
+                                            ],
                                         },
                                         sampler: bevy::render::texture::ImageSampler::Descriptor(
                                             bevy::render::texture::ImageSamplerDescriptor {
@@ -201,43 +229,24 @@ pub fn open(
                                             },
                                         ),
                                         ..default()
-                                    });
+                                    }));
                                     break 'outer;
                                 }
                             }
                         }
                     }
-                    Some((
-                        path,
-                        Mesh::new(
-                            bevy::render::render_resource::PrimitiveTopology::TriangleList,
-                            default(),
-                        )
-                        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-                        .with_inserted_attribute(
-                            Mesh::ATTRIBUTE_UV_0,
-                            uvs.into_iter().map(|uv| uv[0]).collect::<Vec<_>>(),
-                        )
-                        .with_inserted_indices(bevy::render::mesh::Indices::U32(indices)),
-                        tex
-                    ))
-                })
-            })
-            .collect();
-        for thread in threads {
-            match thread.join() {
-                Ok(Some((path, mesh, tex))) => {
-                    registry.0.insert(
+                    registry.meshes.insert(
                         path.clone(),
-                        (
-                            meshes.add(mesh),
-                            tex.map(|tex| {
-                                materials.add(unlit::Unlit {
-                                    texture: images.add(tex),
-                                })
-                            }),
-                        ),
+                        (meshes.add(mesh), tex.as_ref().map(|(path, _)| path.clone())),
                     );
+                    if let Some((path, tex)) = tex {
+                        registry.mats.insert(
+                            path,
+                            materials.add(unlit::Unlit {
+                                texture: images.add(tex),
+                            }),
+                        );
+                    }
                 }
                 Ok(None) => todo!(),
                 Err(_) => continue,
@@ -246,15 +255,15 @@ pub fn open(
     });
     for (path, actors) in batch {
         match path {
-            Some(path) => {
-                let (mesh, material) = &registry.0[&path];
+            Some(ref path) => {
+                let (mesh, material) = &registry.meshes[path];
                 for actor in actors {
                     commands.spawn((
                         MaterialMeshBundle {
                             mesh: mesh.clone_weak(),
                             material: material
                                 .as_ref()
-                                .map(Handle::clone_weak)
+                                .map(|mat| registry.mats[mat].clone_weak())
                                 .unwrap_or(consts.grid.clone_weak()),
                             transform: actor.transform(&asset),
                             ..default()

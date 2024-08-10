@@ -44,14 +44,14 @@ pub fn duplicate(
         });
         match path {
             Some(ref path) => {
-                let (mesh, material) = &registry.0[path];
+                let (mesh, material) = &registry.meshes[path];
                 commands.spawn((
                     actor::SelectedBundle::default(),
                     MaterialMeshBundle {
                         mesh: mesh.clone_weak(),
                         material: material
                             .as_ref()
-                            .map(Handle::clone_weak)
+                            .map(|mat| registry.mats[mat].clone_weak())
                             .unwrap_or(consts.grid.clone_weak()),
                         transform: actor.transform(map),
                         ..default()
