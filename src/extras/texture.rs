@@ -200,15 +200,11 @@ pub fn get_tex_info<C: io::Read + io::Seek>(
         _ => Err("currently unsupported soz :p"),
     }
     .map_err(|e: &str| io::Error::new(io::ErrorKind::InvalidInput, format!("{format}: {e}")))?;
-    let mut rgba: Vec<_> = bgra.into_iter().flat_map(u32::to_le_bytes).collect();
-    for i in (0..rgba.len()).step_by(4) {
-        rgba.swap(i, i + 2)
-    }
     Ok((
         matches!(format.as_str(), "PF_G8" | "PF_BC5"),
         x as u32,
         y as u32,
-        rgba,
+        bgra.into_iter().flat_map(u32::to_le_bytes).collect(),
     ))
 }
 
