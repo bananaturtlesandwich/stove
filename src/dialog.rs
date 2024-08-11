@@ -214,22 +214,23 @@ pub fn open(
                 for actor in actors {
                     commands
                         .spawn((
-                            consts.bounds.clone_weak(),
-                            SpatialBundle {
-                                visibility: Visibility::Hidden,
+                            MaterialMeshBundle {
+                                mesh: consts.cube.clone_weak(),
+                                material: consts.unselected.clone_weak(),
                                 transform: actor.transform(&asset),
                                 ..default()
                             },
-                            bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
                             actor,
                         ))
                         .with_children(|parent| {
-                            parent.spawn(MaterialMeshBundle {
-                                mesh: consts.cube.clone_weak(),
-                                material: consts.unselected.clone_weak(),
-                                visibility: Visibility::Visible,
-                                ..default()
-                            });
+                            parent.spawn((
+                                consts.bounds.clone_weak(),
+                                SpatialBundle {
+                                    visibility: Visibility::Hidden,
+                                    ..default()
+                                },
+                                bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                            ));
                         });
                 }
                 continue;

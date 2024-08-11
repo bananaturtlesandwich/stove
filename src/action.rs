@@ -8,7 +8,6 @@ pub fn duplicate(
     registry: Res<Registry>,
     consts: Res<Constants>,
     selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
-    children: Query<&Children>,
     mut cubes: Query<&mut Handle<wire::Wire>>,
 ) {
     let Some((map, _)) = &mut map.0 else { return };
@@ -20,15 +19,10 @@ pub fn duplicate(
         return;
     }
     for (entity, actor, ..) in selected.iter() {
-        match children.get(entity) {
-            Ok(children) => {
-                if let Some(mut mat) = children
-                    .first()
-                    .and_then(|child| cubes.get_mut(*child).ok())
-                {
-                    commands.entity(entity).remove::<actor::Selected>();
-                    *mat = consts.unselected.clone_weak();
-                }
+        match cubes.get_mut(entity) {
+            Ok(mut mat) => {
+                commands.entity(entity).remove::<actor::Selected>();
+                *mat = consts.unselected.clone_weak();
             }
             Err(_) => {
                 commands.entity(entity).remove::<actor::SelectedBundle>();
@@ -63,22 +57,23 @@ pub fn duplicate(
             None => {
                 commands
                     .spawn((
-                        SpatialBundle {
-                            transform: actor.transform(map),
-                            visibility: Visibility::Hidden,
-                            ..default()
-                        },
-                        consts.bounds.clone_weak(),
-                        bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
-                        new, // child because it's LineList which picking can't do
-                    ))
-                    .with_children(|parent| {
-                        parent.spawn(MaterialMeshBundle {
+                        MaterialMeshBundle {
                             mesh: consts.cube.clone_weak(),
                             material: consts.unselected.clone_weak(),
-                            visibility: Visibility::Visible,
+                            transform: actor.transform(map),
                             ..default()
-                        });
+                        },
+                        new,
+                    ))
+                    .with_children(|parent| {
+                        parent.spawn((
+                            SpatialBundle {
+                                visibility: Visibility::Hidden,
+                                ..default()
+                            },
+                            consts.bounds.clone_weak(),
+                            bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                        ));
                     });
             }
         }

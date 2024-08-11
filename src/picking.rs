@@ -9,7 +9,7 @@ pub fn pick(
     window: Query<&Window, With<bevy::window::PrimaryWindow>>,
     camera: Query<&bevy_mod_raycast::deferred::RaycastSource<()>>,
     selected: Query<(Entity, &Transform), With<actor::Selected>>,
-    children: Query<&Children>,
+    parents: Query<&Parent>,
     mut cubes: Query<&mut Handle<wire::Wire>>,
     mut ctx: bevy_egui::EguiContexts,
 ) {
@@ -21,7 +21,11 @@ pub fn pick(
         *drag = Drag::None
     }
     if let Some((entity, data)) = camera.single().get_nearest_intersection() {
-        if selected.contains(entity) {
+        if selected.contains(entity)
+            || parents
+                .get(entity)
+                .is_ok_and(|parent| selected.contains(parent.get()))
+        {
             match &mouse {
                 mouse if mouse.just_pressed(MouseButton::Left) => {
                     if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
@@ -41,13 +45,10 @@ pub fn pick(
                 _ => (),
             }
         } else if mouse.just_pressed(MouseButton::Left) {
-            match children.get(entity) {
-                Ok(children) => {
-                    if let Some(mut mat) = children
-                        .first()
-                        .and_then(|child| cubes.get_mut(*child).ok())
-                    {
-                        commands.entity(entity).insert(actor::Selected);
+            match parents.get(entity) {
+                Ok(parent) => {
+                    if let Ok(mut mat) = cubes.get_mut(parent.get()) {
+                        commands.entity(parent.get()).insert(actor::Selected);
                         *mat = consts.selected.clone_weak();
                     }
                 }
@@ -69,15 +70,10 @@ pub fn pick(
         && matches!(drag.as_ref(), Drag::None)
     {
         for (entity, _) in selected.iter() {
-            match children.get(entity) {
-                Ok(children) => {
-                    if let Some(mut mat) = children
-                        .first()
-                        .and_then(|child| cubes.get_mut(*child).ok())
-                    {
-                        commands.entity(entity).remove::<actor::Selected>();
-                        *mat = consts.unselected.clone_weak();
-                    }
+            match cubes.get_mut(entity) {
+                Ok(mut mat) => {
+                    commands.entity(entity).remove::<actor::Selected>();
+                    *mat = consts.unselected.clone_weak();
                 }
                 Err(_) => {
                     commands.entity(entity).remove::<actor::SelectedBundle>();
@@ -113,19 +109,7 @@ pub fn drag(
                     Lock::YZ | Lock::Y => Vec3::X,
                     Lock::ZX | Lock::Z => Vec3::Y,
                 }),
-            )
-            // camera
-            //     .0
-            //     .intersect_primitive(bevy_mod_raycast::primitives::Primitive3d::Plane {
-            //         point: *pos,
-            //         normal: match lock.as_ref() {
-            //             Lock::XYZ => camera.1.look_direction().unwrap_or_default(),
-            //             Lock::XY | Lock::X => Vec3::Z,
-            //             Lock::YZ | Lock::Y => Vec3::X,
-            //             Lock::ZX | Lock::Z => Vec3::Y,
-            //         },
-            //     })
-            else {
+            ) else {
                 return;
             };
             let hit = ray.origin + ray.direction * dist;

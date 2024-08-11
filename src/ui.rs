@@ -12,7 +12,6 @@ pub fn ui(
     mut fps: ResMut<bevy_framepace::FramepaceSettings>,
     actors: Query<(Entity, &actor::Actor)>,
     mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
-    children: Query<&Children>,
     mut cubes: Query<&mut Handle<wire::Wire>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
 ) {
@@ -171,48 +170,32 @@ pub fn ui(
                         .clicked() {
                             ui.input(|state| if !state.modifiers.shift && !state.modifiers.ctrl {
                                 for (entity, ..) in selected.iter() {
-                                    match children.get(entity) {
-                                        Ok(children) => {
+                                    match cubes.get_mut(entity) {
+                                        Ok(mut mat) => {
                                             commands.entity(entity).remove::<actor::Selected>();
-                                            if let Some(mut mat) = children
-                                                .first()
-                                                .and_then(|child| cubes.get_mut(*child).ok())
-                                            {
-                                                commands.entity(entity).remove::<actor::Selected>();
-                                                *mat = consts.unselected.clone_weak();
-                                            }
-                                        }
+                                            *mat = consts.unselected.clone_weak();
+                                        },
                                         Err(_) => {
                                             commands.entity(entity).remove::<actor::SelectedBundle>();
-                                        }
+                                        },
                                     }
                                 }
                             });
                             match highlighted {
-                                true => match children.get(entity) {
-                                    Ok(children) => {
-                                        if let Some(mut mat) = children
-                                            .first()
-                                            .and_then(|child| cubes.get_mut(*child).ok())
-                                        {
-                                            commands.entity(entity).remove::<actor::Selected>();
-                                            *mat = consts.unselected.clone_weak();
-                                        }
-                                    }
+                                true => match cubes.get_mut(entity) {
+                                    Ok(mut mat) => {
+                                        commands.entity(entity).remove::<actor::Selected>();
+                                        *mat = consts.unselected.clone_weak();
+                                    },
                                     Err(_) => {
                                         commands.entity(entity).remove::<actor::SelectedBundle>();
-                                    }
+                                    },
                                 },
                                 // false if ui.input(|input| input.modifiers.shift) => todo!(),
-                                false => match children.get(entity) {
-                                    Ok(children) => {
-                                        if let Some(mut mat) = children
-                                            .first()
-                                            .and_then(|child| cubes.get_mut(*child).ok())
-                                        {
-                                            commands.entity(entity).insert(actor::Selected);
-                                            *mat = consts.selected.clone_weak();
-                                        }
+                                false => match cubes.get_mut(entity) {
+                                    Ok(mut mat) => {
+                                        commands.entity(entity).insert(actor::Selected);
+                                        *mat = consts.selected.clone_weak();
                                     }
                                     Err(_) => {
                                         commands
@@ -270,22 +253,23 @@ pub fn ui(
                             commands
                                 .spawn((
                                     actor::Selected,
-                                    consts.bounds.clone_weak(),
-                                    SpatialBundle {
-                                        visibility: Visibility::Hidden,
+                                    MaterialMeshBundle {
+                                        mesh: consts.cube.clone_weak(),
+                                        material: consts.selected.clone_weak(),
                                         transform: actor.transform(map),
                                         ..default()
                                     },
-                                    bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
-                                    actor, // child because it's LineList which picking can't do
+                                    actor,
                                 ))
                                 .with_children(|parent| {
-                                    parent.spawn(MaterialMeshBundle {
-                                        mesh: consts.cube.clone_weak(),
-                                        material: consts.selected.clone_weak(),
-                                        visibility: Visibility::Visible,
-                                        ..default()
-                                    });
+                                    parent.spawn((
+                                        consts.bounds.clone_weak(),
+                                        SpatialBundle {
+                                            visibility: Visibility::Hidden,
+                                            ..default()
+                                        },
+                                        bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                                    ));
                                 });
                         }
                     }
@@ -370,6 +354,7 @@ fn shortcuts(ui: &mut egui::Ui) {
             ("toggle fullscreen", "alt + enter"),
             ("hide ui", "h"),
             ("select", "left-click"),
+            ("deselect", "escape"),
             ("transplant", "ctrl + t"),
         ],
     );
