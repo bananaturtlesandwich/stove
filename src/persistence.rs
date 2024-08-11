@@ -4,6 +4,7 @@ pub fn load(
     mut commands: Commands,
     mut ctx: bevy_egui::EguiContexts,
     mut fps: ResMut<bevy_framepace::FramepaceSettings>,
+    mut wire: ResMut<bevy::pbr::wireframe::WireframeConfig>,
     mut windows: Query<&mut Window>,
 ) {
     let mut appdata = AppData {
@@ -30,15 +31,16 @@ pub fn load(
                 *val = inner
             }
         }
-        retrieve(&mut appdata.version, "VERSION", data);
-        retrieve(&mut appdata.paks, "PAKS", data);
-        retrieve(&mut appdata.pak, "PAK", data);
-        retrieve(&mut appdata.cache, "CACHE", data);
-        retrieve(&mut appdata.textures, "TEXTURES", data);
-        retrieve(&mut appdata.script, "SCRIPT", data);
-        retrieve(&mut appdata.cap, "CAP", data);
-        retrieve(&mut appdata.rate, "RATE", data);
-        retrieve(&mut fullscreen, "FULLSCREEN", data);
+        retrieve(&mut appdata.version, "version", data);
+        retrieve(&mut appdata.paks, "paks", data);
+        retrieve(&mut appdata.pak, "pak", data);
+        retrieve(&mut appdata.cache, "cache", data);
+        retrieve(&mut appdata.textures, "textures", data);
+        retrieve(&mut appdata.wireframe, "wireframe", data);
+        retrieve(&mut appdata.script, "script", data);
+        retrieve(&mut appdata.cap, "cap", data);
+        retrieve(&mut appdata.rate, "rate", data);
+        retrieve(&mut fullscreen, "fullscreen", data);
     });
     fps.limiter = match appdata.cap {
         true => bevy_framepace::Limiter::from_framerate(appdata.rate),
@@ -48,7 +50,9 @@ pub fn load(
         let mut window = windows.single_mut();
         window.mode = bevy::window::WindowMode::BorderlessFullscreen
     }
+    wire.global = appdata.wireframe;
     commands.insert_resource(appdata);
+    commands.trigger(triggers::LoadPaks);
 }
 
 pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>, windows: Query<&Window>) {
@@ -58,16 +62,17 @@ pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>, windows: Q
     use egui::Id;
     ctx.ctx_mut().memory_mut(|storage| {
         let storage = &mut storage.data;
-        storage.insert_persisted(Id::new("VERSION"), appdata.version);
-        storage.insert_persisted(Id::new("PAKS"), appdata.paks.clone());
-        storage.insert_persisted(Id::new("PAK"), appdata.pak.clone());
-        storage.insert_persisted(Id::new("CACHE"), appdata.cache);
-        storage.insert_persisted(Id::new("TEXTURES"), appdata.textures);
-        storage.insert_persisted(Id::new("SCRIPT"), appdata.script.clone());
-        storage.insert_persisted(Id::new("CAP"), appdata.cap);
-        storage.insert_persisted(Id::new("RATE"), appdata.rate);
+        storage.insert_persisted(Id::new("version"), appdata.version);
+        storage.insert_persisted(Id::new("paks"), appdata.paks.clone());
+        storage.insert_persisted(Id::new("pak"), appdata.pak.clone());
+        storage.insert_persisted(Id::new("cache"), appdata.cache);
+        storage.insert_persisted(Id::new("textures"), appdata.textures);
+        storage.insert_persisted(Id::new("wireframe"), appdata.wireframe);
+        storage.insert_persisted(Id::new("script"), appdata.script.clone());
+        storage.insert_persisted(Id::new("cap"), appdata.cap);
+        storage.insert_persisted(Id::new("rate"), appdata.rate);
         storage.insert_persisted(
-            Id::new("FULLSCREEN"),
+            Id::new("fullscreen"),
             windows
                 .get_single()
                 .map(|window| window.mode != bevy::window::WindowMode::Windowed)

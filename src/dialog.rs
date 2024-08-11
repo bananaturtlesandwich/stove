@@ -220,6 +220,7 @@ pub fn open(
                                 transform: actor.transform(&asset),
                                 ..default()
                             },
+                            bevy::pbr::wireframe::NoWireframe,
                             actor,
                         ))
                         .with_children(|parent| {
@@ -324,13 +325,17 @@ pub fn save_as(
     }
 }
 
-pub fn add_pak(_: Trigger<triggers::AddPak>, mut appdata: ResMut<AppData>) {
+pub fn add_pak(_: Trigger<triggers::AddPak>, mut commands: Commands, mut appdata: ResMut<AppData>) {
     if let Some(path) = rfd::FileDialog::new()
         .set_title("add pak folder")
         .pick_folder()
         .and_then(|path| path.to_str().map(str::to_string))
     {
-        appdata.paks.push((path, String::new()))
+        if appdata.paks.is_empty() {
+            appdata.pak = Some(0);
+            commands.trigger(triggers::LoadPaks);
+        }
+        appdata.paks.push((path, String::new()));
     }
 }
 

@@ -8,6 +8,7 @@ pub fn ui(
     mut notif: EventWriter<Notif>,
     mut map: NonSendMut<Map>,
     mut transplant: NonSendMut<Transplant>,
+    mut wire: ResMut<bevy::pbr::wireframe::WireframeConfig>,
     hidden: Res<Hidden>,
     consts: Res<Constants>,
     mut fps: ResMut<bevy_framepace::FramepaceSettings>,
@@ -107,12 +108,18 @@ pub fn ui(
                     }
                 });
                 ui.horizontal(|ui| {
-                    ui.label("cache meshes:");
-                    ui.add(egui::Checkbox::without_text(&mut appdata.cache));
+                    ui.label("load textures:");
+                    ui.add(egui::Checkbox::without_text(&mut appdata.textures));
                 });
                 ui.horizontal(|ui| {
-                    ui.label("use textures:");
-                    ui.add(egui::Checkbox::without_text(&mut appdata.textures));
+                    ui.label("show wireframe");
+                    if ui.add(egui::Checkbox::without_text(&mut appdata.wireframe)).changed() {
+                        wire.global = !wire.global
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("cache meshes:");
+                    ui.add(egui::Checkbox::without_text(&mut appdata.cache));
                 });
                 if ui.button("clear cache").clicked() {
                     match config() {
@@ -263,6 +270,7 @@ pub fn ui(
                                         transform: actor.transform(map),
                                         ..default()
                                     },
+                                    bevy::pbr::wireframe::NoWireframe,
                                     actor,
                                 ))
                                 .with_children(|parent| {

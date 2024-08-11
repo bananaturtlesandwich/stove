@@ -51,6 +51,7 @@ struct AppData {
     pak: Option<usize>,
     cache: bool,
     textures: bool,
+    wireframe: bool,
     script: String,
     query: String,
     cap: bool,
@@ -147,13 +148,23 @@ fn activity() -> discord_rich_presence::activity::Activity<'static> {
 fn main() -> AppExit {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "stove".into(),
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "stove".into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(bevy::render::RenderPlugin {
+                    render_creation: bevy::render::settings::RenderCreation::Automatic(
+                        bevy::render::settings::WgpuSettings {
+                            features: bevy::render::settings::WgpuFeatures::POLYGON_MODE_LINE,
+                            ..default()
+                        },
+                    ),
                     ..default()
                 }),
-                ..default()
-            }),
             unlit::UnlitPlugin,
             wire::WirePlugin,
             bevy_egui::EguiPlugin,
@@ -165,11 +176,8 @@ fn main() -> AppExit {
             bevy_mod_outline::OutlinePlugin,
             bevy_mod_outline::AutoGenerateOutlineNormalsPlugin,
             bevy_framepace::FramepacePlugin,
+            bevy::pbr::wireframe::WireframePlugin,
         ))
-        .configure_schedules(bevy::ecs::schedule::ScheduleBuildSettings {
-            ambiguity_detection: bevy::ecs::schedule::LogLevel::Warn,
-            ..default()
-        })
         .init_non_send_resource::<Map>()
         .init_non_send_resource::<Transplant>()
         .init_resource::<Notifs>()
@@ -181,13 +189,16 @@ fn main() -> AppExit {
         .init_resource::<Hidden>()
         .init_resource::<Client>()
         .init_resource::<Paks>()
+        .insert_resource(bevy::pbr::wireframe::WireframeConfig {
+            global: false,
+            default_color: bevy::color::palettes::css::WHITE.into(),
+        })
         .add_event::<Notif>()
         .add_systems(PreStartup, startup::set_icon)
         // commands aren't applied immediately without this
         .add_systems(Startup, (persistence::load, apply_deferred).chain())
         .add_systems(Update, persistence::write)
         .add_systems(Startup, startup::check_args.after(persistence::load))
-        .add_systems(Startup, startup::load_paks.after(persistence::load))
         .add_systems(Startup, startup::check_updates)
         .add_systems(Startup, startup::initialise)
         .add_systems(
@@ -232,12 +243,7 @@ fn main() -> AppExit {
         .observe(action::deselect)
         .observe(action::fullscreen)
         .observe(action::hide)
-        .observe(
-            |_: Trigger<triggers::LoadPaks>,
-             notif: EventWriter<Notif>,
-             appdata: Res<AppData>,
-             paks: ResMut<Paks>| startup::load_paks(notif, appdata, paks),
-        )
+        .observe(startup::load_paks)
         .run()
 }
 

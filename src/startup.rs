@@ -136,7 +136,12 @@ pub fn initialise(
     })
 }
 
-pub fn load_paks(mut notif: EventWriter<Notif>, appdata: Res<AppData>, mut paks: ResMut<Paks>) {
+pub fn load_paks(
+    _: Trigger<triggers::LoadPaks>,
+    mut notif: EventWriter<Notif>,
+    appdata: Res<AppData>,
+    mut paks: ResMut<Paks>,
+) {
     let Some(pak) = appdata.pak else { return };
     let key = match hex::decode(appdata.paks[pak].1.trim_start_matches("0x")) {
         Ok(key) if !appdata.paks[pak].1.is_empty() => Some(key),

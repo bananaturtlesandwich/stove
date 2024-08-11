@@ -63,6 +63,7 @@ pub fn duplicate(
                             transform: actor.transform(map),
                             ..default()
                         },
+                        bevy::pbr::wireframe::NoWireframe,
                         new,
                     ))
                     .with_children(|parent| {
