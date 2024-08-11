@@ -8,6 +8,7 @@ pub fn shortcuts(
 ) {
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+    let alt = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
     if keys.just_released(KeyCode::KeyO) && ctrl {
         commands.trigger(triggers::Open(None));
     }
@@ -16,9 +17,7 @@ pub fn shortcuts(
         commands.trigger(triggers::AddPak);
     }
     if keys.just_released(KeyCode::KeyS) && ctrl {
-        commands.trigger(triggers::SaveAs(
-            keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
-        ));
+        commands.trigger(triggers::SaveAs(shift));
     }
     if keys.just_released(KeyCode::KeyT) && ctrl {
         commands.trigger(triggers::Transplant);
@@ -59,6 +58,12 @@ pub fn shortcuts(
     }
     if keys.just_released(KeyCode::Escape) {
         commands.trigger(triggers::Deselect);
+    }
+    if keys.just_released(KeyCode::Enter) && alt {
+        commands.trigger(triggers::Fullscreen)
+    }
+    if keys.just_released(KeyCode::KeyH) {
+        commands.trigger(triggers::Hide)
     }
 }
 

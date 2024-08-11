@@ -13,6 +13,10 @@ pub struct Copy;
 pub struct Paste;
 #[derive(Event)]
 pub struct Deselect;
+#[derive(Event)]
+pub struct Fullscreen;
+#[derive(Event)]
+pub struct Hide;
 
 // dialogs
 #[derive(Event)]

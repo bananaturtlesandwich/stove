@@ -8,6 +8,7 @@ pub fn ui(
     mut notif: EventWriter<Notif>,
     mut map: NonSendMut<Map>,
     mut transplant: NonSendMut<Transplant>,
+    hidden: Res<Hidden>,
     consts: Res<Constants>,
     mut fps: ResMut<bevy_framepace::FramepaceSettings>,
     actors: Query<(Entity, &actor::Actor)>,
@@ -15,6 +16,9 @@ pub fn ui(
     mut cubes: Query<&mut Handle<wire::Wire>>,
     matched: Query<(Entity, &actor::Actor), With<actor::Matched>>,
 ) {
+    if hidden.0 {
+        return;
+    }
     egui::SidePanel::left("sidepanel").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             ui.menu_button("file", |ui| {

@@ -101,6 +101,9 @@ enum Lock {
 struct Buffer(Vec3);
 
 #[derive(Default, Resource)]
+struct Hidden(bool);
+
+#[derive(Default, Resource)]
 struct Client(Option<discord_rich_presence::DiscordIpcClient>);
 
 enum Wrapper {
@@ -175,6 +178,7 @@ fn main() -> AppExit {
         .init_resource::<Drag>()
         .init_resource::<Lock>()
         .init_resource::<Buffer>()
+        .init_resource::<Hidden>()
         .init_resource::<Client>()
         .init_resource::<Paks>()
         .add_event::<Notif>()
@@ -226,6 +230,8 @@ fn main() -> AppExit {
         .observe(action::copy)
         .observe(action::paste)
         .observe(action::deselect)
+        .observe(action::fullscreen)
+        .observe(action::hide)
         .observe(
             |_: Trigger<triggers::LoadPaks>,
              notif: EventWriter<Notif>,

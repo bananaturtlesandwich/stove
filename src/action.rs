@@ -215,3 +215,16 @@ pub fn deselect(
         }
     }
 }
+
+pub fn fullscreen(_: Trigger<triggers::Fullscreen>, mut windows: Query<&mut Window>) {
+    use bevy::window::WindowMode;
+    let mut window = windows.single_mut();
+    window.mode = match window.mode {
+        WindowMode::Windowed => WindowMode::BorderlessFullscreen,
+        _ => WindowMode::Windowed,
+    };
+}
+
+pub fn hide(_: Trigger<triggers::Hide>, mut hidden: ResMut<Hidden>) {
+    hidden.0 = !hidden.0
+}
