@@ -219,118 +219,108 @@ pub fn ui(
                             };
                         }
                     }
-                    // otherwise the scroll area bugs out at the bottom
-                    ui.add_space(10.0);
                 })
             );
-        if let (Ok((_, actor, mut transform)), Some((map, _))) = (selected.get_single_mut(), &mut map.0) {
-            egui::ScrollArea::both()
-                .id_source("properties")
-                .auto_shrink([false; 2])
-                .show(ui, |ui| {
-                    actor.show(map, ui, &mut transform);
-                    // otherwise the scroll area bugs out at the bottom
-                    ui.add_space(10.0);
+        ui.add_space(10.0);
+        if let Some((map, _)) = &mut map.0 {
+                ui.vertical_centered_justified(|ui| if ui.add(egui::Button::new("transplant from map").shortcut_text("ctrl + t")).clicked() {
+                    commands.trigger(triggers::Transplant)
                 });
-        }
-    });
-    let mut open = true;
-    let mut transplanted = None;
-    if let (Some((donor, others, selected)), Some((map, _))) = (&mut transplant.0, &mut map.0) {
-        egui::Window::new("transplant actor")
-            .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
-            .resizable(false)
-            .collapsible(false)
-            .open(&mut open)
-            .show(ctx.ctx_mut(), |ui| {
+            if let Ok((_, actor, mut transform)) = selected.get_single_mut() {
+                egui::ScrollArea::both()
+                    .id_source("properties")
+                    .auto_shrink([false; 2])
+                    .show(ui, |ui| {
+                        actor.show(map, ui, &mut transform);
+                    });
+            } else if let Some((donor, others, selected)) = &mut transplant.0 {
                 // putting the button below breaks the scroll area somehow
                 ui.add_enabled_ui(!selected.is_empty(), |ui| {
-                    if ui
-                        .vertical_centered_justified(|ui| ui.button("transplant selected"))
-                        .inner
-                        .clicked()
-                    {
-                        let len = actors.iter().len();
-                        transplanted = Some(len..len + selected.len());
-                        for actor in selected.iter().map(|i| &others[*i]) {
-                            let insert = unreal_asset::types::PackageIndex::new(
-                                map.asset_data.exports.len() as i32 + 1,
-                            );
-                            actor.transplant(map, donor);
-                            notif.send(Notif {
-                                message: format!("transplanted {}", actor.name),
-                                kind: Success,
-                            });
-                            // don't process mesh for transplanted actor for now
-                            let (_, actor) = actor::Actor::new(map, insert).unwrap();
-                            commands
-                                .spawn((
-                                    actor::Selected,
-                                    MaterialMeshBundle {
-                                        mesh: consts.cube.clone_weak(),
-                                        material: consts.selected.clone_weak(),
-                                        transform: actor.transform(map),
+                if ui
+                    .vertical_centered_justified(|ui| ui.button("transplant selected"))
+                    .inner
+                    .clicked()
+                {
+                    for actor in selected.iter().map(|i| &others[*i]) {
+                        let insert = unreal_asset::types::PackageIndex::new(
+                            map.asset_data.exports.len() as i32 + 1,
+                        );
+                        actor.transplant(map, donor);
+                        notif.send(Notif {
+                            message: format!("transplanted {}", actor.name),
+                            kind: Success,
+                        });
+                        // don't process mesh for transplanted actor for now
+                        let (_, actor) = actor::Actor::new(map, insert).unwrap();
+                        commands
+                            .spawn((
+                                actor::Selected,
+                                MaterialMeshBundle {
+                                    mesh: consts.cube.clone_weak(),
+                                    material: consts.selected.clone_weak(),
+                                    transform: actor.transform(map),
+                                    ..default()
+                                },
+                                bevy::pbr::wireframe::NoWireframe,
+                                actor,
+                            ))
+                            .with_children(|parent| {
+                                parent.spawn((
+                                    consts.bounds.clone_weak(),
+                                    SpatialBundle {
+                                        visibility: Visibility::Hidden,
                                         ..default()
                                     },
-                                    bevy::pbr::wireframe::NoWireframe,
-                                    actor,
-                                ))
-                                .with_children(|parent| {
-                                    parent.spawn((
-                                        consts.bounds.clone_weak(),
-                                        SpatialBundle {
-                                            visibility: Visibility::Hidden,
-                                            ..default()
-                                        },
-                                        bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
-                                    ));
-                                });
+                                    bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
+                                ));
+                            });
                         }
+                        selected.clear();
                     }
                 });
-                egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
-                    ui,
-                    ui.text_style_height(&egui::TextStyle::Body),
-                    others.iter().len(),
-                    |ui, range| {
-                        ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
-                            for (i, actor) in range.clone().zip(others[range].iter()) {
-                                if ui
-                                    .selectable_label(selected.contains(&i), &actor.name)
-                                    .on_hover_text(&actor.class)
-                                    .clicked()
-                                {
-                                    ui.input(|input| {
-                                        match selected.iter().position(|entry| entry == &i) {
-                                            Some(i) => {
-                                                selected.remove(i);
-                                            }
-                                            None if input.modifiers.shift
-                                                && selected
-                                                    .last()
-                                                    .is_some_and(|last| last != &i) =>
-                                            {
-                                                let last_selected = *selected.last().unwrap();
-                                                for i in match i < last_selected {
-                                                    true => i..last_selected,
-                                                    false => last_selected + 1..i + 1,
-                                                } {
-                                                    selected.push(i)
-                                                }
-                                            }
-                                            _ => selected.push(i),
+            egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
+                ui,
+                ui.text_style_height(&egui::TextStyle::Body),
+                others.iter().len(),
+                |ui, range| {
+                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                        for (i, actor) in range.clone().zip(others[range].iter()) {
+                            if ui
+                                .selectable_label(selected.contains(&i), &actor.name)
+                                .on_hover_text(&actor.class)
+                                .clicked()
+                            {
+                                ui.input(|input| {
+                                    match selected.iter().position(|entry| entry == &i) {
+                                        Some(i) => {
+                                            selected.remove(i);
                                         }
-                                    })
-                                }
+                                        None if input.modifiers.shift
+                                            && selected
+                                                .last()
+                                                .is_some_and(|last| last != &i) =>
+                                        {
+                                            let last_selected = *selected.last().unwrap();
+                                            for i in match i < last_selected {
+                                                true => i..last_selected,
+                                                false => last_selected + 1..i + 1,
+                                            } {
+                                                selected.push(i)
+                                            }
+                                        }
+                                        _ => selected.push(i),
+                                    }
+                                })
                             }
-                        })
-                    },
-                );
-            });
-        if transplanted.is_some() || !open {
-            transplant.0 = None
+                        }
+                    })
+                });
+            } 
+
+
         }
-    }
+        ui.add_space(10.0);
+    });
 }
 
 fn shortcuts(ui: &mut egui::Ui) {
