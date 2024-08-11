@@ -354,7 +354,7 @@ fn shortcuts(ui: &mut egui::Ui) {
             ("toggle fullscreen", "alt + enter"),
             ("hide ui", "h"),
             ("select", "left-click"),
-            ("deselect", "escape"),
+            ("deselect all", "escape"),
             ("transplant", "ctrl + t"),
         ],
     );

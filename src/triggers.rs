@@ -11,6 +11,8 @@ pub struct Focus;
 pub struct Copy;
 #[derive(Event)]
 pub struct Paste;
+#[derive(Event)]
+pub struct Deselect;
 
 // dialogs
 #[derive(Event)]

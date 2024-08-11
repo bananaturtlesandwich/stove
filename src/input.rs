@@ -57,6 +57,9 @@ pub fn shortcuts(
     if keys.just_released(KeyCode::KeyV) && ctrl {
         commands.trigger(triggers::Paste);
     }
+    if keys.just_released(KeyCode::Escape) {
+        commands.trigger(triggers::Deselect);
+    }
 }
 
 // an edited version of the original default input map

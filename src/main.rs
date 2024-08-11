@@ -225,6 +225,7 @@ fn main() -> AppExit {
         .add_systems(Update, action::approach)
         .observe(action::copy)
         .observe(action::paste)
+        .observe(action::deselect)
         .observe(
             |_: Trigger<triggers::LoadPaks>,
              notif: EventWriter<Notif>,

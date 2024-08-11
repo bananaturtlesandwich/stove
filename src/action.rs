@@ -195,3 +195,23 @@ pub fn paste(
         kind: Success,
     });
 }
+
+pub fn deselect(
+    _: Trigger<triggers::Deselect>,
+    consts: Res<Constants>,
+    selected: Query<Entity, With<actor::Selected>>,
+    mut cubes: Query<&mut Handle<wire::Wire>>,
+    mut commands: Commands,
+) {
+    for entity in selected.iter() {
+        match cubes.get_mut(entity) {
+            Ok(mut mat) => {
+                commands.entity(entity).remove::<actor::Selected>();
+                *mat = consts.unselected.clone_weak();
+            }
+            Err(_) => {
+                commands.entity(entity).remove::<actor::SelectedBundle>();
+            }
+        }
+    }
+}
