@@ -173,7 +173,7 @@ pub fn load_paks(mut notif: EventWriter<Notif>, appdata: Res<AppData>, mut paks:
     let Ok(files) = std::fs::read_dir(path) else {
         return;
     };
-    paks.0 = files
+    paks.1 = files
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .filter_map(|path| {
@@ -213,4 +213,24 @@ pub fn load_paks(mut notif: EventWriter<Notif>, appdata: Res<AppData>, mut paks:
             Some((path, pak))
         })
         .collect();
+    // obtain game name
+    let Some((_, pak)) = paks.1.first() else {
+        return;
+    };
+    let mut split = pak.mount_point().split('/').peekable();
+    while let Some((game, content)) = split.next().zip(split.peek()) {
+        if game != "Engine" && content == &"Content" {
+            paks.0 = game.into();
+            return;
+        }
+    }
+    for entry in pak.files() {
+        let mut split = entry.split('/').take(2);
+        if let Some((game, content)) = split.next().zip(split.next()) {
+            if game != "Engine" && content == "Content" {
+                paks.0 = game.into();
+                return;
+            }
+        }
+    }
 }

@@ -32,6 +32,7 @@ pub fn save<C: std::io::Read + std::io::Seek>(
 }
 
 pub fn get<T>(
+    game: &str,
     pak: &repak::PakReader,
     pak_file: &std::path::Path,
     cache: Option<&std::path::Path>,
@@ -42,29 +43,9 @@ pub fn get<T>(
         Option<super::Wrapper>,
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Result<T, unreal_asset::error::Error> {
-    fn game_name(pak: &repak::PakReader) -> Option<String> {
-        let mut split = pak.mount_point().split('/').peekable();
-        while let Some((game, content)) = split.next().zip(split.peek()) {
-            if game != "Engine" && content == &"Content" {
-                return Some(game.to_string());
-            }
-        }
-        for entry in pak.files() {
-            let mut split = entry.split('/').take(2);
-            if let Some((game, content)) = split.next().zip(split.next()) {
-                if game != "Engine" && content == "Content" {
-                    return Some(game.to_string());
-                }
-            }
-        }
-        None
-    }
     let pak_file = &mut std::io::BufReader::new(std::fs::File::open(pak_file)?);
     let path = path
-        .replace(
-            "/Game",
-            &format!("{}/Content", game_name(pak).unwrap_or_default()),
-        )
+        .replace("/Game", &format!("{}/Content", game))
         .replace("/Engine/", "Engine/Content/");
     let make = |ext: &str| path.to_string() + ext;
     let (mesh, exp, bulk, uptnl) = (

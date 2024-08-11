@@ -67,8 +67,9 @@ pub fn open(
                 s.spawn(|| {
                     // capture path
                     let path = path;
-                    match paks.0.iter().find_map(|(pak_file, pak)| {
+                    match paks.1.iter().find_map(|(pak_file, pak)| {
                         asset::get(
+                            &paks.0,
                             pak,
                             pak_file,
                             cache.as_deref(),
@@ -111,6 +112,7 @@ pub fn open(
                                 break;
                             }
                             let Ok(paths) = asset::get(
+                                &paks.0,
                                 pak,
                                 pak_file,
                                 cache.as_deref(),
@@ -122,6 +124,7 @@ pub fn open(
                             };
                             for path in paths {
                                 if let Ok((false, width, height, data)) = asset::get(
+                                    &paks.0,
                                     pak,
                                     pak_file,
                                     cache.as_deref(),

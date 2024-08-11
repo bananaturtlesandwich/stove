@@ -58,7 +58,7 @@ struct AppData {
 }
 
 #[derive(Default, Resource)]
-struct Paks(Vec<(std::path::PathBuf, repak::PakReader)>);
+struct Paks(String, Vec<(std::path::PathBuf, repak::PakReader)>);
 
 impl AppData {
     fn version(&self) -> unreal_asset::engine_version::EngineVersion {
