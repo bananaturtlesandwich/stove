@@ -17,6 +17,8 @@ pub struct Deselect;
 pub struct Fullscreen;
 #[derive(Event)]
 pub struct Hide;
+#[derive(Event)]
+pub struct LoadPaks;
 
 // dialogs
 #[derive(Event)]
@@ -27,7 +29,3 @@ pub struct SaveAs(pub bool);
 pub struct AddPak;
 #[derive(Event)]
 pub struct Transplant;
-
-// refreshes
-#[derive(Event)]
-pub struct LoadPaks;

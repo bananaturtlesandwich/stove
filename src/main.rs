@@ -243,7 +243,7 @@ fn main() -> AppExit {
         .observe(action::deselect)
         .observe(action::fullscreen)
         .observe(action::hide)
-        .observe(startup::load_paks)
+        .observe(action::load_paks)
         .run()
 }
 
