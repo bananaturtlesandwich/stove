@@ -331,11 +331,9 @@ pub fn add_pak(_: Trigger<triggers::AddPak>, mut commands: Commands, mut appdata
         .pick_folder()
         .and_then(|path| path.to_str().map(str::to_string))
     {
-        if appdata.paks.is_empty() {
-            appdata.pak = Some(0);
-            commands.trigger(triggers::LoadPaks);
-        }
+        appdata.pak = Some(appdata.paks.len());
         appdata.paks.push((path, String::new()));
+        commands.trigger(triggers::LoadPaks);
     }
 }
 
