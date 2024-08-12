@@ -177,6 +177,8 @@ fn main() -> AppExit {
             bevy_mod_outline::AutoGenerateOutlineNormalsPlugin,
             bevy_framepace::FramepacePlugin,
             bevy::pbr::wireframe::WireframePlugin,
+            bevy::diagnostic::FrameTimeDiagnosticsPlugin::default(),
+            bevy::diagnostic::LogDiagnosticsPlugin::default(),
         ))
         .init_non_send_resource::<Map>()
         .init_non_send_resource::<Transplant>()

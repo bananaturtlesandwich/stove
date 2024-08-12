@@ -59,7 +59,7 @@ pub fn open(
             }
         }
     }
-    let keys = batch.keys().cloned().filter_map(|k| k).collect::<Vec<_>>();
+    let keys = batch.keys().flatten().cloned().collect::<Vec<_>>();
     std::thread::scope(|s| {
         let threads: Vec<_> = keys
             .into_iter()

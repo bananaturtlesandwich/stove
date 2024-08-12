@@ -64,7 +64,7 @@ pub fn write(mut ctx: bevy_egui::EguiContexts, appdata: Res<AppData>, windows: Q
         let storage = &mut storage.data;
         storage.insert_persisted(Id::new("version"), appdata.version);
         storage.insert_persisted(Id::new("paks"), appdata.paks.clone());
-        storage.insert_persisted(Id::new("pak"), appdata.pak.clone());
+        storage.insert_persisted(Id::new("pak"), appdata.pak);
         storage.insert_persisted(Id::new("cache"), appdata.cache);
         storage.insert_persisted(Id::new("textures"), appdata.textures);
         storage.insert_persisted(Id::new("wireframe"), appdata.wireframe);

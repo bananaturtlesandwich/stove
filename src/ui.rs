@@ -85,16 +85,6 @@ pub fn ui(
                 appdata.paks.remove(i);
             }
             ui.menu_button("options", |ui| {
-                ui.menu_button("about",|ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
-                        ui.spacing_mut().item_spacing.x = size;
-                        ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
-                        ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
-                        ui.label(egui::special_emojis::GITHUB.to_string());
-                    });
-                });
-                ui.menu_button("shortcuts", shortcuts);
                 ui.horizontal(|ui| {
                     ui.label("frame rate cap:"); 
                     if ui.add(egui::Checkbox::without_text(&mut appdata.cap)).changed() {
@@ -118,7 +108,7 @@ pub fn ui(
                     }
                 });
                 ui.horizontal(|ui| {
-                    ui.label("cache meshes:");
+                    ui.label("cache assets:");
                     ui.add(egui::Checkbox::without_text(&mut appdata.cache));
                 });
                 if ui.button("clear cache").clicked() {
@@ -142,6 +132,18 @@ pub fn ui(
                 ui.label("post-save commands");
                 ui.text_edit_multiline(&mut appdata.script);
             });
+            ui.menu_button("help", |ui| {
+                ui.menu_button("about",|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
+                        ui.spacing_mut().item_spacing.x = size;
+                        ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
+                        ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
+                        ui.label(egui::special_emojis::GITHUB.to_string());
+                    });
+                });
+                ui.menu_button("shortcuts", shortcuts);
+            })
         });
         if ui.add(egui::TextEdit::singleline(&mut appdata.query).hint_text("🔎 search actors")).changed() {
             for (entity, _) in matched.iter() {
