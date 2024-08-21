@@ -31,6 +31,19 @@ pub fn save<C: std::io::Read + std::io::Seek>(
     )
 }
 
+#[test]
+fn path_with_mount() {
+    let game = "OMD";
+    let path = "/Game/Environments/CastleOrder/Railing/Mesh/RailingShortC";
+    let mount = "../../../OMD/Content/Environments/CastleOrder/";
+    let path: String = path
+        .replace("/Game", &format!("{}/Content", game))
+        .replace("/Engine/", "Engine/Content/")
+        .trim_start_matches(mount.trim_start_matches("../../../"))
+        .into();
+    assert_eq!(path, "Railing/Mesh/RailingShortC")
+}
+
 pub fn get<T>(
     game: &str,
     pak: &repak::PakReader,
@@ -44,16 +57,27 @@ pub fn get<T>(
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Result<T, unreal_asset::error::Error> {
     let pak_file = &mut std::io::BufReader::new(std::fs::File::open(pak_file)?);
-    let path = path
+    let path: String = path
         .replace("/Game", &format!("{}/Content", game))
-        .replace("/Engine/", "Engine/Content/");
-    let make = |ext: &str| path.to_string() + ext;
+        .replace("/Engine/", "Engine/Content/")
+        .trim_start_matches(pak.mount_point().trim_start_matches("../../../"))
+        .into();
+    let make = |ext: &str| path.clone() + ext;
     let (mesh, exp, bulk, uptnl) = (
         make(".uasset"),
         make(".uexp"),
         make(".ubulk"),
         make(".uptnl"),
     );
+    // macro_rules! asdf {
+    //     ($ex: expr) => {{
+    //         let temp = $ex;
+    //         if dbg {
+    //             println!("{temp:?}")
+    //         }
+    //         temp
+    //     }};
+    // }
     let cache_path = |path: &str| cache.unwrap().join(path.trim_start_matches('/'));
     match cache {
         Some(_)
