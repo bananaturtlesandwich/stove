@@ -272,7 +272,8 @@ pub fn load_paks(
     let Ok(files) = std::fs::read_dir(path) else {
         return;
     };
-    paks.1 = files
+    paks.1 = path.into();
+    paks.2 = files
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .filter_map(|path| {
@@ -313,7 +314,7 @@ pub fn load_paks(
         })
         .collect();
     // obtain game name
-    let Some((_, pak)) = paks.1.first() else {
+    let Some((_, pak)) = paks.2.first() else {
         return;
     };
     let mut split = pak.mount_point().split('/').peekable();

@@ -8,7 +8,7 @@ use unreal_asset::{
 };
 
 impl Actor {
-    pub fn location(&self, map: &crate::Asset) -> bevy::math::Vec3 {
+    pub fn location(&self, map: &Asset) -> bevy::math::Vec3 {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .and_then(|norm| {
@@ -27,7 +27,7 @@ impl Actor {
             .unwrap_or_default()
     }
 
-    pub fn add_location(&self, map: &mut crate::Asset, offset: bevy::math::Vec3) {
+    pub fn add_location(&self, map: &mut Asset, offset: bevy::math::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -78,7 +78,7 @@ impl Actor {
         }
     }
 
-    pub fn rotation(&self, map: &crate::Asset) -> bevy::math::Quat {
+    pub fn rotation(&self, map: &Asset) -> bevy::math::Quat {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .map(|norm| {
@@ -107,7 +107,7 @@ impl Actor {
             .unwrap_or_default()
     }
 
-    pub fn combine_rotation(&self, map: &mut crate::Asset, offset: bevy::math::Quat) {
+    pub fn combine_rotation(&self, map: &mut Asset, offset: bevy::math::Quat) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -168,7 +168,7 @@ impl Actor {
         }
     }
 
-    pub fn scale(&self, map: &crate::Asset) -> bevy::math::Vec3 {
+    pub fn scale(&self, map: &Asset) -> bevy::math::Vec3 {
         map.asset_data.exports[self.transform]
             .get_normal_export()
             .and_then(|norm| {
@@ -185,7 +185,7 @@ impl Actor {
             .unwrap_or(bevy::math::Vec3::ONE)
     }
 
-    pub fn mul_scale(&self, map: &mut crate::Asset, offset: bevy::math::Vec3) {
+    pub fn mul_scale(&self, map: &mut Asset, offset: bevy::math::Vec3) {
         let mut names = map.get_name_map();
         let Some(norm) = map.asset_data.exports[self.transform].get_normal_export_mut() else {
             return;
@@ -236,7 +236,7 @@ impl Actor {
         }
     }
 
-    pub fn transform(&self, map: &crate::Asset) -> bevy::prelude::Transform {
+    pub fn transform(&self, map: &Asset) -> bevy::prelude::Transform {
         bevy::prelude::Transform {
             translation: self.location(map),
             rotation: self.rotation(map),

@@ -8,7 +8,7 @@ use unreal_asset::types::fname::ToSerializedName;
 impl Actor {
     pub fn show(
         &self,
-        asset: &mut crate::Asset,
+        asset: &mut Asset,
         ui: &mut egui::Ui,
         transform: &mut bevy::prelude::Transform,
     ) {

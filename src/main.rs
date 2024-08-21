@@ -17,7 +17,7 @@ mod ui;
 mod unlit;
 mod wire;
 
-type Asset = unreal_asset::Asset<std::io::BufReader<std::fs::File>>;
+type Asset = unreal_asset::Asset<Wrapper>;
 type Export = unreal_asset::Export<unreal_asset::types::PackageIndex>;
 
 #[derive(Default)]
@@ -59,7 +59,11 @@ struct AppData {
 }
 
 #[derive(Default, Resource)]
-struct Paks(String, Vec<(std::path::PathBuf, repak::PakReader)>);
+struct Paks(
+    String,
+    std::path::PathBuf,
+    Vec<(std::path::PathBuf, repak::PakReader)>,
+);
 
 impl AppData {
     fn version(&self) -> unreal_asset::engine_version::EngineVersion {

@@ -2,7 +2,7 @@ use super::*;
 use unreal_asset::{cast, types::fname::ToSerializedName, Import};
 
 impl Actor {
-    pub fn transplant(&self, recipient: &mut crate::Asset, donor: &crate::Asset) {
+    pub fn transplant(&self, recipient: &mut Asset, donor: &Asset) {
         let mut children = self.get_actor_exports(donor, recipient.asset_data.exports.len());
 
         // make sure the actor has a unique object name

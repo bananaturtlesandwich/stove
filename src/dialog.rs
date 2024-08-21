@@ -67,20 +67,10 @@ pub fn open(
                 s.spawn(|| {
                     // capture path
                     let path = path;
-                    match paks.1.iter().find_map(|(pak_file, pak)| {
-                        asset::get(
-                            &paks.0,
-                            pak,
-                            pak_file,
-                            cache.as_deref(),
-                            &path,
-                            version,
-                            |asset, _| Ok(extras::get_mesh_info(asset)?),
-                        )
-                        .ok()
-                        .map(|mesh| (mesh, pak_file, pak))
+                    match asset::get(&paks, cache.as_deref(), &path, version, |asset, _| {
+                        Ok(extras::get_mesh_info(asset)?)
                     }) {
-                        Some(((positions, indices, uvs, mats, _mat_data), pak_file, pak)) => Ok((
+                        Some((positions, indices, uvs, mats, _mat_data)) => Ok((
                             path,
                             Mesh::new(
                                 bevy::render::render_resource::PrimitiveTopology::TriangleList,
@@ -93,8 +83,6 @@ pub fn open(
                             )
                             .with_inserted_indices(bevy::render::mesh::Indices::U32(indices)),
                             mats,
-                            pak_file,
-                            pak,
                         )),
                         None => Err(path),
                     }
@@ -103,7 +91,7 @@ pub fn open(
             .collect();
         for thread in threads {
             match thread.join() {
-                Ok(Ok((path, mesh, mats, pak_file, pak))) => {
+                Ok(Ok((path, mesh, mats))) => {
                     // hard to multithread material loading since the material might not parse
                     let mut tex = None;
                     if appdata.textures {
@@ -111,22 +99,16 @@ pub fn open(
                             if registry.mats.contains_key(&mat) {
                                 break;
                             }
-                            let Ok(paths) = asset::get(
-                                &paks.0,
-                                pak,
-                                pak_file,
-                                cache.as_deref(),
-                                &mat,
-                                version,
-                                |mat, _| Ok(extras::get_tex_paths(mat)),
-                            ) else {
+                            let Some(paths) =
+                                asset::get(&paks, cache.as_deref(), &mat, version, |mat, _| {
+                                    Ok(extras::get_tex_paths(mat))
+                                })
+                            else {
                                 continue;
                             };
                             for path in paths {
-                                if let Ok((false, width, height, data)) = asset::get(
-                                    &paks.0,
-                                    pak,
-                                    pak_file,
+                                if let Some((false, width, height, data)) = asset::get(
+                                    &paks,
                                     cache.as_deref(),
                                     &path,
                                     version,

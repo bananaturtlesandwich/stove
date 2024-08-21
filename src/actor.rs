@@ -1,4 +1,4 @@
-use std::fs::File;
+use super::Asset;
 use unreal_asset::{
     cast,
     error::Error,
@@ -6,7 +6,6 @@ use unreal_asset::{
     properties::{Property, PropertyDataTrait},
     reader::archive_trait::ArchiveTrait,
     types::{fname::FName, PackageIndex, PackageIndexTrait},
-    Asset,
 };
 
 mod delete;
@@ -60,10 +59,7 @@ impl Actor {
         PackageIndex::new(self.export as i32 + 1)
     }
 
-    pub fn new(
-        asset: &crate::Asset,
-        package: PackageIndex,
-    ) -> Result<(Option<String>, Self), Error> {
+    pub fn new(asset: &Asset, package: PackageIndex) -> Result<(Option<String>, Self), Error> {
         if package.index == 0 {
             return Err(Error::invalid_package_index(
                 "actor was null reference".to_string(),
@@ -159,11 +155,7 @@ impl Actor {
     }
 
     /// gets all exports related to the given actor
-    fn get_actor_exports(
-        &self,
-        asset: &Asset<std::io::BufReader<File>>,
-        offset: usize,
-    ) -> Vec<super::Export> {
+    fn get_actor_exports(&self, asset: &super::Asset, offset: usize) -> Vec<super::Export> {
         let level = asset
             .asset_data
             .exports
@@ -215,7 +207,7 @@ impl Actor {
 }
 
 /// gets all actor exports within a map (all exports direct children of PersistentLevel)
-pub fn get_actors(asset: &crate::Asset) -> Vec<PackageIndex> {
+pub fn get_actors(asset: &Asset) -> Vec<PackageIndex> {
     match asset
         .asset_data
         .exports
@@ -233,7 +225,7 @@ pub fn get_actors(asset: &crate::Asset) -> Vec<PackageIndex> {
 }
 
 /// creates and assigns a unique name
-fn give_unique_name(orig: &mut FName, asset: &mut crate::Asset) {
+fn give_unique_name(orig: &mut FName, asset: &mut Asset) {
     // for the cases where the number is unnecessary
     let mut name = orig.get_owned_content();
     if asset.search_name_reference(&name).is_none() {

@@ -2,7 +2,7 @@ use super::*;
 
 impl Actor {
     /// delete an actor from a map
-    pub fn delete(&self, map: &mut crate::Asset) {
+    pub fn delete(&self, map: &mut Asset) {
         let val = self.index();
         if let Some(level) = map
             .asset_data
