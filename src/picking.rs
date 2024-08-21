@@ -94,7 +94,7 @@ pub fn drag(
     )>,
     mut selected: Query<(&actor::Actor, &mut Transform), With<actor::Selected>>,
 ) {
-    let Some((map, _)) = &mut map.0 else { return };
+    let Some((map, ..)) = &mut map.0 else { return };
     let window = window.single();
     let camera = camera.single();
     match drag.as_mut() {

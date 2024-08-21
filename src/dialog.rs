@@ -1,3 +1,5 @@
+use unreal_asset::exports::ExportBaseTrait;
+
 use super::*;
 
 pub fn open(
@@ -41,6 +43,12 @@ pub fn open(
         .map(|path| path.join("cache"));
     let version = appdata.version();
     let mut batch = std::collections::BTreeMap::<_, Vec<_>>::new();
+    let mut export_names: Vec<_> = asset
+        .asset_data
+        .exports
+        .iter()
+        .map(|ex| ex.get_base_export().object_name.get_owned_content())
+        .collect();
     for i in actor::get_actors(&asset) {
         let (path, actor) = match actor::Actor::new(&asset, i) {
             Ok(actor) => actor,
@@ -52,6 +60,7 @@ pub fn open(
                 continue;
             }
         };
+        export_names[i.index as usize - 1] = actor.name.clone();
         match batch.get_mut(&path) {
             Some(vec) => vec.push(actor),
             None => {
@@ -220,7 +229,12 @@ pub fn open(
             }
         }
     }
-    map.0 = Some((asset, path.clone()));
+    let import_names = asset
+        .imports
+        .iter()
+        .map(|ex| ex.object_name.get_owned_content())
+        .collect();
+    map.0 = Some((asset, path.clone(), export_names, import_names));
     notif.send(Notif {
         message: "map opened".into(),
         kind: Success,
@@ -241,7 +255,7 @@ pub fn save_as(
     appdata: Res<AppData>,
     mut map: NonSendMut<Map>,
 ) {
-    let Some((map, path)) = &mut map.0 else {
+    let Some((map, path, ..)) = &mut map.0 else {
         notif.send(Notif {
             message: "no map to save".into(),
             kind: Error,

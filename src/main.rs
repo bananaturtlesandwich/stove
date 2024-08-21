@@ -21,7 +21,7 @@ type Asset = unreal_asset::Asset<Wrapper>;
 type Export = unreal_asset::Export<unreal_asset::types::PackageIndex>;
 
 #[derive(Default)]
-struct Map(Option<(Asset, std::path::PathBuf)>);
+struct Map(Option<(Asset, std::path::PathBuf, Vec<String>, Vec<String>)>);
 
 #[derive(Default)]
 struct Transplant(Option<(Asset, Vec<actor::Actor>, Vec<usize>)>);

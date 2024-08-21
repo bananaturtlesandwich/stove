@@ -93,7 +93,7 @@ pub fn ui(
                             false => bevy_framepace::Limiter::Off,
                         }
                     }
-                    if ui.add_enabled(appdata.cap, egui::DragValue::new(&mut appdata.rate)).changed() {
+                    if ui.add_enabled(appdata.cap, egui::DragValue::new(&mut appdata.rate).range(5..=i32::MAX)).changed() {
                         fps.limiter = bevy_framepace::Limiter::from_framerate(appdata.rate)
                     }
                 });
@@ -223,12 +223,12 @@ pub fn ui(
                     ui.add_space(10.0);
                 })
             );
-        if let (Ok((_, actor, mut transform)), Some((map, _))) = (selected.get_single_mut(), &mut map.0) {
+        if let (Ok((_, actor, mut transform)), Some((map, _, exports, imports))) = (selected.get_single_mut(), &mut map.0) {
             egui::ScrollArea::both()
                 .id_source("properties")
                 .auto_shrink([false; 2])
                 .show(ui, |ui| {
-                    actor.show(map, ui, &mut transform);
+                    actor.show(map, ui, &mut transform, &exports, &imports);
                     // otherwise the scroll area bugs out at the bottom
                     ui.add_space(10.0);
                 });
@@ -236,7 +236,7 @@ pub fn ui(
     });
     let mut open = true;
     let mut transplanted = None;
-    if let (Some((donor, others, selected)), Some((map, _))) = (&mut transplant.0, &mut map.0) {
+    if let (Some((donor, others, selected)), Some((map, ..))) = (&mut transplant.0, &mut map.0) {
         egui::Window::new("transplant actor")
             .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
             .resizable(false)

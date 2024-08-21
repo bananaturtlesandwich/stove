@@ -11,20 +11,30 @@ impl Actor {
         asset: &mut Asset,
         ui: &mut egui::Ui,
         transform: &mut bevy::prelude::Transform,
+        exports: &[String],
+        imports: &[String],
     ) {
-        ui.heading(format!("{} ({})", self.name, self.export));
+        ui.heading(format!("{} ({})", self.name, self.export + 1));
         fn export(
             ui: &mut egui::Ui,
             export: &mut crate::Export,
             transform: &mut bevy::prelude::Transform,
+            exports: &[String],
+            imports: &[String],
         ) {
             if let Some(norm) = export.get_normal_export_mut() {
                 for prop in norm.properties.iter_mut() {
-                    property(ui, prop, transform);
+                    property(ui, prop, transform, exports, imports);
                 }
             }
         }
-        export(ui, &mut asset.asset_data.exports[self.export], transform);
+        export(
+            ui,
+            &mut asset.asset_data.exports[self.export],
+            transform,
+            exports,
+            imports,
+        );
         for i in asset.asset_data.exports[self.export]
             .get_base_export()
             .create_before_serialization_dependencies
@@ -32,26 +42,18 @@ impl Actor {
             .iter()
         {
             if let Some(ex) = asset.get_export_mut(*i) {
-                let (name, id, index) = {
-                    let ex = ex.get_base_export();
-                    (
-                        ex.object_name.get_owned_content(),
-                        ex.serial_offset,
-                        -ex.class_index.index - 1,
-                    )
-                };
-                let response = ui
-                    .push_id(id, |ui| {
-                        ui.collapsing(egui::RichText::new(name).strong(), |ui| {
-                            export(ui, ex, transform)
-                        })
+                let base = ex.get_base_export();
+                let name = base
+                    .object_name
+                    .get_content(|name| format!("{} ({})", name, i.index));
+                let index = -base.class_index.index - 1;
+                ui.push_id(base.serial_offset, |ui| {
+                    ui.collapsing(egui::RichText::new(name).strong(), |ui| {
+                        export(ui, ex, transform, exports, imports)
                     })
-                    .response;
-                if let Some(import) = asset.imports.get(index as usize) {
-                    import
-                        .object_name
-                        .get_content(|name| response.on_hover_text(name));
-                }
+                })
+                .response
+                .on_hover_text(&imports[index as usize]);
             }
         }
     }
@@ -86,10 +88,12 @@ fn array_property(
     ui: &mut egui::Ui,
     arr: &mut ArrayProperty,
     transform: &mut bevy::prelude::Transform,
+    exports: &[String],
+    imports: &[String],
 ) {
     ui.collapsing("", |ui| {
         for (i, entry) in arr.value.iter_mut().enumerate() {
-            ui.push_id(i, |ui| property(ui, entry, transform));
+            ui.push_id(i, |ui| property(ui, entry, transform, exports, imports));
         }
     });
 }
@@ -181,18 +185,13 @@ fn soft_property(ui: &mut egui::Ui, path: &mut SoftObjectPathPropertyValue) {
     }
 }
 
-fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelude::Transform) {
-    if let Property::ObjectProperty(_) = prop {
-        return;
-    }
-    if let Property::ArrayProperty(ArrayProperty { value, .. }) = prop {
-        if !value
-            .first()
-            .is_some_and(|val| !matches!(val, Property::ObjectProperty(_)))
-        {
-            return;
-        }
-    }
+fn property(
+    ui: &mut egui::Ui,
+    prop: &mut Property,
+    transform: &mut bevy::prelude::Transform,
+    exports: &[String],
+    imports: &[String],
+) {
     match prop.get_name().get_owned_content().as_str() {
         "UCSModifiedProperties" | "UCSSerializationIndex" | "BlueprintCreatedComponents" => (),
         name => {
@@ -226,6 +225,19 @@ fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelud
                             option(ui, &mut txt.value, text, String::new);
                             ui.label("invariant string:");
                             option(ui, &mut txt.culture_invariant_string, text, String::new);
+                        }
+                        Property::ObjectProperty(obj) => {
+                            // let res = drag(ui, &mut obj.value.index);
+                            ui.add(
+                                egui::widgets::DragValue::new(&mut obj.value.index)
+                                    .range(-(imports.len() as i32)..=exports.len() as i32)
+                                    .speed(1.0),
+                            );
+                            ui.label(match obj.value.index {
+                                1..=i32::MAX => &exports[obj.value.index as usize - 1],
+                                0 => "null",
+                                i32::MIN..0 => &imports[-obj.value.index as usize - 1],
+                            });
                         }
                         Property::AssetObjectProperty(obj) => {
                             option(ui, &mut obj.value, text, String::new)
@@ -339,12 +351,18 @@ fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelud
                                 drag(ui, val)
                             }
                         }
-                        Property::SetProperty(set) => array_property(ui, &mut set.value, transform),
-                        Property::ArrayProperty(arr) => array_property(ui, arr, transform),
+                        Property::SetProperty(set) => {
+                            array_property(ui, &mut set.value, transform, exports, imports)
+                        }
+                        Property::ArrayProperty(arr) => {
+                            array_property(ui, arr, transform, exports, imports)
+                        }
                         Property::MapProperty(map) => {
                             ui.collapsing("", |ui| {
                                 for (i, value) in map.value.values_mut().enumerate() {
-                                    ui.push_id(i, |ui| property(ui, value, transform));
+                                    ui.push_id(i, |ui| {
+                                        property(ui, value, transform, exports, imports)
+                                    });
                                 }
                             });
                         }
@@ -403,7 +421,9 @@ fn property(ui: &mut egui::Ui, prop: &mut Property, transform: &mut bevy::prelud
                         Property::StructProperty(str) => {
                             ui.collapsing("", |ui| {
                                 for (i, val) in str.value.iter_mut().enumerate() {
-                                    ui.push_id(i, |ui| property(ui, val, transform));
+                                    ui.push_id(i, |ui| {
+                                        property(ui, val, transform, exports, imports)
+                                    });
                                 }
                             });
                         }

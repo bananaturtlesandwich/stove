@@ -10,7 +10,7 @@ pub fn duplicate(
     selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
     mut cubes: Query<&mut Handle<wire::Wire>>,
 ) {
-    let Some((map, _)) = &mut map.0 else { return };
+    let Some((map, ..)) = &mut map.0 else { return };
     if selected.is_empty() {
         notif.send(Notif {
             message: "no actors to duplicate".into(),
@@ -88,7 +88,7 @@ pub fn delete(
     mut map: NonSendMut<Map>,
     selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
 ) {
-    let Some((map, _)) = &mut map.0 else { return };
+    let Some((map, ..)) = &mut map.0 else { return };
     if selected.is_empty() {
         notif.send(Notif {
             message: "no actors to delete".into(),
@@ -174,7 +174,7 @@ pub fn paste(
     buffer: Res<Buffer>,
     mut selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
 ) {
-    let Some((map, _)) = &mut map.0 else { return };
+    let Some((map, ..)) = &mut map.0 else { return };
     if selected.is_empty() {
         notif.send(Notif {
             message: "no actors to paste location to".into(),
