@@ -314,22 +314,35 @@ pub fn load_paks(
         })
         .collect();
     // obtain game name
-    let Some((_, pak)) = paks.2.first() else {
-        return;
-    };
-    let mut split = pak.mount_point().split('/').peekable();
-    while let Some((game, content)) = split.next().zip(split.peek()) {
-        if game != "Engine" && content == &"Content" {
-            paks.0 = game.into();
-            return;
-        }
-    }
-    for entry in pak.files() {
-        let mut split = entry.split('/').take(2);
-        if let Some((game, content)) = split.next().zip(split.next()) {
-            if game != "Engine" && content == "Content" {
+    for (_, pak) in paks.2.iter() {
+        let mut split = pak.mount_point().split('/').peekable();
+        while let Some((game, content)) = split.next().zip(split.peek()) {
+            if game != "Engine" && content == &"Content" {
                 paks.0 = game.into();
                 return;
+            }
+        }
+        for entry in pak.files() {
+            let mut split = entry.split('/').take(2);
+            if let Some((game, content)) = split.next().zip(split.next()) {
+                if game != "Engine" && content == "Content" {
+                    paks.0 = game.into();
+                    return;
+                }
+            }
+        }
+    }
+    if let Ok(dir) = std::fs::read_dir(path) {
+        for dir in dir.filter_map(Result::ok) {
+            if !dir.file_type().is_ok_and(|t| t.is_dir()) {
+                continue;
+            }
+            let name = dir.file_name().to_string_lossy().into();
+            if name == "Engine" {
+                continue;
+            }
+            if dir.path().join("Content").exists() {
+                paks.0 = name;
             }
         }
     }

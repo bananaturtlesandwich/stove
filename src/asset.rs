@@ -55,7 +55,10 @@ pub fn get<T>(
         Option<super::Wrapper>,
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Option<T> {
-    let loose = paks.1.join(path.trim_start_matches("/Game/"));
+    let path = path
+        .replace("/Game", &format!("{}/Content", paks.0))
+        .replace("/Engine/", "Engine/Content/");
+    let loose = paks.1.join(&path);
     let mesh = loose.with_extension("uasset");
     if mesh.exists() {
         if let Ok(asset) = open(mesh, version).and_then(|asset| {
@@ -74,9 +77,6 @@ pub fn get<T>(
             return Some(asset);
         }
     }
-    let path = path
-        .replace("/Game", &format!("{}/Content", paks.0))
-        .replace("/Engine/", "Engine/Content/");
     for (pak_file, pak) in paks.2.iter() {
         if let Ok(asset) = read(pak, pak_file, cache, &path, version, &func) {
             return Some(asset);
