@@ -118,9 +118,9 @@ pub fn initialise(
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: bevy::render::render_resource::TextureDimension::D2,
-                    format: bevy::render::render_resource::TextureFormat::Rgba8Unorm,
+                    format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
                     usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING,
-                    view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8Unorm],
+                    view_formats: &[bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb],
                 },
                 sampler: bevy::render::texture::ImageSampler::Descriptor(
                     bevy::render::texture::ImageSamplerDescriptor {
