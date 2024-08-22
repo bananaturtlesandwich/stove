@@ -31,10 +31,17 @@ pub fn sidebar(
                     ui.close_menu();
                 }
                 if ui
-                    .add(egui::Button::new("transplant").shortcut_text("ctrl + t"))
+                    .add(egui::Button::new("transplant from").shortcut_text("ctrl + t"))
                     .clicked()
                 {
-                    commands.trigger(triggers::Transplant);
+                    commands.trigger(triggers::TransplantFrom);
+                    ui.close_menu();
+                }
+                if ui
+                    .add(egui::Button::new("transplant into").shortcut_text("alt + t"))
+                    .clicked()
+                {
+                    commands.trigger(triggers::TransplantInto);
                     ui.close_menu();
                 }
                 if ui
@@ -363,7 +370,8 @@ fn shortcuts(ui: &mut egui::Ui) {
         "file",
         &[
             ("open", "ctrl + o"),
-            ("transplant", "ctrl + t"),
+            ("transplant from", "ctrl + t"),
+            ("transplant into", "alt + t"),
             ("save", "ctrl + s"),
             ("save as", "ctrl + shift + s"),
             ("add pak folder", "alt + o"),

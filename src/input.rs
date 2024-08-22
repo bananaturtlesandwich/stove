@@ -19,7 +19,10 @@ pub fn shortcuts(
         commands.trigger(triggers::SaveAs(shift));
     }
     if keys.just_released(KeyCode::KeyT) && ctrl {
-        commands.trigger(triggers::Transplant);
+        commands.trigger(triggers::TransplantFrom);
+    }
+    if keys.just_released(KeyCode::KeyT) && alt {
+        commands.trigger(triggers::TransplantInto);
     }
     if keys.just_pressed(KeyCode::KeyX) {
         *lock = match shift {

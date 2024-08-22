@@ -28,4 +28,6 @@ pub struct SaveAs(pub bool);
 #[derive(Event)]
 pub struct AddPak;
 #[derive(Event)]
-pub struct Transplant;
+pub struct TransplantFrom;
+#[derive(Event)]
+pub struct TransplantInto;

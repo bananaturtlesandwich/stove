@@ -4,16 +4,16 @@ use super::*;
 
 pub fn open(
     trigger: Trigger<triggers::Open>,
-    mut commands: Commands,
+    commands: Commands,
     actors: Query<Entity, With<actor::Actor>>,
     mut notif: EventWriter<Notif>,
     appdata: ResMut<AppData>,
-    mut client: ResMut<Client>,
-    mut map: NonSendMut<Map>,
-    mut registry: ResMut<Registry>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<unlit::Unlit>>,
-    mut images: ResMut<Assets<Image>>,
+    client: ResMut<Client>,
+    map: NonSendMut<Map>,
+    registry: ResMut<Registry>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<unlit::Unlit>>,
+    images: ResMut<Assets<Image>>,
     paks: Res<Paks>,
     consts: Res<Constants>,
 ) {
@@ -35,6 +35,28 @@ pub fn open(
             return;
         }
     };
+    open_asset(
+        path, asset, commands, actors, notif, appdata, client, map, registry, meshes, materials,
+        images, paks, consts,
+    );
+}
+
+fn open_asset(
+    path: std::path::PathBuf,
+    asset: super::Asset,
+    mut commands: Commands,
+    actors: Query<Entity, With<actor::Actor>>,
+    mut notif: EventWriter<Notif>,
+    appdata: ResMut<AppData>,
+    mut client: ResMut<Client>,
+    mut map: NonSendMut<Map>,
+    mut registry: ResMut<Registry>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<unlit::Unlit>>,
+    mut images: ResMut<Assets<Image>>,
+    paks: Res<Paks>,
+    consts: Res<Constants>,
+) {
     for actor in actors.iter() {
         commands.entity(actor).despawn_recursive();
     }
@@ -333,8 +355,8 @@ pub fn add_pak(_: Trigger<triggers::AddPak>, mut commands: Commands, mut appdata
     }
 }
 
-pub fn transplant(
-    _: Trigger<triggers::Transplant>,
+pub fn transplant_from(
+    _: Trigger<triggers::TransplantFrom>,
     mut notif: EventWriter<Notif>,
     appdata: ResMut<AppData>,
     map: NonSend<Map>,
@@ -375,4 +397,64 @@ pub fn transplant(
             });
         }
     }
+}
+
+pub fn transplant_into(
+    _: Trigger<triggers::TransplantInto>,
+    commands: Commands,
+    mut notif: EventWriter<Notif>,
+    appdata: ResMut<AppData>,
+    mut map: NonSendMut<Map>,
+    selected: Query<&actor::Actor, With<actor::Selected>>,
+    actors: Query<Entity, With<actor::Actor>>,
+    client: ResMut<Client>,
+    registry: ResMut<Registry>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<unlit::Unlit>>,
+    images: ResMut<Assets<Image>>,
+    paks: Res<Paks>,
+    consts: Res<Constants>,
+) {
+    let Some((donor, ..)) = &mut map.0 else {
+        notif.send(Notif {
+            message: "no map to transplant into".into(),
+            kind: Error,
+        });
+        return;
+    };
+    if selected.is_empty() {
+        notif.send(Notif {
+            message: "no actors selected to transplant".into(),
+            kind: Error,
+        });
+        return;
+    }
+    let Some(path) = rfd::FileDialog::new()
+        .set_title("open map")
+        .add_filter("maps", &["umap"])
+        .pick_file()
+    else {
+        return;
+    };
+    let mut recipient = match asset::open(&path, appdata.version()) {
+        Ok(recipient) => recipient,
+        Err(e) => {
+            notif.send(Notif {
+                message: e.to_string(),
+                kind: Error,
+            });
+            return;
+        }
+    };
+    for actor in selected.iter() {
+        actor.transplant(&mut recipient, donor, &mut vec![], &mut vec![]);
+        notif.send(Notif {
+            message: format!("transplanted {}", actor.name),
+            kind: Success,
+        });
+    }
+    open_asset(
+        path, recipient, commands, actors, notif, appdata, client, map, registry, meshes,
+        materials, images, paks, consts,
+    );
 }
