@@ -12,8 +12,7 @@ pub fn shortcuts(
     if keys.just_released(KeyCode::KeyO) && ctrl {
         commands.trigger(triggers::Open(None));
     }
-    if keys.just_released(KeyCode::KeyO) && keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight])
-    {
+    if keys.just_released(KeyCode::KeyO) && alt {
         commands.trigger(triggers::AddPak);
     }
     if keys.just_released(KeyCode::KeyS) && ctrl {
@@ -79,7 +78,10 @@ pub fn camera(
     mut ctx: bevy_egui::EguiContexts,
 ) {
     let ctx = ctx.ctx_mut();
-    if ctx.is_pointer_over_area() || ctx.wants_keyboard_input() {
+    if ctx.is_pointer_over_area()
+        || ctx.wants_keyboard_input()
+        || keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight])
+    {
         return;
     }
     let mut controller = controllers.single_mut();

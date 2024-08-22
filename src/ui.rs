@@ -192,7 +192,7 @@ pub fn sidebar(
                         let highlighted = selected.contains(entity);
                         if ui.selectable_label(
                             highlighted,
-                            &actor.name
+                            format!("{} ({})", actor.name, actor.export + 1)
                         )
                         .on_hover_text(&actor.class)
                         .clicked() {
