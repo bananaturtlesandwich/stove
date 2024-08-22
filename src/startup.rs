@@ -107,7 +107,7 @@ pub fn initialise(
         selected: wire.add(wire::Wire { selected: true }),
         grid: materials.add(unlit::Unlit {
             texture: images.add(Image {
-                data: include_bytes!("../assets/DefaultWhiteGrid.rgba").into(),
+                data: include_bytes!("../assets/proto.rgba").into(),
                 texture_descriptor: bevy::render::render_resource::TextureDescriptor {
                     label: None,
                     size: bevy::render::render_resource::Extent3d {
