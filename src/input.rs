@@ -78,7 +78,8 @@ pub fn camera(
     mut controllers: Query<&mut smooth_bevy_cameras::controllers::unreal::UnrealCameraController>,
     mut ctx: bevy_egui::EguiContexts,
 ) {
-    if ctx.ctx_mut().is_pointer_over_area() {
+    let ctx = ctx.ctx_mut();
+    if ctx.is_pointer_over_area() || ctx.wants_keyboard_input() {
         return;
     }
     let mut controller = controllers.single_mut();
@@ -124,13 +125,10 @@ pub fn camera(
     let mut panning = Vec2::ZERO;
     let mut locomotion = Vec2::ZERO;
 
+    panning += keyboard_mvmt_sensitivity * panning_dir;
+    locomotion.y += keyboard_mvmt_sensitivity * translation_dir.y;
+
     if right_pressed {
-        panning += keyboard_mvmt_sensitivity * panning_dir;
-
-        if translation_dir.y != 0.0 {
-            locomotion.y += keyboard_mvmt_sensitivity * translation_dir.y;
-        }
-
         keyboard_mvmt_sensitivity += keyboard_mvmt_wheel_sensitivity * wheel_delta;
         controller.keyboard_mvmt_sensitivity = keyboard_mvmt_sensitivity.max(0.01);
     }
