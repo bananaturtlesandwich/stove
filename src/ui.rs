@@ -77,6 +77,11 @@ pub fn ui(
                                 appdata.pak = None;
                                 paks.0.clear();
                             }
+                            if let Some(pak) = appdata.pak.as_mut() {
+                                if &i < pak {
+                                    *pak -= 1;
+                                }
+                            }
                             remove_at = Some(i)
                         }
                     });

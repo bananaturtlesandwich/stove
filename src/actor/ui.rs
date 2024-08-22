@@ -92,8 +92,29 @@ fn array_property(
     imports: &[String],
 ) {
     ui.collapsing("", |ui| {
+        let mut remove = None;
         for (i, entry) in arr.value.iter_mut().enumerate() {
-            ui.push_id(i, |ui| property(ui, entry, transform, exports, imports));
+            ui.push_id(i, |ui| {
+                ui.horizontal(|ui| {
+                    property(ui, entry, transform, exports, imports);
+                    if ui.button("x").clicked() {
+                        remove = Some(i);
+                    }
+                })
+            });
+        }
+        if let Some(i) = remove {
+            arr.value.remove(i);
+        }
+        if let Some(prop) = arr.value.last() {
+            if ui.button("+").clicked() {
+                arr.value.push(prop.clone())
+            }
+        } else {
+            ui.horizontal(|ui| {
+                ui.add_enabled(false, egui::Button::new("+"));
+                ui.label("there is not enough data to add to empty arrays");
+            });
         }
     });
 }
@@ -359,11 +380,24 @@ fn property(
                         }
                         Property::MapProperty(map) => {
                             ui.collapsing("", |ui| {
+                                let mut remove = None;
                                 for (i, value) in map.value.values_mut().enumerate() {
                                     ui.push_id(i, |ui| {
-                                        property(ui, value, transform, exports, imports)
+                                        ui.horizontal(|ui| {
+                                            property(ui, value, transform, exports, imports);
+                                            if ui.button("x").clicked() {
+                                                remove = Some(i);
+                                            }
+                                        })
                                     });
                                 }
+                                if let Some(i) = remove {
+                                    map.value.remove_by_index(i);
+                                }
+                                ui.horizontal(|ui| {
+                                    ui.add_enabled(false, egui::Button::new("+"));
+                                    ui.label("there is not enough data to add to maps");
+                                });
                             });
                         }
                         Property::PerPlatformBoolProperty(bools) => {
