@@ -51,9 +51,9 @@ impl Actor {
                     ui.collapsing(egui::RichText::new(name).strong(), |ui| {
                         export(ui, ex, transform, exports, imports)
                     })
-                })
-                .response
-                .on_hover_text(&imports[index as usize]);
+                    .header_response
+                    .on_hover_text(&imports[index as usize])
+                });
             }
         }
     }
@@ -197,7 +197,8 @@ fn property(
         name => {
             ui.push_id(name, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(egui::widget_text::RichText::new(name).strong());
+                    ui.label(egui::widget_text::RichText::new(name).strong())
+                        .on_hover_text(prop.to_serialized_name());
                     match prop {
                         Property::BoolProperty(bool) => {
                             ui.checkbox(&mut bool.value, "");
@@ -222,9 +223,8 @@ fn property(
                         Property::NameProperty(name) => fname(ui, &mut name.value),
                         Property::StrProperty(str) => option(ui, &mut str.value, text, String::new),
                         Property::TextProperty(txt) => {
-                            option(ui, &mut txt.value, text, String::new);
-                            ui.label("invariant string:");
                             option(ui, &mut txt.culture_invariant_string, text, String::new);
+                            option(ui, &mut txt.value, text, String::new);
                         }
                         Property::ObjectProperty(obj) => {
                             // let res = drag(ui, &mut obj.value.index);
@@ -434,9 +434,7 @@ fn property(
                         _ => (),
                     };
                 })
-            })
-            .response
-            .on_hover_text(prop.to_serialized_name());
+            });
         }
     };
 }

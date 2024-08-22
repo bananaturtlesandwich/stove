@@ -337,8 +337,16 @@ pub fn transplant(
     _: Trigger<triggers::Transplant>,
     mut notif: EventWriter<Notif>,
     appdata: ResMut<AppData>,
+    map: NonSend<Map>,
     mut transplant: NonSendMut<Transplant>,
 ) {
+    if map.0.is_none() {
+        notif.send(Notif {
+            message: "no map to transplant into".into(),
+            kind: Error,
+        });
+        return;
+    };
     let Some(path) = rfd::FileDialog::new()
         .set_title("open map")
         .add_filter("maps", &["umap"])

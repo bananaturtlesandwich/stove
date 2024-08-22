@@ -31,6 +31,13 @@ pub fn ui(
                     ui.close_menu();
                 }
                 if ui
+                    .add(egui::Button::new("transplant").shortcut_text("ctrl + t"))
+                    .clicked()
+                {
+                    commands.trigger(triggers::Transplant);
+                    ui.close_menu();
+                }
+                if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
                     .clicked()
                 {
@@ -145,6 +152,9 @@ pub fn ui(
                 ui.menu_button("shortcuts", shortcuts);
             })
         });
+        if map.0.is_none() {
+            return;
+        }
         if ui.add(egui::TextEdit::singleline(&mut appdata.query).hint_text("🔎 search actors")).changed() {
             for (entity, _) in matched.iter() {
                 commands.entity(entity).remove::<actor::Matched>();
@@ -219,18 +229,15 @@ pub fn ui(
                             };
                         }
                     }
-                    // otherwise the scroll area bugs out at the bottom
-                    ui.add_space(10.0);
                 })
             );
+        ui.add_space(10.0);
         if let (Ok((_, actor, mut transform)), Some((map, _, exports, imports))) = (selected.get_single_mut(), &mut map.0) {
             egui::ScrollArea::both()
                 .id_source("properties")
                 .auto_shrink([false; 2])
                 .show(ui, |ui| {
                     actor.show(map, ui, &mut transform, &exports, &imports);
-                    // otherwise the scroll area bugs out at the bottom
-                    ui.add_space(10.0);
                 });
         }
     });
@@ -349,6 +356,7 @@ fn shortcuts(ui: &mut egui::Ui) {
         "file",
         &[
             ("open", "ctrl + o"),
+            ("transplant", "ctrl + t"),
             ("save", "ctrl + s"),
             ("save as", "ctrl + shift + s"),
             ("add pak folder", "alt + o"),
@@ -369,7 +377,6 @@ fn shortcuts(ui: &mut egui::Ui) {
             ("hide ui", "h"),
             ("select", "left-click"),
             ("deselect all", "escape"),
-            ("transplant", "ctrl + t"),
         ],
     );
     section(
