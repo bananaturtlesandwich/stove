@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn ui(
+pub fn sidebar(
     mut ctx: bevy_egui::EguiContexts,
     mut appdata: ResMut<AppData>,
     mut paks: ResMut<Paks>,
@@ -401,4 +401,16 @@ fn shortcuts(ui: &mut egui::Ui) {
             ("lock x / y / z plane", "shift + x / y / z"),
         ],
     );
+}
+pub fn notifs(
+    mut notif: EventReader<Notif>,
+    mut notifs: ResMut<Notifs>,
+    mut ctx: bevy_egui::EguiContexts,
+) {
+    for Notif { message, kind } in notif.read() {
+        notifs
+            .0
+            .add(egui_notify::Toast::custom(message, kind.clone()));
+    }
+    notifs.0.show(ctx.ctx_mut());
 }

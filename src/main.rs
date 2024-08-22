@@ -199,40 +199,37 @@ fn main() -> AppExit {
         })
         .add_event::<Notif>()
         .add_systems(PreStartup, startup::set_icon)
-        // commands aren't applied immediately without this
-        .add_systems(Startup, (persistence::load, apply_deferred).chain())
-        .add_systems(Update, persistence::write)
-        .add_systems(Startup, startup::check_args.after(persistence::load))
-        .add_systems(Startup, startup::check_updates)
-        .add_systems(Startup, startup::initialise)
         .add_systems(
-            Update,
-            |mut drops: EventReader<bevy::window::FileDragAndDrop>, mut commands: Commands| {
-                for drop in drops.read() {
-                    if let bevy::window::FileDragAndDrop::DroppedFile { path_buf, .. } = drop {
-                        commands.trigger(triggers::Open(Some(path_buf.clone())));
-                    }
-                }
-            },
+            Startup,
+            (
+                startup::check_updates,
+                startup::discord,
+                startup::camera,
+                startup::consts,
+                (persistence::load, startup::check_args).chain(),
+            ),
         )
-        .add_systems(Update, ui::ui)
-        .add_systems(Update, input::shortcuts)
-        // post update because egui isn't built until update
-        .add_systems(PostUpdate, picking::pick)
-        .add_systems(PostUpdate, picking::drag.after(picking::pick))
-        .add_systems(PostUpdate, input::camera)
         .add_systems(
             Update,
-            |mut notif: EventReader<Notif>,
-             mut notifs: ResMut<Notifs>,
-             mut ctx: bevy_egui::EguiContexts| {
-                for Notif { message, kind } in notif.read() {
-                    notifs
-                        .0
-                        .add(egui_notify::Toast::custom(message, kind.clone()));
-                }
-                notifs.0.show(ctx.ctx_mut());
-            },
+            (
+                persistence::write,
+                |mut drops: EventReader<bevy::window::FileDragAndDrop>, mut commands: Commands| {
+                    for drop in drops.read() {
+                        if let bevy::window::FileDragAndDrop::DroppedFile { path_buf, .. } = drop {
+                            commands.trigger(triggers::Open(Some(path_buf.clone())));
+                        }
+                    }
+                },
+                ui::sidebar,
+                ui::notifs,
+                input::shortcuts,
+                action::approach,
+            ),
+        )
+        // post update because egui isn't built until update
+        .add_systems(
+            PostUpdate,
+            ((picking::pick, picking::drag).chain(), input::camera),
         )
         .observe(dialog::open)
         .observe(dialog::save_as)
@@ -241,7 +238,6 @@ fn main() -> AppExit {
         .observe(action::duplicate)
         .observe(action::delete)
         .observe(action::focus)
-        .add_systems(Update, action::approach)
         .observe(action::copy)
         .observe(action::paste)
         .observe(action::deselect)
