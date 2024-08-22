@@ -14,7 +14,7 @@ impl Actor {
         exports: &[String],
         imports: &[String],
     ) {
-        ui.heading(format!("{} ({})", self.name, self.export + 1));
+        ui.heading(&self.display);
         fn export(
             ui: &mut egui::Ui,
             export: &mut crate::Export,

@@ -51,6 +51,7 @@ pub struct Actor {
     pub export: usize,
     transform: usize,
     pub name: String,
+    pub display: String,
     pub class: String,
 }
 
@@ -92,6 +93,7 @@ impl Actor {
             },
             false => norm.base_export.object_name.get_owned_content(),
         };
+        let display = format!("{name} ({})", export + 1);
         let class = asset
             .get_import(norm.base_export.class_index)
             .map(|import| import.object_name.get_owned_content())
@@ -125,6 +127,7 @@ impl Actor {
                             export,
                             transform: export,
                             name,
+                            display,
                             class,
                         },
                     ))
@@ -138,6 +141,7 @@ impl Actor {
                                     export,
                                     transform: obj.value.index as usize - 1,
                                     name,
+                                    display,
                                     class,
                                 },
                             ));
