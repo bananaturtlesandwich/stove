@@ -248,7 +248,9 @@ pub fn ui(
     });
     let mut open = true;
     let mut transplanted = None;
-    if let (Some((donor, others, selected)), Some((map, ..))) = (&mut transplant.0, &mut map.0) {
+    if let (Some((donor, others, selected)), Some((map, _, export_names, import_names))) =
+        (&mut transplant.0, &mut map.0)
+    {
         egui::Window::new("transplant actor")
             .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
             .resizable(false)
@@ -265,16 +267,16 @@ pub fn ui(
                         let len = actors.iter().len();
                         transplanted = Some(len..len + selected.len());
                         for actor in selected.iter().map(|i| &others[*i]) {
-                            let insert = unreal_asset::types::PackageIndex::new(
-                                map.asset_data.exports.len() as i32 + 1,
-                            );
-                            actor.transplant(map, donor);
+                            let len = map.asset_data.exports.len();
+                            let insert = unreal_asset::types::PackageIndex::new(len as i32 + 1);
+                            actor.transplant(map, donor, export_names, import_names);
                             notif.send(Notif {
                                 message: format!("transplanted {}", actor.name),
                                 kind: Success,
                             });
                             // don't process mesh for transplanted actor for now
                             let (_, actor) = actor::Actor::new(map, insert).unwrap();
+                            export_names[len] = actor.name.clone();
                             commands
                                 .spawn((
                                     actor::Selected,

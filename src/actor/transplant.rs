@@ -2,7 +2,13 @@ use super::*;
 use unreal_asset::{cast, types::fname::ToSerializedName, Import};
 
 impl Actor {
-    pub fn transplant(&self, recipient: &mut Asset, donor: &Asset) {
+    pub fn transplant(
+        &self,
+        recipient: &mut Asset,
+        donor: &Asset,
+        export_names: &mut Vec<String>,
+        import_names: &mut Vec<String>,
+    ) {
         let mut children = self.get_actor_exports(donor, recipient.asset_data.exports.len());
 
         // make sure the actor has a unique object name
@@ -104,6 +110,11 @@ impl Actor {
                 recipient.add_name_reference(prop.to_serialized_name(), false);
             })
         }
+        export_names.extend(
+            children
+                .iter()
+                .map(|ex| ex.get_base_export().object_name.get_owned_content()),
+        );
         // finally add the exports
         recipient.asset_data.exports.append(&mut children);
 
@@ -152,6 +163,7 @@ impl Actor {
             };
             i += 1;
         }
+        import_names.extend(imports.iter().map(|im| im.object_name.get_owned_content()));
         recipient.imports.append(&mut imports);
     }
 }

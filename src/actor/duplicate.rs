@@ -2,7 +2,7 @@ use super::*;
 
 impl Actor {
     /// adds an actor to a map where the actor is already present
-    pub fn duplicate(&self, asset: &mut Asset) {
+    pub fn duplicate(&self, asset: &mut Asset, export_names: &mut Vec<String>) {
         let len = asset.asset_data.exports.len();
         let mut children = self.get_actor_exports(asset, len);
 
@@ -24,6 +24,11 @@ impl Actor {
                 .push(actor_ref);
         }
 
+        export_names.extend(
+            children
+                .iter()
+                .map(|ex| ex.get_base_export().object_name.get_owned_content()),
+        );
         // actually add the exports ;p
         asset.asset_data.exports.append(&mut children);
     }

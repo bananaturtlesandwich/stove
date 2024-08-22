@@ -10,7 +10,9 @@ pub fn duplicate(
     selected: Query<(Entity, &actor::Actor, &mut Transform), With<actor::Selected>>,
     mut cubes: Query<&mut Handle<wire::Wire>>,
 ) {
-    let Some((map, ..)) = &mut map.0 else { return };
+    let Some((map, _, export_names, _)) = &mut map.0 else {
+        return;
+    };
     if selected.is_empty() {
         notif.send(Notif {
             message: "no actors to duplicate".into(),
@@ -28,10 +30,11 @@ pub fn duplicate(
                 commands.entity(entity).remove::<actor::SelectedBundle>();
             }
         }
-        let insert =
-            unreal_asset::types::PackageIndex::new(map.asset_data.exports.len() as i32 + 1);
-        actor.duplicate(map);
+        let len = map.asset_data.exports.len();
+        let insert = unreal_asset::types::PackageIndex::new(len as i32 + 1);
+        actor.duplicate(map, export_names);
         let (path, new) = actor::Actor::new(map, insert).unwrap();
+        export_names[len] = new.name.clone();
         notif.send(Notif {
             message: format!("{} duplicated", actor.name),
             kind: Warning,
@@ -57,9 +60,10 @@ pub fn duplicate(
             None => {
                 commands
                     .spawn((
+                        actor::Selected,
                         MaterialMeshBundle {
                             mesh: consts.cube.clone_weak(),
-                            material: consts.unselected.clone_weak(),
+                            material: consts.selected.clone_weak(),
                             transform: actor.transform(map),
                             ..default()
                         },
@@ -68,11 +72,11 @@ pub fn duplicate(
                     ))
                     .with_children(|parent| {
                         parent.spawn((
+                            consts.bounds.clone_weak(),
                             SpatialBundle {
                                 visibility: Visibility::Hidden,
                                 ..default()
                             },
-                            consts.bounds.clone_weak(),
                             bevy_mod_raycast::deferred::RaycastMesh::<()>::default(),
                         ));
                     });
