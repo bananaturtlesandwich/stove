@@ -91,7 +91,6 @@ pub fn camera(
     let smooth_bevy_cameras::controllers::unreal::UnrealCameraController {
         rotate_sensitivity: mouse_rotate_sensitivity,
         mouse_translate_sensitivity,
-        wheel_translate_sensitivity,
         mut keyboard_mvmt_sensitivity,
         keyboard_mvmt_wheel_sensitivity,
         ..
@@ -133,14 +132,8 @@ pub fn camera(
     panning += keyboard_mvmt_sensitivity * panning_dir;
     locomotion.y += keyboard_mvmt_sensitivity * translation_dir.y;
 
-    if right_pressed {
-        keyboard_mvmt_sensitivity += keyboard_mvmt_wheel_sensitivity * wheel_delta;
-        controller.keyboard_mvmt_sensitivity = keyboard_mvmt_sensitivity.max(0.01);
-    }
-
-    if wheel_delta != 0.0 {
-        locomotion.y += wheel_translate_sensitivity * wheel_delta;
-    }
+    keyboard_mvmt_sensitivity += keyboard_mvmt_wheel_sensitivity * wheel_delta;
+    controller.keyboard_mvmt_sensitivity = keyboard_mvmt_sensitivity.max(0.01);
 
     if middle_pressed {
         // for some reason y needs inversion

@@ -34,15 +34,21 @@ pub fn save<C: std::io::Read + std::io::Seek>(
 
 #[test]
 fn path_with_mount() {
-    let game = "OMD";
-    let path = "/Game/Environments/CastleOrder/Railing/Mesh/RailingShortC";
-    let mount = "../../../OMD/Content/Environments/CastleOrder/";
-    let path: String = path
-        .replace("/Game", &format!("{}/Content", game))
-        .replace("/Engine/", "Engine/Content/")
-        .trim_start_matches(mount.trim_start_matches("../../../"))
-        .into();
-    assert_eq!(path, "Railing/Mesh/RailingShortC")
+    let game = "Lava";
+    let path = "/Theme04_Wasteland/Mesh/SM_TH04_Asphalt_Piece_D";
+    let mount = "../../../Lava/Plugins/Objects/Theme_Sets/Theme04_Wasteland/Content/Mesh/";
+    let file = "SM_TH04_Asphalt_Piece_D.uasset";
+    let path = match path.split('/').nth(1) {
+        Some("Game") => path.replace("/Game", &format!("{}/Content", game)),
+        Some("Engine") => path.replace("/Engine/", "Engine/Content/"),
+        Some(plugin) => path.replace(&format!("/{plugin}/"), &format!("{plugin}/Content/")),
+        _ => path.into(),
+    };
+    assert_eq!(
+        path,
+        "Theme04_Wasteland/Content/Mesh/SM_TH04_Asphalt_Piece_D"
+    );
+    assert!((mount.to_owned() + file).ends_with(&(path + ".uasset")));
 }
 
 pub fn get<T>(
@@ -55,9 +61,12 @@ pub fn get<T>(
         Option<super::Wrapper>,
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Option<T> {
-    let path = path
-        .replace("/Game", &format!("{}/Content", paks.0))
-        .replace("/Engine/", "Engine/Content/");
+    let path = match path.split('/').nth(1) {
+        Some("Game") => path.replace("/Game", &format!("{}/Content", paks.0)),
+        Some("Engine") => path.replace("/Engine/", "Engine/Content/"),
+        Some(plugin) => path.replace(&format!("/{plugin}/"), &format!("{plugin}/Content/")),
+        _ => path.into(),
+    };
     let loose = paks.1.join(&path);
     let mesh = loose.with_extension("uasset");
     if mesh.exists() {
@@ -96,10 +105,16 @@ fn read<T>(
         Option<super::Wrapper>,
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Result<T, unreal_asset::error::Error> {
-    let pak_file = &mut std::io::BufReader::new(std::fs::File::open(pak_file)?);
-    let path: String = path
-        .trim_start_matches(pak.mount_point().trim_start_matches("../../../"))
-        .into();
+    let mut path: String = path.into();
+    let mesh = path.clone() + ".uasset";
+    let Some(file) = pak
+        .files()
+        .into_iter()
+        .find(|file| (pak.mount_point().to_string() + file).ends_with(&mesh))
+    else {
+        return Err(Error::NoData("asset not found in pak".into()));
+    };
+    path = file.trim_end_matches(".uasset").into();
     let make = |ext: &str| path.clone() + ext;
     let (mesh, exp, bulk, uptnl) = (
         make(".uasset"),
@@ -108,6 +123,7 @@ fn read<T>(
         make(".uptnl"),
     );
     let cached = |path: &str| cache.unwrap().join(path.trim_start_matches('/'));
+    let pak_file = &mut std::io::BufReader::new(std::fs::File::open(pak_file)?);
     match cache {
         Some(_)
             if cached(&mesh).exists() ||
