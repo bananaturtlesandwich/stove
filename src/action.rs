@@ -234,6 +234,16 @@ pub fn hide(_: Trigger<triggers::Hide>, mut hidden: ResMut<Hidden>) {
     hidden.0 = !hidden.0
 }
 
+#[test]
+fn aes() {
+    let key = "0x620E8AD508F57F0E1A40BBE1929A490EDA59CA40FEFE4745D1D594F7F2C2E0CA";
+    assert_eq!(
+        key.trim_start_matches("0x"),
+        "620E8AD508F57F0E1A40BBE1929A490EDA59CA40FEFE4745D1D594F7F2C2E0CA"
+    );
+    let _ = hex::decode(key.trim_start_matches("0x")).unwrap();
+}
+
 pub fn load_paks(
     _: Trigger<triggers::LoadPaks>,
     mut notif: EventWriter<Notif>,
@@ -241,8 +251,9 @@ pub fn load_paks(
     mut paks: ResMut<Paks>,
 ) {
     let Some(pak) = appdata.pak else { return };
+    use aes::cipher::KeyInit;
     let key = match hex::decode(appdata.paks[pak].1.trim_start_matches("0x")) {
-        Ok(key) if !appdata.paks[pak].1.is_empty() => Some(key),
+        Ok(key) if !appdata.paks[pak].1.is_empty() => aes::Aes256::new_from_slice(&key).ok(),
         Ok(_) => None,
         Err(_) => {
             notif.send(Notif {
@@ -277,18 +288,16 @@ pub fn load_paks(
         return;
     };
     paks.1 = path.into();
+    // use std::io::Write;
+    // let mut log = std::fs::File::create("paks.log").unwrap();
     paks.2 = files
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .filter_map(|path| {
-            use aes::cipher::KeyInit;
             let mut pak_file = std::io::BufReader::new(std::fs::File::open(path.clone()).ok()?);
             let mut pak = repak::PakBuilder::new();
-            if let Some(key) = key
-                .as_deref()
-                .and_then(|bytes| aes::Aes256::new_from_slice(bytes).ok())
-            {
-                pak = pak.key(key);
+            if let Some(key) = key.as_ref() {
+                pak = pak.key(key.clone());
             }
             #[cfg(target_os = "windows")]
             {
@@ -314,6 +323,12 @@ pub fn load_paks(
                 });
             }
             let pak = pak.reader(&mut pak_file).ok()?;
+            // let _ = writeln!(
+            //     &mut log,
+            //     "{path:?}\n{}\n{:?}",
+            //     pak.mount_point(),
+            //     pak.files()
+            // );
             Some((path, pak))
         })
         .collect();

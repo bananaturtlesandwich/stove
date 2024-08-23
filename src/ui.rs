@@ -74,11 +74,13 @@ pub fn sidebar(
                             };
                             commands.trigger(triggers::LoadPaks);
                         }
-                        egui::TextEdit::singleline(&mut appdata.paks[i].1)
+                         if egui::TextEdit::singleline(&mut appdata.paks[i].1)
                             .clip_text(false)
                             .hint_text("aes key if needed")
                             .desired_width(100.0)
-                            .show(ui);
+                            .show(ui).response.lost_focus() {
+                            commands.trigger(triggers::LoadPaks);
+                        }
                         if ui.button("x").clicked() {
                             if selected {
                                 appdata.pak = None;
