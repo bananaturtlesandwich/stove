@@ -288,8 +288,8 @@ pub fn load_paks(
         return;
     };
     paks.1 = path.into();
-    // use std::io::Write;
-    // let mut log = std::fs::File::create("paks.log").unwrap();
+    use std::io::Write;
+    let mut log = std::fs::File::create("paks.log").unwrap();
     paks.2 = files
         .filter_map(Result::ok)
         .map(|dir| dir.path())
@@ -322,13 +322,18 @@ pub fn load_paks(
                     })
                 });
             }
-            let pak = pak.reader(&mut pak_file).ok()?;
-            // let _ = writeln!(
-            //     &mut log,
-            //     "{path:?}\n{}\n{:?}",
-            //     pak.mount_point(),
-            //     pak.files()
-            // );
+            let pak = pak
+                .reader(&mut pak_file)
+                .inspect_err(|e| {
+                    let _ = writeln!(&mut log, "{path:?}\n{e}");
+                })
+                .ok()?;
+            let _ = writeln!(
+                &mut log,
+                "{path:?}\n{}\n{:?}",
+                pak.mount_point(),
+                pak.files()
+            );
             Some((path, pak))
         })
         .collect();

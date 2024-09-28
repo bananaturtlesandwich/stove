@@ -48,7 +48,7 @@ fn path_with_mount() {
         path,
         "Theme04_Wasteland/Content/Mesh/SM_TH04_Asphalt_Piece_D"
     );
-    assert!((mount.to_owned() + file).ends_with(&(path + ".uasset")));
+    assert!((mount.to_owned() + file).contains(&path));
 }
 
 pub fn get<T>(
@@ -106,11 +106,10 @@ fn read<T>(
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Result<T, unreal_asset::error::Error> {
     let mut path: String = path.into();
-    let mesh = path.clone() + ".uasset";
     let Some(file) = pak
         .files()
         .into_iter()
-        .find(|file| (pak.mount_point().to_string() + file).ends_with(&mesh))
+        .find(|file| (pak.mount_point().to_string() + file).contains(&path))
     else {
         return Err(Error::NoData("asset not found in pak".into()));
     };

@@ -41,6 +41,13 @@ fn parse_tex() -> Result<(), unreal_asset::error::Error> {
         "moon",
         EngineVersion::VER_UE5_1,
     )?;
+    parse(
+        include_bytes!("tests/T_WD105_hr_ControlTower_01a_B.uasset").as_slice(),
+        include_bytes!("tests/T_WD105_hr_ControlTower_01a_B.uexp").as_slice(),
+        None,
+        "T_WD105_hr_ControlTower_01a_B",
+        EngineVersion::VER_UE4_27,
+    )?;
     Ok(())
 }
 
