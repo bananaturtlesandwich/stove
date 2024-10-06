@@ -5,6 +5,7 @@ fn main() {
             .compile()
             .expect("failed to change icon");
         println!("cargo:rerun-if-env-changed=OODLE");
+        println!("cargo:rustc-link-search=oodle");
         println!(
             "cargo:rustc-link-search={}",
             std::env::var("OODLE").unwrap_or(

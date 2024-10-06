@@ -26,6 +26,7 @@ bevy = { version = "0.14", default-features = false, features = [
     "bevy_render",
     "multi_threaded",
 ] }
+bevy_dylib = "0.14"
 winit = "0.30"
 bevy_mod_raycast = { version = "0.18", default-features = false }
 smooth-bevy-cameras = "0.12"

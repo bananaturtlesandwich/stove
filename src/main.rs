@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::type_complexity, clippy::too_many_arguments, clippy::unit_arg)]
 use bevy::prelude::*;
+#[allow(unused_imports)]
+#[cfg(debug_assertions)]
+use bevy_dylib;
 use egui_notify::ToastLevel::{Error, Info, Success, Warning};
 
 mod action;
