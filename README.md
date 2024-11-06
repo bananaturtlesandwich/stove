@@ -2,7 +2,7 @@
 
 **<h1 align="center">[get the latest alpha build!](https://github.com/bananaturtlesandwich/stove/releases)</h1>**
 
-<h1 align="center"><img width=900 src=https://github.com/bananaturtlesandwich/stove/assets/71292624/72571954-59b6-469b-9f67-8cb6ae95d7c1></h1>
+<h1 align="center"><img width=900 src=https://github.com/user-attachments/assets/a480a151-c6c1-4d27-a78a-af0bdccdd754></h1>
 
 # features
 - visualise maps as they would be in-game
