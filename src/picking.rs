@@ -17,14 +17,17 @@ pub fn pick(
     if ctx.ctx_mut().is_pointer_over_area() {
         return;
     }
-    if mouse.any_just_released([MouseButton::Left, MouseButton::Middle, MouseButton::Right]) {
+    if mouse.any_just_released([MouseButton::Left, MouseButton::Middle, MouseButton::Right])
+        || keys.any_just_released([KeyCode::ShiftLeft, KeyCode::ShiftRight])
+    {
         *drag = Drag::None
     }
     if let Some((entity, data)) = camera.single().get_nearest_intersection() {
-        if selected.contains(entity)
-            || parents
-                .get(entity)
-                .is_ok_and(|parent| selected.contains(parent.get()))
+        if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight])
+            && (selected.contains(entity)
+                || parents
+                    .get(entity)
+                    .is_ok_and(|parent| selected.contains(parent.get())))
         {
             match &mouse {
                 mouse if mouse.just_pressed(MouseButton::Left) => {

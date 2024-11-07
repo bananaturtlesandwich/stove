@@ -400,9 +400,9 @@ fn shortcuts(ui: &mut egui::Ui) {
         "actor",
         &[
             ("focus", "f"),
-            ("move", "left-drag"),
-            ("rotate", "right-drag"),
-            ("scale", "middle-drag"),
+            ("move", "shift + left-drag"),
+            ("rotate", "shift + right-drag"),
+            ("scale", "shift + middle-drag"),
             ("copy location", "ctrl + c"),
             ("paste location", "ctrl + v"),
             ("duplicate", "alt + left-drag"),

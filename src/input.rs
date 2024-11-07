@@ -96,11 +96,6 @@ pub fn camera(
         ..
     } = *controller;
 
-    let right_pressed =
-        mouse.pressed(MouseButton::Right) && !matches!(drag.as_ref(), Drag::Rotate(..));
-    let middle_pressed =
-        mouse.pressed(MouseButton::Middle) && !matches!(drag.as_ref(), Drag::Scale(_));
-
     let mut cursor_delta = Vec2::ZERO;
     for event in motion.read() {
         cursor_delta += event.delta;
@@ -135,14 +130,14 @@ pub fn camera(
     keyboard_mvmt_sensitivity += keyboard_mvmt_wheel_sensitivity * wheel_delta;
     controller.keyboard_mvmt_sensitivity = keyboard_mvmt_sensitivity.max(0.01);
 
-    if middle_pressed {
+    if mouse.pressed(MouseButton::Middle) && !matches!(drag.as_ref(), Drag::Scale(_)) {
         // for some reason y needs inversion
         panning += mouse_translate_sensitivity * bevy::math::vec2(cursor_delta.x, -cursor_delta.y);
     }
 
     use smooth_bevy_cameras::controllers::unreal::ControlEvent;
 
-    if right_pressed {
+    if mouse.pressed(MouseButton::Right) && !matches!(drag.as_ref(), Drag::Rotate(..)) {
         events.send(ControlEvent::Rotate(
             mouse_rotate_sensitivity * cursor_delta,
         ));
