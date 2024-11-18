@@ -24,7 +24,7 @@ type Asset = unreal_asset::Asset<Wrapper>;
 type Export = unreal_asset::Export<unreal_asset::types::PackageIndex>;
 
 #[derive(Default)]
-struct Map(Option<(Asset, std::path::PathBuf, Vec<String>, Vec<String>)>);
+struct Map(Option<(Asset, Option<std::path::PathBuf>, Vec<String>, Vec<String>)>);
 
 #[derive(Default)]
 struct Transplant(Option<(Asset, Vec<actor::Actor>, Vec<usize>)>);
@@ -61,6 +61,7 @@ struct AppData {
     rate: f64,
 }
 
+#[derive(Clone)]
 enum GamePath {
     Loose(std::path::PathBuf),
     Packed(String),
@@ -70,7 +71,7 @@ enum GamePath {
 struct Content {
     game: String,
     folder: std::path::PathBuf,
-    maps: Vec<GamePath>,
+    maps: Vec<(String, GamePath)>,
     paks: Vec<(std::path::PathBuf, repak::PakReader)>,
 }
 
@@ -116,6 +117,9 @@ struct Buffer(Vec3);
 
 #[derive(Default, Resource)]
 struct Hidden(bool);
+
+#[derive(Default, Resource)]
+struct FromPak(bool);
 
 #[derive(Default, Resource)]
 struct Client(Option<discord_rich_presence::DiscordIpcClient>);
@@ -200,6 +204,7 @@ fn main() -> AppExit {
         .init_resource::<Lock>()
         .init_resource::<Buffer>()
         .init_resource::<Hidden>()
+        .init_resource::<FromPak>()
         .init_resource::<Client>()
         .init_resource::<Content>()
         .insert_resource(bevy::pbr::wireframe::WireframeConfig {
@@ -241,6 +246,7 @@ fn main() -> AppExit {
             ((picking::pick, picking::drag).chain(), input::camera),
         )
         .observe(dialog::open)
+        .observe(dialog::from_pak)
         .observe(dialog::save_as)
         .observe(dialog::add_pak)
         .observe(dialog::transplant_from)

@@ -295,7 +295,9 @@ pub fn load_paks(
             match path.extension().and_then(std::ffi::OsStr::to_str) {
                 Some("pak") => (),
                 Some("umap") => {
-                    content.maps.push(GamePath::Loose(path));
+                    if let Some(name) = path.file_stem().and_then(std::ffi::OsStr::to_str) {
+                        content.maps.push((name.into(), GamePath::Loose(path)));
+                    }
                     return None;
                 }
                 _ => return None,
@@ -340,7 +342,13 @@ pub fn load_paks(
                 .into_iter()
                 .filter(|file| file.ends_with(".umap"))
             {
-                content.maps.push(GamePath::Packed(map))
+                content.maps.push((
+                    map.split('/')
+                        .rev()
+                        .next()
+                        .map_or_else(|| map.clone(), Into::into),
+                    GamePath::Packed(map),
+                ))
             }
             Some((path.into(), pak))
         })

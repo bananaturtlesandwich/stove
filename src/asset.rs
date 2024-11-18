@@ -94,7 +94,7 @@ pub fn get<T>(
     None
 }
 
-fn read<T>(
+pub fn read<T>(
     pak: &repak::PakReader,
     pak_file: &std::path::Path,
     cache: Option<&std::path::Path>,
