@@ -248,7 +248,7 @@ pub fn load_paks(
     _: Trigger<triggers::LoadPaks>,
     mut notif: EventWriter<Notif>,
     appdata: Res<AppData>,
-    mut paks: ResMut<Paks>,
+    mut content: ResMut<Content>,
 ) {
     let Some(pak) = appdata.pak else { return };
     use aes::cipher::KeyInit;
@@ -287,10 +287,10 @@ pub fn load_paks(
     let Ok(files) = std::fs::read_dir(path) else {
         return;
     };
-    paks.1 = path.into();
+    content.folder = path.into();
     // use std::io::Write;
     // let mut log = std::fs::File::create("paks.log").unwrap();
-    paks.2 = files
+    content.paks = files
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .filter_map(|path| {
@@ -333,19 +333,19 @@ pub fn load_paks(
         })
         .collect();
     // obtain game name
-    for (_, pak) in paks.2.iter() {
+    for (_, pak) in content.paks.iter() {
         let mut split = pak.mount_point().split('/').peekable();
-        while let Some((game, content)) = split.next().zip(split.peek()) {
-            if game != "Engine" && content == &"Content" {
-                paks.0 = game.into();
+        while let Some((game, cont)) = split.next().zip(split.peek()) {
+            if game != "Engine" && cont == &"Content" {
+                content.game = game.into();
                 return;
             }
         }
         for entry in pak.files() {
             let mut split = entry.split('/').take(2);
-            if let Some((game, content)) = split.next().zip(split.next()) {
-                if game != "Engine" && content == "Content" {
-                    paks.0 = game.into();
+            if let Some((game, cont)) = split.next().zip(split.next()) {
+                if game != "Engine" && cont == "Content" {
+                    content.game = game.into();
                     return;
                 }
             }
@@ -361,7 +361,7 @@ pub fn load_paks(
                 continue;
             }
             if dir.path().join("Content").exists() {
-                paks.0 = name;
+                content.game = name;
             }
         }
     }

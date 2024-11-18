@@ -14,7 +14,7 @@ pub fn open(
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<unlit::Unlit>>,
     images: ResMut<Assets<Image>>,
-    paks: Res<Paks>,
+    content: Res<Content>,
     consts: Res<Constants>,
 ) {
     let Some(path) = trigger.event().0.clone().or_else(|| {
@@ -37,7 +37,7 @@ pub fn open(
     };
     open_asset(
         path, asset, commands, actors, notif, appdata, client, map, registry, meshes, materials,
-        images, paks, consts,
+        images, content, consts,
     );
 }
 
@@ -54,7 +54,7 @@ fn open_asset(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<unlit::Unlit>>,
     mut images: ResMut<Assets<Image>>,
-    paks: Res<Paks>,
+    content: Res<Content>,
     consts: Res<Constants>,
 ) {
     for actor in actors.iter() {
@@ -98,7 +98,7 @@ fn open_asset(
                 s.spawn(|| {
                     // capture path
                     let path = path;
-                    match asset::get(&paks, cache.as_deref(), &path, version, |asset, _| {
+                    match asset::get(&content, cache.as_deref(), &path, version, |asset, _| {
                         Ok(extras::get_mesh_info(asset)?)
                     }) {
                         Some((positions, indices, uvs, mats, _mat_data)) => Ok((
@@ -131,7 +131,7 @@ fn open_asset(
                                 break;
                             }
                             let Some(paths) =
-                                asset::get(&paks, cache.as_deref(), &mat, version, |mat, _| {
+                                asset::get(&content, cache.as_deref(), &mat, version, |mat, _| {
                                     Ok(extras::get_tex_paths(mat))
                                 })
                             else {
@@ -139,7 +139,7 @@ fn open_asset(
                             };
                             for path in paths {
                                 if let Some((false, width, height, data)) = asset::get(
-                                    &paks,
+                                    &content,
                                     cache.as_deref(),
                                     &path,
                                     version,
@@ -412,7 +412,7 @@ pub fn transplant_into(
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<unlit::Unlit>>,
     images: ResMut<Assets<Image>>,
-    paks: Res<Paks>,
+    content: Res<Content>,
     consts: Res<Constants>,
 ) {
     let Some((donor, ..)) = &mut map.0 else {
@@ -455,6 +455,6 @@ pub fn transplant_into(
     }
     open_asset(
         path, recipient, commands, actors, notif, appdata, client, map, registry, meshes,
-        materials, images, paks, consts,
+        materials, images, content, consts,
     );
 }

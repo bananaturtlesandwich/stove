@@ -62,11 +62,11 @@ struct AppData {
 }
 
 #[derive(Default, Resource)]
-struct Paks(
-    String,
-    std::path::PathBuf,
-    Vec<(std::path::PathBuf, repak::PakReader)>,
-);
+struct Content {
+    game: String,
+    folder: std::path::PathBuf,
+    paks: Vec<(std::path::PathBuf, repak::PakReader)>,
+}
 
 impl AppData {
     fn version(&self) -> unreal_asset::engine_version::EngineVersion {
@@ -195,7 +195,7 @@ fn main() -> AppExit {
         .init_resource::<Buffer>()
         .init_resource::<Hidden>()
         .init_resource::<Client>()
-        .init_resource::<Paks>()
+        .init_resource::<Content>()
         .insert_resource(bevy::pbr::wireframe::WireframeConfig {
             global: false,
             default_color: bevy::color::palettes::css::WHITE.into(),

@@ -52,7 +52,7 @@ fn path_with_mount() {
 }
 
 pub fn get<T>(
-    paks: &super::Paks,
+    content: &super::Content,
     cache: Option<&std::path::Path>,
     path: &str,
     version: unreal_asset::engine_version::EngineVersion,
@@ -62,12 +62,12 @@ pub fn get<T>(
     ) -> Result<T, unreal_asset::error::Error>,
 ) -> Option<T> {
     let path = match path.split('/').nth(1) {
-        Some("Game") => path.replace("/Game", &format!("{}/Content", paks.0)),
+        Some("Game") => path.replace("/Game", &format!("{}/Content", content.game)),
         Some("Engine") => path.replace("/Engine/", "Engine/Content/"),
         Some(plugin) => path.replace(&format!("/{plugin}/"), &format!("{plugin}/Content/")),
         _ => path.into(),
     };
-    let loose = paks.1.join(&path);
+    let loose = content.folder.join(&path);
     let mesh = loose.with_extension("uasset");
     if mesh.exists() {
         if let Ok(asset) = open(mesh, version).and_then(|asset| {
@@ -86,7 +86,7 @@ pub fn get<T>(
             return Some(asset);
         }
     }
-    for (pak_file, pak) in paks.2.iter() {
+    for (pak_file, pak) in content.paks.iter() {
         if let Ok(asset) = read(pak, pak_file, cache, &path, version, &func) {
             return Some(asset);
         }

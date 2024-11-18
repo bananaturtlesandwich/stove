@@ -3,7 +3,7 @@ use super::*;
 pub fn sidebar(
     mut ctx: bevy_egui::EguiContexts,
     mut appdata: ResMut<AppData>,
-    mut paks: ResMut<Paks>,
+    mut content: ResMut<Content>,
     mut commands: Commands,
     mut notif: EventWriter<Notif>,
     mut map: NonSendMut<Map>,
@@ -63,7 +63,7 @@ pub fn sidebar(
                 .show_index(ui, &mut appdata.version, VERSIONS.len(), |i| VERSIONS[i].1.to_string());
             let mut remove_at = None;
             // kinda wanna split appdata into components so this isn't necessary
-            ui.menu_button("paks", |ui| {
+            ui.menu_button("content", |ui| {
                 for i in 0..appdata.paks.len() {
                     ui.horizontal(|ui| {
                         let selected = appdata.pak == Some(i);
@@ -84,7 +84,7 @@ pub fn sidebar(
                         if ui.button("x").clicked() {
                             if selected {
                                 appdata.pak = None;
-                                paks.0.clear();
+                                content.game.clear();
                             }
                             if let Some(pak) = appdata.pak.as_mut() {
                                 if &i < pak {
@@ -154,9 +154,9 @@ pub fn sidebar(
                 ui.text_edit_multiline(&mut appdata.script);
             });
             ui.menu_button("help", |ui| {
+                let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
                 ui.menu_button("about",|ui| {
                     ui.horizontal_wrapped(|ui| {
-                        let size = ui.fonts(|fonts| fonts.glyph_width(&egui::TextStyle::Body.resolve(ui.style()), ' '));
                         ui.spacing_mut().item_spacing.x = size;
                         ui.label("stove is an editor for cooked unreal map files running on my spaghetti code - feel free to help untangle it on");
                         ui.hyperlink_to("github","https://github.com/bananaturtlesandwich/stove");
