@@ -35,14 +35,123 @@ pub fn open(
             return;
         }
     };
+    let name: Option<String> = path.to_str().map(|s| s.into());
     open_asset(
-        path, asset, commands, actors, notif, appdata, client, map, registry, meshes, materials,
-        images, content, consts,
+        name.as_deref(),
+        Some(path),
+        asset,
+        commands,
+        actors,
+        notif,
+        appdata,
+        client,
+        map,
+        registry,
+        meshes,
+        materials,
+        images,
+        content,
+        consts,
     );
 }
 
+pub fn from_pak(
+    trigger: Trigger<triggers::FromPak>,
+    commands: Commands,
+    actors: Query<Entity, With<actor::Actor>>,
+    mut notif: EventWriter<Notif>,
+    appdata: ResMut<AppData>,
+    client: ResMut<Client>,
+    map: NonSendMut<Map>,
+    registry: ResMut<Registry>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<unlit::Unlit>>,
+    images: ResMut<Assets<Image>>,
+    content: Res<Content>,
+    consts: Res<Constants>,
+) {
+    match &trigger.event().0 {
+        GamePath::Loose(path) => {
+            let asset = match asset::open(path, appdata.version()) {
+                Ok(asset) => asset,
+                Err(e) => {
+                    notif.send(Notif {
+                        message: e.to_string(),
+                        kind: Error,
+                    });
+                    return;
+                }
+            };
+            open_asset(
+                path.to_str(),
+                None,
+                asset,
+                commands,
+                actors,
+                notif,
+                appdata,
+                client,
+                map,
+                registry,
+                meshes,
+                materials,
+                images,
+                content,
+                consts,
+            );
+        }
+        GamePath::Packed(path) => {
+            let cache = config()
+                .filter(|_| appdata.cache)
+                .map(|path| path.join("cache"));
+            dbg!(&path);
+            let Some(asset) = content.paks.iter().find_map(|(pak_file, pak)| {
+                match asset::read(
+                    pak,
+                    pak_file,
+                    cache.as_deref(),
+                    &path,
+                    appdata.version(),
+                    |asset, _| Ok(asset),
+                ) {
+                    Ok(asset) => dbg!(Some(asset)),
+                    Err(unreal_asset::Error::NoData(_)) => dbg!(None),
+                    Err(e) => {
+                        notif.send(Notif {
+                            message: dbg!(e.to_string()),
+                            kind: Error,
+                        });
+                        None
+                    }
+                }
+            }) else {
+                return;
+            };
+            dbg!();
+            open_asset(
+                Some(path),
+                None,
+                asset,
+                commands,
+                actors,
+                notif,
+                appdata,
+                client,
+                map,
+                registry,
+                meshes,
+                materials,
+                images,
+                content,
+                consts,
+            );
+        }
+    }
+}
+
 fn open_asset(
-    path: std::path::PathBuf,
+    name: Option<&str>,
+    path: Option<std::path::PathBuf>,
     asset: super::Asset,
     mut commands: Commands,
     actors: Query<Entity, With<actor::Actor>>,
@@ -57,6 +166,14 @@ fn open_asset(
     content: Res<Content>,
     consts: Res<Constants>,
 ) {
+    use discord_rich_presence::DiscordIpc;
+    if let (Some(client), Some(name)) = (client.0.as_mut(), name) {
+        let _ = client.set_activity(
+            activity()
+                .details("currently editing:")
+                .state(name.split('\\').last().unwrap_or_default()),
+        );
+    }
     for actor in actors.iter() {
         commands.entity(actor).despawn_recursive();
     }
@@ -256,19 +373,11 @@ fn open_asset(
         .iter()
         .map(|ex| ex.object_name.get_owned_content())
         .collect();
-    map.0 = Some((asset, path.clone(), export_names, import_names));
+    map.0 = Some((asset, path, export_names, import_names));
     notif.send(Notif {
         message: "map opened".into(),
         kind: Success,
     });
-    use discord_rich_presence::DiscordIpc;
-    if let (Some(client), Some(name)) = (client.0.as_mut(), path.to_str()) {
-        let _ = client.set_activity(
-            activity()
-                .details("currently editing:")
-                .state(name.split('\\').last().unwrap_or_default()),
-        );
-    }
 }
 
 pub fn save_as(
@@ -284,15 +393,16 @@ pub fn save_as(
         });
         return;
     };
-    if trigger.event().0 {
+    if trigger.event().0 || path.is_none() {
         if let Some(new) = rfd::FileDialog::new()
             .set_title("save map as")
             .add_filter("maps", &["umap"])
             .save_file()
         {
-            *path = new;
+            *path = Some(new);
         }
     }
+    let Some(path) = path else { return };
     match asset::save(map, path) {
         Ok(_) => {
             // literally no idea why std::process::Command doesn't work
@@ -454,7 +564,20 @@ pub fn transplant_into(
         });
     }
     open_asset(
-        path, recipient, commands, actors, notif, appdata, client, map, registry, meshes,
-        materials, images, content, consts,
+        None,
+        Some(path),
+        recipient,
+        commands,
+        actors,
+        notif,
+        appdata,
+        client,
+        map,
+        registry,
+        meshes,
+        materials,
+        images,
+        content,
+        consts,
     );
 }

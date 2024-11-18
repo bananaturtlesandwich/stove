@@ -3,6 +3,7 @@ use super::*;
 pub fn shortcuts(
     mut commands: Commands,
     mut lock: ResMut<Lock>,
+    mut from_pak: ResMut<FromPak>,
     keys: Res<ButtonInput<KeyCode>>,
     mut ctx: bevy_egui::EguiContexts,
 ) {
@@ -10,7 +11,10 @@ pub fn shortcuts(
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     let alt = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
     if keys.just_released(KeyCode::KeyO) && ctrl {
-        commands.trigger(triggers::Open(None));
+        match shift {
+            true => from_pak.0 = true,
+            false => commands.trigger(triggers::Open(None)),
+        }
     }
     if keys.just_released(KeyCode::KeyO) && alt {
         commands.trigger(triggers::AddPak);
