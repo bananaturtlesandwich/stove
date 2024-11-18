@@ -61,10 +61,16 @@ struct AppData {
     rate: f64,
 }
 
+enum GamePath {
+    Loose(std::path::PathBuf),
+    Packed(String),
+}
+
 #[derive(Default, Resource)]
 struct Content {
     game: String,
     folder: std::path::PathBuf,
+    maps: Vec<GamePath>,
     paks: Vec<(std::path::PathBuf, repak::PakReader)>,
 }
 

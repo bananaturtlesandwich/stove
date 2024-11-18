@@ -180,7 +180,7 @@ pub fn sidebar(
                     ui.menu_button("how do i load meshes?", |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.spacing_mut().item_spacing.x = size;
-                            ui.label("maps don't contain any mesh data in them so this needs to be supplied to stove with alt + o. you add the topmost content folder if loose and the paks folder in that topmost content folder if paks. if ucas then the files need to be extracted with");
+                            ui.label("maps don't contain any mesh data in them so the content or paks folder needs to be supplied to stove with alt + o. if ucas then the files need to be extracted with");
                             ui.hyperlink_to("zentools-ue4", "https://github.com/WistfulHopes/ZenTools-UE4/releases");
                             ui.label("or");
                             ui.hyperlink_to("zentools", "https://github.com/Archengius/ZenTools/releases");

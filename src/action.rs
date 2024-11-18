@@ -284,16 +284,22 @@ pub fn load_paks(
         ) -> i32;
     }
     let path = &appdata.paks[pak].0;
-    let Ok(files) = std::fs::read_dir(path) else {
-        return;
-    };
     content.folder = path.into();
     // use std::io::Write;
     // let mut log = std::fs::File::create("paks.log").unwrap();
-    content.paks = files
+    content.paks = walkdir::WalkDir::new(path)
+        .into_iter()
         .filter_map(Result::ok)
-        .map(|dir| dir.path())
         .filter_map(|path| {
+            let path = path.into_path();
+            match path.extension().and_then(std::ffi::OsStr::to_str) {
+                Some("pak") => (),
+                Some("umap") => {
+                    content.maps.push(GamePath::Loose(path));
+                    return None;
+                }
+                _ => return None,
+            }
             let mut pak_file = std::io::BufReader::new(std::fs::File::open(path.clone()).ok()?);
             let mut pak = repak::PakBuilder::new();
             if let Some(key) = key.as_ref() {
@@ -329,7 +335,14 @@ pub fn load_paks(
             //     pak.mount_point(),
             //     pak.files()
             // );
-            Some((path, pak))
+            for map in pak
+                .files()
+                .into_iter()
+                .filter(|file| file.ends_with(".umap"))
+            {
+                content.maps.push(GamePath::Packed(map))
+            }
+            Some((path.into(), pak))
         })
         .collect();
     // obtain game name
