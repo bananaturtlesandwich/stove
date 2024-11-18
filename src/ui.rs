@@ -163,6 +163,33 @@ pub fn sidebar(
                         ui.label(egui::special_emojis::GITHUB.to_string());
                     });
                 });
+                ui.menu_button("faq", |ui| {
+                    ui.menu_button("how do i get the game files?", |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing.x = size;
+                            ui.label("the game files will be contained in the game's content folder either as loose files or in a container file (a pak or ucas file). the container files can be extracted using");
+                            ui.hyperlink_to("repak","https://github.com/trumank/repak/releases");
+                            ui.label("if paks or");
+                            ui.hyperlink_to("zentools-ue4", "https://github.com/WistfulHopes/ZenTools-UE4/releases");
+                            ui.label("or");
+                            ui.hyperlink_to("zentools", "https://github.com/Archengius/ZenTools/releases");
+                            ui.label("if ucas");
+                        });
+                    });
+                    ui.menu_button("where are the map files?", |ui| ui.label("any files from the game with the umap extension are maps"));
+                    ui.menu_button("how do i load meshes?", |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing.x = size;
+                            ui.label("maps don't contain any mesh data in them so this needs to be supplied to stove with alt + o. you add the topmost content folder if loose and the paks folder in that topmost content folder if paks. if ucas then the files need to be extracted with");
+                            ui.hyperlink_to("zentools-ue4", "https://github.com/WistfulHopes/ZenTools-UE4/releases");
+                            ui.label("or");
+                            ui.hyperlink_to("zentools", "https://github.com/Archengius/ZenTools/releases");
+                            ui.label("and then loaded as loose files. the folder structure must be maintained with the game name/Content in the root directory")
+                        });
+                    });
+                    ui.menu_button("nothing is showing up", |ui| ui.label("either the map has no actors or the game requires mappings for asset editing which stove doesn't support yet"));
+                    ui.menu_button("what about 5.3 and 5.4?", |ui| ui.label("stove doesn't support the latest engine versions yet"));
+                });
                 ui.menu_button("shortcuts", shortcuts);
             })
         });
