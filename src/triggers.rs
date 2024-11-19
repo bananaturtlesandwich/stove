@@ -24,7 +24,7 @@ pub struct LoadPaks;
 #[derive(Event)]
 pub struct Open(pub Option<std::path::PathBuf>);
 #[derive(Event)]
-pub struct FromContent(pub GamePath);
+pub struct FromContent(pub String, pub GamePath);
 #[derive(Event)]
 pub struct SaveAs(pub bool);
 #[derive(Event)]

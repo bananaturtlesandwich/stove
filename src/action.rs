@@ -344,10 +344,7 @@ pub fn load_paks(
                 .filter(|file| file.ends_with(".umap"))
             {
                 content.maps.push((
-                    map.split('/')
-                        .rev()
-                        .next()
-                        .map_or_else(|| map.clone(), Into::into),
+                    map.split('/').rev().next().unwrap_or_default().into(),
                     GamePath::Packed(map),
                 ))
             }

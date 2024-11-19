@@ -70,7 +70,8 @@ pub fn from_content(
     content: Res<Content>,
     consts: Res<Constants>,
 ) {
-    match &trigger.event().0 {
+    let name = &trigger.event().0;
+    match &trigger.event().1 {
         GamePath::Loose(path) => {
             let asset = match asset::open(path, appdata.version()) {
                 Ok(asset) => asset,
@@ -83,7 +84,7 @@ pub fn from_content(
                 }
             };
             open_asset(
-                path.to_str(),
+                Some(name),
                 None,
                 asset,
                 commands,
@@ -124,9 +125,8 @@ pub fn from_content(
             }) else {
                 return;
             };
-            dbg!();
             open_asset(
-                Some(path),
+                Some(name),
                 None,
                 asset,
                 commands,
