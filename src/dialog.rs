@@ -55,8 +55,8 @@ pub fn open(
     );
 }
 
-pub fn from_pak(
-    trigger: Trigger<triggers::FromPak>,
+pub fn from_content(
+    trigger: Trigger<triggers::FromContent>,
     commands: Commands,
     actors: Query<Entity, With<actor::Actor>>,
     mut notif: EventWriter<Notif>,

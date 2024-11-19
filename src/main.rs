@@ -119,7 +119,7 @@ struct Buffer(Vec3);
 struct Hidden(bool);
 
 #[derive(Default, Resource)]
-struct FromPak(bool);
+struct FromContent(bool);
 
 #[derive(Default, Resource)]
 struct Client(Option<discord_rich_presence::DiscordIpcClient>);
@@ -204,7 +204,7 @@ fn main() -> AppExit {
         .init_resource::<Lock>()
         .init_resource::<Buffer>()
         .init_resource::<Hidden>()
-        .init_resource::<FromPak>()
+        .init_resource::<FromContent>()
         .init_resource::<Client>()
         .init_resource::<Content>()
         .insert_resource(bevy::pbr::wireframe::WireframeConfig {
@@ -246,7 +246,7 @@ fn main() -> AppExit {
             ((picking::pick, picking::drag).chain(), input::camera),
         )
         .observe(dialog::open)
-        .observe(dialog::from_pak)
+        .observe(dialog::from_content)
         .observe(dialog::save_as)
         .observe(dialog::add_pak)
         .observe(dialog::transplant_from)
