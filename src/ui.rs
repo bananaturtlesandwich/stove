@@ -306,7 +306,8 @@ pub fn sidebar(
                         ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
                             for (name, path) in &content.maps[range] {
                                 if ui.selectable_label(false, name).clicked() {
-                                    commands.trigger(triggers::FromContent(path.clone()));
+                                    commands
+                                        .trigger(triggers::FromContent(name.clone(), path.clone()));
                                     clicked = true;
                                 }
                             }
