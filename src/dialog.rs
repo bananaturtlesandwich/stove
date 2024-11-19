@@ -101,24 +101,21 @@ pub fn from_pak(
             );
         }
         GamePath::Packed(path) => {
-            let cache = config()
-                .filter(|_| appdata.cache)
-                .map(|path| path.join("cache"));
-            dbg!(&path);
             let Some(asset) = content.paks.iter().find_map(|(pak_file, pak)| {
-                match asset::read(
-                    pak,
-                    pak_file,
-                    cache.as_deref(),
-                    &path,
+                let pak_file = &mut std::io::BufReader::new(std::fs::File::open(pak_file).ok()?);
+                match unreal_asset::Asset::new(
+                    super::Wrapper::Bytes(std::io::Cursor::new(pak.get(path, pak_file).ok()?)),
+                    pak.get(&path.replace(".umap", ".uexp"), pak_file)
+                        .ok()
+                        .map(std::io::Cursor::new)
+                        .map(super::Wrapper::Bytes),
                     appdata.version(),
-                    |asset, _| Ok(asset),
+                    None,
                 ) {
-                    Ok(asset) => dbg!(Some(asset)),
-                    Err(unreal_asset::Error::NoData(_)) => dbg!(None),
+                    Ok(asset) => Some(asset),
                     Err(e) => {
                         notif.send(Notif {
-                            message: dbg!(e.to_string()),
+                            message: e.to_string(),
                             kind: Error,
                         });
                         None
