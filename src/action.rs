@@ -287,6 +287,7 @@ pub fn load_paks(
     content.folder = path.into();
     // use std::io::Write;
     // let mut log = std::fs::File::create("paks.log").unwrap();
+    content.maps.clear();
     content.paks = walkdir::WalkDir::new(path)
         .into_iter()
         .filter_map(Result::ok)

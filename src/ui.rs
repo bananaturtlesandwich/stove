@@ -9,7 +9,7 @@ pub fn sidebar(
     mut map: NonSendMut<Map>,
     mut transplant: NonSendMut<Transplant>,
     mut wire: ResMut<bevy::pbr::wireframe::WireframeConfig>,
-    mut from_pak: ResMut<FromPak>,
+    mut from_content: ResMut<FromContent>,
     hidden: Res<Hidden>,
     consts: Res<Constants>,
     mut fps: ResMut<bevy_framepace::FramepaceSettings>,
@@ -32,10 +32,10 @@ pub fn sidebar(
                     ui.close_menu();
                 }
                 if ui
-                    .add(egui::Button::new("open from pak").shortcut_text("ctrl + shift + o"))
+                    .add(egui::Button::new("open from content").shortcut_text("ctrl + shift + o"))
                     .clicked()
                 {
-                    from_pak.0 = true;
+                    from_content.0 = true;
                 }
                 if ui
                     .add(egui::Button::new("transplant from").shortcut_text("ctrl + t"))
@@ -291,8 +291,8 @@ pub fn sidebar(
     });
     let mut open = true;
     let mut clicked = false;
-    if from_pak.0 {
-        egui::Window::new("open from pak")
+    if from_content.0 {
+        egui::Window::new("open from content")
             .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
             .resizable(false)
             .collapsible(false)
@@ -306,7 +306,7 @@ pub fn sidebar(
                         ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
                             for (name, path) in &content.maps[range] {
                                 if ui.selectable_label(false, name).clicked() {
-                                    commands.trigger(triggers::FromPak(path.clone()));
+                                    commands.trigger(triggers::FromContent(path.clone()));
                                     clicked = true;
                                 }
                             }
@@ -316,7 +316,7 @@ pub fn sidebar(
             });
     }
     if !open || clicked {
-        from_pak.0 = false
+        from_content.0 = false
     }
     let mut transplanted = None;
     if let (Some((donor, others, selected)), Some((map, _, export_names, import_names))) =
@@ -434,7 +434,7 @@ fn shortcuts(ui: &mut egui::Ui) {
         "file",
         &[
             ("open", "ctrl + o"),
-            ("open from pak", "ctrl + shift + o"),
+            ("open from content", "ctrl + shift + o"),
             ("transplant from", "ctrl + t"),
             ("transplant into", "alt + t"),
             ("save", "ctrl + s"),
