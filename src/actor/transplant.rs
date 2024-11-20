@@ -30,9 +30,13 @@ impl Actor {
             // update actor's level reference
             let level_ref = PackageIndex::new(pos as i32 + 1);
             children[0].get_base_export_mut().outer_index = level_ref;
-            children[0]
+            if let Some(i) = children[0]
                 .get_base_export_mut()
-                .create_before_create_dependencies[0] = level_ref;
+                .create_before_create_dependencies
+                .first_mut()
+            {
+                *i = level_ref
+            }
             // add actor to level data
             level.actors.push(actor_ref);
             level
