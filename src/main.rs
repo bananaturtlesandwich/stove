@@ -119,7 +119,13 @@ struct Buffer(Vec3);
 struct Hidden(bool);
 
 #[derive(Default, Resource)]
-struct FromContent(bool);
+enum FromContent {
+    #[default]
+    None,
+    Open,
+    From,
+    Into,
+}
 
 #[derive(Default, Resource)]
 struct Client(Option<discord_rich_presence::DiscordIpcClient>);

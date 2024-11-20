@@ -35,7 +35,7 @@ pub fn sidebar(
                     .add(egui::Button::new("open from content").shortcut_text("ctrl + shift + o"))
                     .clicked()
                 {
-                    from_content.0 = true;
+                    *from_content = FromContent::Open;
                 }
                 if ui
                     .add(egui::Button::new("transplant from").shortcut_text("ctrl + t"))
@@ -45,11 +45,23 @@ pub fn sidebar(
                     ui.close_menu();
                 }
                 if ui
+                    .add(egui::Button::new("transplant from content").shortcut_text("ctrl + shift + t"))
+                    .clicked()
+                {
+                    *from_content = FromContent::From;
+                }
+                if ui
                     .add(egui::Button::new("transplant into").shortcut_text("alt + t"))
                     .clicked()
                 {
                     commands.trigger(triggers::TransplantInto);
                     ui.close_menu();
+                }
+                if ui
+                    .add(egui::Button::new("transplant into content").shortcut_text("alt + shift + t"))
+                    .clicked()
+                {
+                    *from_content = FromContent::Into;
                 }
                 if ui
                     .add(egui::Button::new("save").shortcut_text("ctrl + s"))
@@ -291,33 +303,43 @@ pub fn sidebar(
     });
     let mut open = true;
     let mut clicked = false;
-    if from_content.0 {
-        egui::Window::new("open from content")
-            .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
-            .resizable(false)
-            .collapsible(false)
-            .open(&mut open)
-            .show(ctx.ctx_mut(), |ui| {
-                egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
-                    ui,
-                    ui.text_style_height(&egui::TextStyle::Body),
-                    content.maps.len(),
-                    |ui, range| {
-                        ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
-                            for (name, path) in &content.maps[range] {
-                                if ui.selectable_label(false, name).clicked() {
-                                    commands
-                                        .trigger(triggers::FromContent(name.clone(), path.clone()));
-                                    clicked = true;
+    if !matches!(from_content.as_ref(), FromContent::None) {
+        egui::Window::new(match from_content.as_ref() {
+            FromContent::None => "wut",
+            FromContent::Open => "open from content",
+            FromContent::From => "transplant from content",
+            FromContent::Into => "transplant into content",
+        })
+        .anchor(egui::Align2::CENTER_CENTER, (0.0, 0.0))
+        .resizable(false)
+        .collapsible(false)
+        .open(&mut open)
+        .show(ctx.ctx_mut(), |ui| {
+            egui::ScrollArea::both().auto_shrink([false; 2]).show_rows(
+                ui,
+                ui.text_style_height(&egui::TextStyle::Body),
+                content.maps.len(),
+                |ui, range| {
+                    ui.with_layout(egui::Layout::default().with_cross_justify(true), |ui| {
+                        for (name, path) in &content.maps[range] {
+                            if ui.selectable_label(false, name).clicked() {
+                                match from_content.as_ref() {
+                                    FromContent::None => (),
+                                    FromContent::Open => commands
+                                        .trigger(triggers::FromContent(name.clone(), path.clone())),
+                                    FromContent::From => todo!(),
+                                    FromContent::Into => todo!(),
                                 }
+                                clicked = true;
                             }
-                        })
-                    },
-                )
-            });
+                        }
+                    })
+                },
+            )
+        });
     }
     if !open || clicked {
-        from_content.0 = false
+        *from_content = FromContent::None;
     }
     let mut transplanted = None;
     if let (Some((donor, others, selected)), Some((map, _, export_names, import_names))) =
@@ -437,7 +459,9 @@ fn shortcuts(ui: &mut egui::Ui) {
             ("open", "ctrl + o"),
             ("open from content", "ctrl + shift + o"),
             ("transplant from", "ctrl + t"),
+            ("transplant from content", "ctrl + shift + t"),
             ("transplant into", "alt + t"),
+            ("transplant into content", "alt + shift + t"),
             ("save", "ctrl + s"),
             ("save as", "ctrl + shift + s"),
             ("add pak folder", "alt + o"),

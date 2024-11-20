@@ -12,7 +12,7 @@ pub fn shortcuts(
     let alt = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
     if keys.just_released(KeyCode::KeyO) && ctrl {
         match shift {
-            true => from_content.0 = true,
+            true => *from_content = FromContent::Open,
             false => commands.trigger(triggers::Open(None)),
         }
     }
@@ -23,10 +23,17 @@ pub fn shortcuts(
         commands.trigger(triggers::SaveAs(shift));
     }
     if keys.just_released(KeyCode::KeyT) && ctrl {
-        commands.trigger(triggers::TransplantFrom);
+        match shift {
+            true => *from_content = FromContent::Open,
+            false => commands.trigger(triggers::TransplantFrom),
+        }
     }
     if keys.just_released(KeyCode::KeyT) && alt {
         commands.trigger(triggers::TransplantInto);
+        match shift {
+            true => *from_content = FromContent::Into,
+            false => commands.trigger(triggers::TransplantInto),
+        }
     }
     if keys.just_pressed(KeyCode::KeyX) {
         *lock = match shift {
